@@ -2,71 +2,120 @@
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Visio = Microsoft.Office.Interop.Visio;
-using OllamaSharp;  // OllamaSharp namespace
+using OllamaSharp;
+using OllamaSharp.Models;
 using System.Diagnostics;
+using System.Linq;
+using System.Net.Http;
 
 namespace VisioPlugin
 {
-    public class AIChatPane : Form  // Change from UserControl to Form
+    public class AIChatPane : Form
     {
         private TextBox chatInput;
         private Button sendButton;
         private RichTextBox chatHistory;
+        private ComboBox modelDropdown;
+        private Label modelLabel;
         private Visio.Application visioApplication;
-        private OllamaApiClient ollamaClient;  // OllamaSharp API client
+        private OllamaApiClient ollamaClient;
+        private string selectedModel;
+        private string[] availableModels;
 
-        public AIChatPane(Visio.Application visioApp, OllamaApiClient ollamaClient)
+        public AIChatPane(Visio.Application visioApp, OllamaApiClient ollamaClient, string initialModel)
         {
             visioApplication = visioApp;
-            this.ollamaClient = ollamaClient;  // Inject Ollama API client
+            this.ollamaClient = ollamaClient;
+            this.selectedModel = initialModel;
             InitializeComponent();
-            
-            // Set form properties
+            LoadAvailableModels();  // Load the available models into the dropdown
+
             this.Text = "AI Chat";
             this.Size = new System.Drawing.Size(400, 600);
-
-            Debug.WriteLine("AIChatPane initialized");
         }
 
         private void InitializeComponent()
         {
+            // Initialize chat history
+            chatHistory = new RichTextBox
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true
+            };
+
+            // Initialize chat input
+            chatInput = new TextBox
+            {
+                Dock = DockStyle.Bottom,
+                Height = 50
+            };
+
+            // Initialize send button
+            sendButton = new Button
+            {
+                Text = "Send",
+                Dock = DockStyle.Bottom,
+                Height = 30
+            };
+            sendButton.Click += SendButton_Click;
+
+            // Initialize model label
+            modelLabel = new Label
+            {
+                Text = "Select AI Model:",
+                Dock = DockStyle.Top,
+                Height = 20
+            };
+
+            // Initialize model dropdown
+            modelDropdown = new ComboBox
+            {
+                Dock = DockStyle.Top,
+                Height = 30
+            };
+            modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged;
+
+            // Add controls to the form
+            Controls.Add(chatHistory);
+            Controls.Add(chatInput);
+            Controls.Add(sendButton);
+            Controls.Add(modelDropdown);
+            Controls.Add(modelLabel);
+
+            this.Layout += (sender, e) => PerformLayout();
+        }
+
+        // Load available models and populate the dropdown
+        private async void LoadAvailableModels()
+        {
             try
             {
-                chatHistory = new RichTextBox
+                var models = await ollamaClient.ListLocalModels();
+                if (models != null && models.Any())
                 {
-                    Dock = DockStyle.Fill,
-                    ReadOnly = true
-                };
-
-                chatInput = new TextBox
+                    availableModels = models.Select(m => m.Name).ToArray();
+                    modelDropdown.Items.AddRange(availableModels);
+                    modelDropdown.SelectedItem = selectedModel;  // Set the default model
+                }
+                else
                 {
-                    Dock = DockStyle.Bottom,
-                    Height = 50
-                };
-
-                sendButton = new Button
-                {
-                    Text = "Send",
-                    Dock = DockStyle.Bottom,
-                    Height = 30
-                };
-                sendButton.Click += SendButton_Click;
-
-                Controls.Add(chatHistory);
-                Controls.Add(chatInput);
-                Controls.Add(sendButton);
-
-                // Set the form's layout
-                this.Layout += (sender, e) => PerformLayout();
-
-                Debug.WriteLine("AIChatPane components initialized");
+                    MessageBox.Show("No models available. Please check your Ollama installation.");
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in InitializeComponent: {ex.Message}");
+                MessageBox.Show($"Error loading models: {ex.Message}");
             }
         }
 
+        // Update the selected model when dropdown selection changes
+        private void ModelDropdown_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            selectedModel = modelDropdown.SelectedItem?.ToString();
+            Debug.WriteLine($"Selected model updated to: {selectedModel}");
+        }
+
+        // Send the message and get a response from the selected model
         private async void SendButton_Click(object sender, EventArgs e)
         {
             string userMessage = chatInput.Text.Trim();
@@ -77,44 +126,90 @@ namespace VisioPlugin
 
                 sendButton.Enabled = false;
                 string aiResponse = await GetAIResponse(userMessage);
-                AppendMessage("AI", aiResponse);
-                sendButton.Enabled = true;
+
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        AppendMessage("AI", aiResponse);
+                        sendButton.Enabled = true;
+                    }));
+                }
+                else
+                {
+                    AppendMessage("AI", aiResponse);
+                    sendButton.Enabled = true;
+                }
             }
         }
 
-        // Method to get AI response from Ollama API
         private async Task<string> GetAIResponse(string userMessage)
         {
             string aiResponse = "";
             try
             {
-                Debug.WriteLine($"Sending message to AI: {userMessage}");
-                await foreach (var stream in ollamaClient.Generate(userMessage))
+                var request = new GenerateRequest
+                {
+                    Model = selectedModel,
+                    Prompt = userMessage
+                };
+
+                // Create a placeholder message for the AI response
+                AppendMessage("AI", "");
+
+                // Stream the response and append to the same line
+                await foreach (var stream in ollamaClient.Generate(request))
                 {
                     aiResponse += stream.Response;
-                    Debug.WriteLine($"Received partial response: {stream.Response}");
+
+                    // Update the last message instead of appending a new one
+                    UpdateLastMessage("AI", aiResponse);
                 }
-                Debug.WriteLine($"Full AI response: {aiResponse}");
+            }
+            catch (HttpRequestException httpEx)
+            {
+                aiResponse = $"Error getting AI response: {httpEx.Message}";
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error getting AI response: {ex.Message}");
-                aiResponse = $"Error getting AI response: {ex.Message}";
+                aiResponse = $"Unexpected error: {ex.Message}";
             }
 
             return aiResponse;
         }
 
+        // Method to append a new message (as before)
         private void AppendMessage(string sender, string message)
         {
             if (InvokeRequired)
             {
-                Invoke(new Action(() => AppendMessage(sender, message)));
-                return;
+                BeginInvoke(new Action(() => AppendMessage(sender, message)));
             }
+            else
+            {
+                chatHistory.AppendText($"{sender}: {message}\n\n");
+                chatHistory.ScrollToCaret();
+            }
+        }
 
-            chatHistory.AppendText($"{sender}: {message}\n\n");
-            chatHistory.ScrollToCaret();
+        // New method to update the last message
+        private void UpdateLastMessage(string sender, string message)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateLastMessage(sender, message)));
+            }
+            else
+            {
+                // Remove the last line (the previous partial message) and append the new one
+                int lastMessageIndex = chatHistory.Text.LastIndexOf($"{sender}: ");
+                if (lastMessageIndex >= 0)
+                {
+                    chatHistory.Select(lastMessageIndex, chatHistory.Text.Length - lastMessageIndex);
+                    chatHistory.SelectedText = $"{sender}: {message}\n\n";
+                }
+                chatHistory.ScrollToCaret();
+            }
         }
     }
 }
