@@ -253,7 +253,7 @@
   -->
   <ItemGroup>
     <Compile Include="AIChatPane.cs">
-      <SubType>UserControl</SubType>
+      <SubType>Form</SubType>
     </Compile>
     <Compile Include="LibraryManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">

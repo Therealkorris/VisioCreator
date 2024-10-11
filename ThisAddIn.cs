@@ -8,6 +8,7 @@ using Visio = Microsoft.Office.Interop.Visio;
 using Microsoft.Office.Tools.Ribbon;
 using OllamaSharp;  // OllamaSharp namespace for Ollama API
 using System.Windows.Forms;
+using System.Threading;
 
 namespace VisioPlugin
 {
@@ -17,12 +18,14 @@ namespace VisioPlugin
         private Visio.Application visioApplication;
         internal Office.IRibbonUI Ribbon { get; set; }
         private LibraryManager libraryManager;
+        private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
         private string apiEndpoint = "http://localhost:11434";  // Default API endpoint
         public bool isConnected = false;  // Connection status
         private string[] availableModels = new string[0];  // Placeholder for AI models
         private OllamaApiClient ollamaClient;  // OllamaSharp API client
         private string selectedModel = "llama3.1:8b";  // Default model for the API
+        private AIChatPane aiChatPane;  // Add this field
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -33,6 +36,8 @@ namespace VisioPlugin
         {
             visioApplication = (Visio.Application)Application;
             libraryManager = new LibraryManager(visioApplication);
+            uiControl = new System.Windows.Forms.Control();
+            uiControl.CreateControl(); // Ensure the control has a handle
         }
 
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
@@ -130,46 +135,58 @@ namespace VisioPlugin
 
                 // Check available models
                 var models = await ollamaClient.ListLocalModels();
+
                 Debug.WriteLine($"ListLocalModels call completed. Response: {models}");
 
-                if (models != null && models.Any())
+                // Use uiControl.Invoke to run UI-related code on the UI thread
+                uiControl.Invoke((MethodInvoker)(() =>
                 {
-                    isConnected = true;
-                    Debug.WriteLine("Successfully connected to Ollama API and retrieved models.");
-                    availableModels = models.Select(m => m.Name).ToArray();
-                    Debug.WriteLine($"Available models: {string.Join(", ", availableModels)}");
-                }
-                else
-                {
-                    isConnected = false;
-                    Debug.WriteLine("No models available in Ollama or models list is null.");
-                }
+                    if (models != null && models.Any())
+                    {
+                        isConnected = true;
+                        Debug.WriteLine("Successfully connected to Ollama API and retrieved models.");
+                        availableModels = models.Select(m => m.Name).ToArray();
+                        Debug.WriteLine($"Available models: {string.Join(", ", availableModels)}");
+
+                        // Create and show the AIChatPane
+                        ShowAIChatPane();
+                    }
+                    else
+                    {
+                        isConnected = false;
+                        Debug.WriteLine("No models available in Ollama or models list is null.");
+                        MessageBox.Show("No AI models available. Please check your Ollama installation.");
+                    }
+
+                    Debug.WriteLine($"Connection status: {(isConnected ? "Connected" : "Not Connected")}");
+                    Debug.WriteLine($"Number of available models: {availableModels?.Length ?? 0}");
+
+                    // Update the ribbon controls
+                    Debug.WriteLine("Attempting to invalidate ribbon controls...");
+                    try
+                    {
+                        Ribbon?.InvalidateControl("ConnectionStatus");
+                        Ribbon?.InvalidateControl("ModelSelectionDropDown");
+                        Debug.WriteLine("Ribbon controls invalidated successfully.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error invalidating ribbon controls: {ex.Message}");
+                    }
+                }));
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error connecting to Ollama API: {ex.Message}");
                 Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
                 isConnected = false;
-            }
-
-            Debug.WriteLine($"Connection status: {(isConnected ? "Connected" : "Not Connected")}");
-            Debug.WriteLine($"Number of available models: {availableModels?.Length ?? 0}");
-
-            // Update the ribbon controls
-            Debug.WriteLine("Attempting to invalidate ribbon controls...");
-            try
-            {
-                Ribbon?.InvalidateControl("ConnectionStatus");
-                Ribbon?.InvalidateControl("ModelSelectionDropDown");
-                Debug.WriteLine("Ribbon controls invalidated successfully.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error invalidating ribbon controls: {ex.Message}");
+                MessageBox.Show($"Error connecting to AI: {ex.Message}");
             }
 
             Debug.WriteLine("OnConnectButtonClick method completed");
         }
+
+
 
         // Provides the label for each model in the AI model selection dropdown
         // Provides the label for each model in the AI model selection dropdown
@@ -234,8 +251,41 @@ namespace VisioPlugin
             }
         }
 
+        // Add this new method to create and show the AIChatPane
+        private void ShowAIChatPane()
+        {
+            if (aiChatPane == null || aiChatPane.IsDisposed)
+            {
+                aiChatPane = new AIChatPane(visioApplication, ollamaClient);
+                aiChatPane.FormClosed += (sender, e) => aiChatPane = null;
 
+                IntPtr visioHandle = new IntPtr(visioApplication.WindowHandle32);
+                if (visioHandle == IntPtr.Zero)
+                {
+                    Debug.WriteLine("Visio main window handle is zero. Showing form without owner.");
+                    aiChatPane.Show();
+                }
+                else
+                {
+                    aiChatPane.Show(new WindowWrapper(visioHandle));
+                }
+            }
+            else
+            {
+                aiChatPane.BringToFront();
+            }
+        }
 
+        // Add this helper class to properly parent the form to the Visio window
+        public class WindowWrapper : IWin32Window
+        {
+            public WindowWrapper(IntPtr handle)
+            {
+                Handle = handle;
+            }
+
+            public IntPtr Handle { get; }
+        }
 
         #region VSTO generated code
 
