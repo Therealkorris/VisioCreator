@@ -132,6 +132,7 @@ namespace VisioPlugin
             addIn.OnConnectButtonClick(control);
         }
 
+
         public int GetModelCount(Office.IRibbonControl control)
         {
             return addIn.GetModelCount(control);

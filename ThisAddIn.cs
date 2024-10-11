@@ -7,6 +7,7 @@ using Office = Microsoft.Office.Core;
 using Visio = Microsoft.Office.Interop.Visio;
 using Microsoft.Office.Tools.Ribbon;
 using OllamaSharp;  // OllamaSharp namespace for Ollama API
+using System.Windows.Forms;
 
 namespace VisioPlugin
 {
@@ -115,6 +116,8 @@ namespace VisioPlugin
         // Attempts to connect to the AI API using OllamaSharp
         public async void OnConnectButtonClick(Office.IRibbonControl control)
         {
+            System.Windows.Forms.MessageBox.Show("OnConnectButtonClick method started");
+            Debug.WriteLine("OnConnectButtonClick method started");
             try
             {
                 Debug.WriteLine($"Connecting to Ollama API at {apiEndpoint}...");
@@ -123,46 +126,77 @@ namespace VisioPlugin
                 var uri = new Uri(apiEndpoint);
                 ollamaClient = new OllamaApiClient(uri);
 
+                Debug.WriteLine("OllamaApiClient initialized. Attempting to list models...");
+
                 // Check available models
                 var models = await ollamaClient.ListLocalModels();
-                if (models.Any())
+                Debug.WriteLine($"ListLocalModels call completed. Response: {models}");
+
+                if (models != null && models.Any())
                 {
                     isConnected = true;
-                    Debug.WriteLine("Successfully connected to Ollama API.");
+                    Debug.WriteLine("Successfully connected to Ollama API and retrieved models.");
+                    availableModels = models.Select(m => m.Name).ToArray();
+                    Debug.WriteLine($"Available models: {string.Join(", ", availableModels)}");
                 }
                 else
                 {
                     isConnected = false;
-                    Debug.WriteLine("No models available in Ollama.");
+                    Debug.WriteLine("No models available in Ollama or models list is null.");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error connecting to Ollama API: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
                 isConnected = false;
             }
 
-            // Update the ribbon control for connection status
-            Ribbon?.InvalidateControl("ConnectionStatus");
+            Debug.WriteLine($"Connection status: {(isConnected ? "Connected" : "Not Connected")}");
+            Debug.WriteLine($"Number of available models: {availableModels?.Length ?? 0}");
+
+            // Update the ribbon controls
+            Debug.WriteLine("Attempting to invalidate ribbon controls...");
+            try
+            {
+                Ribbon?.InvalidateControl("ConnectionStatus");
+                Ribbon?.InvalidateControl("ModelSelectionDropDown");
+                Debug.WriteLine("Ribbon controls invalidated successfully.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error invalidating ribbon controls: {ex.Message}");
+            }
+
+            Debug.WriteLine("OnConnectButtonClick method completed");
         }
 
         // Provides the label for each model in the AI model selection dropdown
+        // Provides the label for each model in the AI model selection dropdown
         public string GetModelLabel(Office.IRibbonControl control, int index)
         {
-            return availableModels[index];
+            Debug.WriteLine($"GetModelLabel called for index {index}");
+            if (availableModels != null && index >= 0 && index < availableModels.Length)
+            {
+                Debug.WriteLine($"Returning model name: {availableModels[index]}");
+                return availableModels[index];
+            }
+            Debug.WriteLine("Returning empty string");
+            return string.Empty;
         }
 
         // Provides the number of available AI models
         public int GetModelCount(Office.IRibbonControl control)
         {
-            return availableModels.Length;
+            Debug.WriteLine($"GetModelCount called. Returning {availableModels?.Length ?? 0}");
+            return availableModels?.Length ?? 0;
         }
 
         // Handles the event when an AI model is selected
         public void OnModelSelectionChange(Office.IRibbonControl control, string selectedItemId)
         {
             Debug.WriteLine($"Model selected: {selectedItemId}");
-            selectedModel = selectedItemId;
+            selectedModel = selectedItemId;  // Set the selected model
         }
 
         // Loads the available AI models asynchronously using OllamaSharp
@@ -170,16 +204,38 @@ namespace VisioPlugin
         {
             try
             {
-                // Fetch the models and convert them to strings (assuming 'Name' is the property you need)
+                // Fetch models from Ollama (this is already a list of Model objects)
                 var models = await ollamaClient.ListLocalModels();
-                availableModels = models.Select(model => model.Name).ToArray();  // Convert to string array
+
+                // Ensure models exist
+                if (models != null && models.Any())
+                {
+                    Debug.WriteLine("Ollama Models Retrieved:");
+                    foreach (var model in models)
+                    {
+                        Debug.WriteLine($"Model Name: {model.Name}, Size: {model.Size}, Modified: {model.ModifiedAt}");
+                    }
+
+                    // Convert model names to a string array for the dropdown
+                    availableModels = models.Select(model => model.Name).ToArray();
+
+                    // Invalidate the dropdown control to refresh the model list in the UI
+                    Ribbon?.InvalidateControl("ModelSelectionDropDown");
+                }
+                else
+                {
+                    Debug.WriteLine("No models available in Ollama.");
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error loading models: {ex.Message}");
+                Debug.WriteLine($"Error loading models from Ollama: {ex.Message}");
                 availableModels = new string[0];
             }
         }
+
+
+
 
         #region VSTO generated code
 
