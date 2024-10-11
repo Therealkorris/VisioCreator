@@ -13,7 +13,7 @@ namespace VisioPlugin
         private RichTextBox chatHistory;
         private Visio.Application visioApplication;
         private OllamaApiClient ollamaClient;  // OllamaSharp API client
-        private string selectedModel = "llama3.1:8b";  // Default model for the API
+        private string selectedModel = "llama3.2:latest";  // Default model for the API
 
         public AIChatPane(Visio.Application visioApp, OllamaApiClient ollamaClient)
         {
