@@ -81,26 +81,33 @@ namespace VisioPlugin
             return categories.Keys.ToList();
         }
 
-        public IEnumerable<string> GetShapesInCategory(string category)
+        public IEnumerable<string> GetShapesInCategory(string categoryName)
         {
-            if (categories.TryGetValue(category, out ShapeCategory shapeCategory))
+            // Assuming we have a way to load the library
+            var shapes = new List<string>();
+
+            // Example of loading shapes from a specific stencil or category
+            var stencil = visioApplication.Documents.OpenEx(categoryName, (short)Visio.VisOpenSaveArgs.visOpenDocked);
+
+            foreach (Visio.Master master in stencil.Masters)
             {
-                return shapeCategory.GetShapeNames();
+                shapes.Add(master.Name);
             }
 
-            return Enumerable.Empty<string>();
+            return shapes;
         }
 
-        public void AddShapeToDocument(string category, string shapeName, double x, double y)
+        public void AddShapeToDocument(string categoryName, string shapeName, double x, double y)
         {
-            if (categories.TryGetValue(category, out ShapeCategory shapeCategory))
-            {
-                Visio.Master master = shapeCategory.GetShape(shapeName);
-                if (master != null)
-                {
-                    visioApplication.ActivePage.Drop(master, x, y);
-                }
-            }
+            // Open the stencil that contains the shapes
+            var stencil = visioApplication.Documents.OpenEx(categoryName, (short)Visio.VisOpenSaveArgs.visOpenDocked);
+
+            // Find the master shape by name
+            var master = stencil.Masters[shapeName];
+
+            // Add the shape to the active page at the specified position
+            var activePage = visioApplication.ActivePage;
+            activePage.Drop(master, x, y);
         }
     }
 
