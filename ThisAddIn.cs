@@ -241,7 +241,7 @@ namespace VisioPlugin
         {
             if (aiChatPane == null || aiChatPane.IsDisposed)
             {
-                aiChatPane = new AIChatPane(visioApplication, libraryManager, selectedModel, pythonApiEndpoint, availableModels);
+                aiChatPane = new AIChatPane(selectedModel, pythonApiEndpoint, availableModels);
                 aiChatPane.FormClosed += (sender, e) => aiChatPane = null;
 
                 IntPtr visioHandle = new IntPtr(visioApplication.WindowHandle32);
@@ -259,6 +259,7 @@ namespace VisioPlugin
                 aiChatPane.BringToFront();
             }
         }
+
 
         public class WindowWrapper : IWin32Window
         {
