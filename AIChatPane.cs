@@ -14,27 +14,86 @@ namespace VisioPlugin
 {
     public partial class AIChatPane : Form
     {
+        private readonly Visio.Application visioApplication;
+        private readonly LibraryManager libraryManager;
+        private string selectedModel;
+        private readonly string pythonApiEndpoint;
+
         private TextBox chatInput;
         private Button sendButton;
         private RichTextBox chatHistory;
         private ComboBox modelDropdown;
         private Label modelLabel;
-        private Visio.Application visioApplication;
-        private string selectedModel;
         private string[] availableModels;
-        private LibraryManager libraryManager;
         private static readonly HttpClient httpClient = new HttpClient();
 
-        public AIChatPane(Visio.Application visioApp, string initialModel)
+        public AIChatPane(Visio.Application visioApp, LibraryManager libManager, string model, string apiEndpoint, string[] availableModels)
         {
             visioApplication = visioApp;
-            this.selectedModel = initialModel;
-            libraryManager = new LibraryManager(visioApp);
-            libraryManager.LoadLibraries();
+            libraryManager = libManager;
+            selectedModel = model;
+            pythonApiEndpoint = apiEndpoint;
+            this.availableModels = availableModels;
             InitializeComponent();
+            PopulateModelDropdown();
+        }
 
-            // Load models asynchronously, without blocking the UI
-            _ = LoadAvailableModelsAsync(); // Fire and forget, UI continues to load
+        private async Task LoadAvailableModelsAsync()
+        {
+            try
+            {
+                var response = await httpClient.GetAsync($"{pythonApiEndpoint}/models");
+                response.EnsureSuccessStatusCode();
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var modelResponse = JsonConvert.DeserializeObject<ModelResponse>(responseContent);
+                availableModels = modelResponse?.Models?.ToArray() ?? Array.Empty<string>();
+                
+                // Ensure UI updates happen on the UI thread
+                this.Invoke((MethodInvoker)delegate 
+                {
+                    PopulateModelDropdown();
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading models: {ex.Message}");
+                this.Invoke((MethodInvoker)delegate 
+                {
+                    MessageBox.Show("Error loading models. Please try again later.");
+                });
+            }
+        }
+
+        private async Task LoadAvailableModels()
+        {
+        try
+        {
+            var response = await httpClient.GetAsync($"{pythonApiEndpoint}/models");
+            response.EnsureSuccessStatusCode();
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var modelResponse = JsonConvert.DeserializeObject<ModelResponse>(responseContent);
+            availableModels = modelResponse?.Models?.ToArray() ?? Array.Empty<string>();
+            PopulateModelDropdown();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error loading models: {ex.Message}");
+            MessageBox.Show("Error loading models. Please try again later.");
+        }
+    }
+
+        private void PopulateModelDropdown()
+        {
+            if (availableModels != null && availableModels.Any())
+            {
+                modelDropdown.Items.Clear();
+                modelDropdown.Items.AddRange(availableModels);
+                modelDropdown.SelectedItem = selectedModel;
+            }
+            else
+            {
+                MessageBox.Show("No models available.");
+            }
         }
 
         private void InitializeComponent()
@@ -97,93 +156,78 @@ namespace VisioPlugin
             this.Layout += (sender, e) => PerformLayout();
         }
 
-        private async Task LoadAvailableModelsAsync()
-        {
-            try
-            {
-                HttpResponseMessage response = await httpClient.GetAsync("http://127.0.0.1:8000/models");
-                response.EnsureSuccessStatusCode();
-
-                string responseBody = await response.Content.ReadAsStringAsync();
-
-                // Parse the response using a strongly typed class
-                var modelsResponse = JsonConvert.DeserializeObject<ModelsResponse>(responseBody);
-
-                if (modelsResponse != null && modelsResponse.Models.Any())
-                {
-                    // Populate the dropdown with models
-                    Invoke(new Action(() => {
-                        modelDropdown.Items.Clear();
-                        modelDropdown.Items.AddRange(modelsResponse.Models.ToArray());
-                        modelDropdown.SelectedItem = selectedModel; // Set the default
-                    }));
-                }
-                else
-                {
-                    MessageBox.Show("No models available.");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading models: {ex.Message}");
-            }
-        }
-
-
-        // Define the class to match the API response
-        public class ModelsResponse
-        {
-            public List<string> Models { get; set; }
-        }
-
-
         private void ModelDropdown_SelectedIndexChanged(object sender, EventArgs e)
         {
             selectedModel = modelDropdown.SelectedItem?.ToString();
             Debug.WriteLine($"Selected model updated to: {selectedModel}");
         }
 
-        private void ChatInput_KeyDown(object sender, KeyEventArgs e)
+        private async void ChatInput_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter && !e.Shift)
             {
                 e.SuppressKeyPress = true;
-                SendMessage();
+                await SendMessage();
             }
         }
 
-        private void SendButton_Click(object sender, EventArgs e)
+        private async void SendButton_Click(object sender, EventArgs e)
         {
-            SendMessage();
+            await SendMessage();
         }
 
-        private async void SendMessage()
+        private async Task SendMessage()
         {
             string userMessage = chatInput.Text.Trim();
-            if (!string.IsNullOrEmpty(userMessage))
+            if (string.IsNullOrEmpty(userMessage))
+                return;
+
+            AppendToChatHistory("User: " + userMessage);
+            chatInput.Clear();
+
+            try
             {
-                AppendMessage("User", userMessage);
-                chatInput.Clear();
-                sendButton.Enabled = false;
-
-                // Send message to AI and get the response
-                var aiResponse = await GetAIResponseFromServer(userMessage);
-
-                if (aiResponse != null)
+                var payload = new
                 {
-                    Debug.WriteLine("AI Response: " + JsonConvert.SerializeObject(aiResponse));  // Debugging info
-                    // Parse response and handle command execution
-                    ExecuteVisioCommand(aiResponse);
-                }
-                else
-                {
-                    AppendMessage("System", "No response from AI.");
-                }
+                    prompt = userMessage,
+                    model = selectedModel
+                };
 
-                sendButton.Enabled = true;
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/execute-command", jsonContent);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Debug.WriteLine($"AI Response: {responseContent}");
+
+                var aiResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseContent);
+                if (aiResponse.ContainsKey("response"))
+                {
+                    AppendToChatHistory("System: " + aiResponse["response"]);
+                }
+                else if (aiResponse.ContainsKey("error"))
+                {
+                    AppendToChatHistory("Error: " + aiResponse["error"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory("Error: " + ex.Message);
             }
         }
 
+        private void AppendToChatHistory(string message)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string>(AppendToChatHistory), message);
+                return;
+            }
+
+            chatHistory.AppendText(message + Environment.NewLine);
+            chatHistory.ScrollToCaret();
+        }
+
+        // Communicate with the FastAPI server running locally on Python
         private async Task<dynamic> GetAIResponseFromServer(string message)
         {
             try
@@ -191,10 +235,12 @@ namespace VisioPlugin
                 var requestData = new
                 {
                     command = message,
-                    @params = new { model = selectedModel }
+                    // Corrected the syntax issue here by adding a comma
+                    @params = new { model = selectedModel } // `params` is a reserved keyword, so it's escaped with `@`
                 };
 
                 var jsonContent = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+                Debug.WriteLine($"Sending Payload: {JsonConvert.SerializeObject(requestData)}");
                 var response = await httpClient.PostAsync("http://127.0.0.1:8000/execute-command", jsonContent);
                 response.EnsureSuccessStatusCode();
 
@@ -203,8 +249,7 @@ namespace VisioPlugin
             }
             catch (Exception ex)
             {
-                AppendMessage("System", $"Error: {ex.Message}");
-                Debug.WriteLine($"Error in GetAIResponseFromServer: {ex.Message}");  // Debugging info
+                Debug.WriteLine($"Error in GetAIResponseFromServer: {ex.Message}");
                 return null;
             }
         }
@@ -255,5 +300,30 @@ namespace VisioPlugin
                 chatHistory.ScrollToCaret();
             }
         }
+
+        public void UpdateAvailableModels(string[] models)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string[]>(UpdateAvailableModels), new object[] { models });
+                return;
+            }
+
+            modelDropdown.Items.Clear();
+            modelDropdown.Items.AddRange(models);
+            if (!string.IsNullOrEmpty(selectedModel) && models.Contains(selectedModel))
+            {
+                modelDropdown.SelectedItem = selectedModel;
+            }
+            else if (models.Length > 0)
+            {
+                modelDropdown.SelectedIndex = 0;
+            }
+        }
+    }
+
+    public class ModelResponse
+    {
+        public List<string> Models { get; set; }
     }
 }

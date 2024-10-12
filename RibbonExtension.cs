@@ -59,7 +59,7 @@ namespace VisioPlugin
 
         public void OnCategorySelectionChange(Office.IRibbonControl control, string selectedId, int selectedIndex)
         {
-            Debug.WriteLine($"RibbonExtension: Selected ID: {selectedId}, Selected Index: {selectedIndex}");
+            //Debug.WriteLine($"RibbonExtension: Selected ID: {selectedId}, Selected Index: {selectedIndex}");
             addIn.OnCategorySelectionChange(control, selectedId, selectedIndex);
         }
 
@@ -81,7 +81,7 @@ namespace VisioPlugin
                 throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
             }
             string categoryId = categories[index];
-            Debug.WriteLine($"GetCategoryId called for index {index}, returning: {categoryId}");
+            //Debug.WriteLine($"GetCategoryId called for index {index}, returning: {categoryId}");
             return categoryId;
         }
 
@@ -93,7 +93,7 @@ namespace VisioPlugin
                 throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
             }
             string categoryLabel = categories[index];
-            Debug.WriteLine($"GetCategoryLabel called for index {index}, returning: {categoryLabel}");
+            //Debug.WriteLine($"GetCategoryLabel called for index {index}, returning: {categoryLabel}");
             return categoryLabel;
         }
 
@@ -101,7 +101,7 @@ namespace VisioPlugin
         {
             if (!string.IsNullOrEmpty(addIn.CurrentCategory))
             {
-                Debug.WriteLine($"GetSelectedCategoryID called, returning: {addIn.CurrentCategory}");
+                //Debug.WriteLine($"GetSelectedCategoryID called, returning: {addIn.CurrentCategory}");
                 return addIn.CurrentCategory;
             }
             else
@@ -110,7 +110,7 @@ namespace VisioPlugin
                 if (categories.Length > 0)
                 {
                     addIn.CurrentCategory = categories[0];
-                    Debug.WriteLine($"GetSelectedCategoryID called, setting CurrentCategory to default: {addIn.CurrentCategory}");
+                    //Debug.WriteLine($"GetSelectedCategoryID called, setting CurrentCategory to default: {addIn.CurrentCategory}");
                     return addIn.CurrentCategory;
                 }
                 else

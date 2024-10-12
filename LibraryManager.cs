@@ -43,7 +43,7 @@ namespace VisioPlugin
                     foreach (Visio.Master master in stencilDoc.Masters)
                     {
                         categories[category].AddShape(master.Name, master);
-                        Debug.WriteLine($"Added shape: {master.Name} to category: {category}");
+                        //Debug.WriteLine($"Added shape: {master.Name} to category: {category}");
                     }
                 }
             }
@@ -56,7 +56,7 @@ namespace VisioPlugin
             {
                 if (doc.Type == Visio.VisDocumentTypes.visTypeStencil)
                 {
-                    Debug.WriteLine($"Loading stencil: {doc.Name}");
+                    //Debug.WriteLine($"Loading stencil: {doc.Name}");
                     string category = doc.Name;
                     if (!categories.ContainsKey(category))
                     {
@@ -66,7 +66,7 @@ namespace VisioPlugin
                     foreach (Visio.Master master in doc.Masters)
                     {
                         categories[category].AddShape(master.Name, master);
-                        Debug.WriteLine($"Added shape: {master.Name} to category: {category}");
+                        //Debug.WriteLine($"Added shape: {master.Name} to category: {category}");
                     }
                 }
             }

@@ -35,17 +35,31 @@ async def list_models():
         raise HTTPException(status_code=500, detail=f"Error fetching models: {str(e)}")
 
 @app.post("/execute-command")
-async def execute_command(query: Query):
+async def execute_command(request_data: dict):
+    prompt = request_data.get("prompt")
+    model = request_data.get("model", "llama3:latest")
+    
+    if not prompt:
+        return {"error": "Prompt is missing"}
+
     try:
-        # Sending command to the API server
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": query.model, "prompt": query.prompt}
-        )
+        # Sending prompt to Ollama AI API
+        response = requests.post(f"http://localhost:11434/api/generate", json={"model": model, "prompt": prompt})
         response.raise_for_status()
-        return {"status": "success", "result": response.json()["response"]}
+
+        ai_result = response.json()
+        return {"response": ai_result.get("response", "No response from AI")}
+    
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+        return {"error": f"Failed to communicate with AI: {str(e)}"}
+
+# Additional route for handling Visio-specific commands
+@app.post("/handle-visio-command")
+async def handle_visio_command(request_data: dict):
+    # Logic for handling Visio actions
+    command = request_data.get("command")
+    # process Visio commands like create_shape etc.
+    return {"status": "Processed Visio command"}
 
 if __name__ == "__main__":
     import uvicorn
