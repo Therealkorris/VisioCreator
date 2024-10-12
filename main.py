@@ -63,9 +63,21 @@ async def handle_text_prompt(prompt: str = Form(...), model: str = Form("llama3.
 @app.post("/image-prompt")
 async def handle_image_prompt(prompt: str = Form(...), file: UploadFile = File(...), model: str = Form("llama3.2")):
     logging.info(f"Received image prompt: {prompt}, model: {model}, file: {file.filename}")
+
+    # Prepare the files for the request
     files = {"file": (file.filename, await file.read(), file.content_type)}
-    response = requests.post(f"http://localhost:11434/api/generate", data={"prompt": prompt, "model": model}, files=files)
-    return response.json()
+    
+    # Prepare form data
+    data = {"prompt": prompt, "model": model}
+    
+    # Send the request to the AI API
+    try:
+        response = requests.post("http://localhost:11434/api/generate", data=data, files=files)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logging.error(f"Error processing the image-prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process the image")
 
 # WebSocket for Visio-specific commands
 @app.websocket("/ws/visio-command")

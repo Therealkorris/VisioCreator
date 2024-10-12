@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text;
+using System.Net.Http.Headers;
 
 namespace VisioPlugin
 {
@@ -212,9 +213,33 @@ namespace VisioPlugin
         {
             AppendToChatHistory("User sent an image: " + Path.GetFileName(imagePath));
 
-            var response = await BackendCommunication.SendImageMessage(imagePath, selectedModel, pythonApiEndpoint);
-            AppendToChatHistory("AI: " + response);
+            try
+            {
+                var content = new MultipartFormDataContent();
+
+                // Add the image file
+                var imageContent = new ByteArrayContent(File.ReadAllBytes(imagePath));
+                imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg"); // Adjust for the file type
+                content.Add(imageContent, "file", Path.GetFileName(imagePath));
+
+                // Add the prompt and model as form data
+                content.Add(new StringContent("Image analysis prompt"), "prompt"); // Example prompt
+                content.Add(new StringContent(selectedModel), "model");
+
+                // Send the request to FastAPI server
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/image-prompt", content);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                AppendToChatHistory("AI: " + responseContent);
+                Debug.WriteLine($"AI Response: {responseContent}");
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory("Error: " + ex.Message);
+                Debug.WriteLine("Error sending image: " + ex.Message);
+            }
         }
+
 
         private void AppendToChatHistory(string message)
         {
