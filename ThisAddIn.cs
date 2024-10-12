@@ -132,7 +132,6 @@ namespace VisioPlugin
             }
         }
 
-
         private async Task LoadModelsAsync()
         {
             try

@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Collections.Generic;
+using System.IO;
 
 namespace VisioPlugin
 {
@@ -47,9 +48,9 @@ namespace VisioPlugin
                 var responseContent = await response.Content.ReadAsStringAsync();
                 var modelResponse = JsonConvert.DeserializeObject<ModelResponse>(responseContent);
                 availableModels = modelResponse?.Models?.ToArray() ?? Array.Empty<string>();
-                
+
                 // Ensure UI updates happen on the UI thread
-                this.Invoke((MethodInvoker)delegate 
+                this.Invoke((MethodInvoker)delegate
                 {
                     PopulateModelDropdown();
                 });
@@ -57,30 +58,12 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error loading models: {ex.Message}");
-                this.Invoke((MethodInvoker)delegate 
+                this.Invoke((MethodInvoker)delegate
                 {
                     MessageBox.Show("Error loading models. Please try again later.");
                 });
             }
         }
-
-        private async Task LoadAvailableModels()
-        {
-        try
-        {
-            var response = await httpClient.GetAsync($"{pythonApiEndpoint}/models");
-            response.EnsureSuccessStatusCode();
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var modelResponse = JsonConvert.DeserializeObject<ModelResponse>(responseContent);
-            availableModels = modelResponse?.Models?.ToArray() ?? Array.Empty<string>();
-            PopulateModelDropdown();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error loading models: {ex.Message}");
-            MessageBox.Show("Error loading models. Please try again later.");
-        }
-    }
 
         private void PopulateModelDropdown()
         {
@@ -179,41 +162,44 @@ namespace VisioPlugin
         private async Task SendMessage()
         {
             string userMessage = chatInput.Text.Trim();
-            if (string.IsNullOrEmpty(userMessage))
-                return;
+            if (string.IsNullOrEmpty(userMessage)) return;
 
             AppendToChatHistory("User: " + userMessage);
             chatInput.Clear();
 
             try
             {
-                var payload = new
-                {
-                    prompt = userMessage,
-                    model = selectedModel
-                };
-
+                var payload = new { prompt = userMessage, model = selectedModel };
                 var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
                 var response = await httpClient.PostAsync($"{pythonApiEndpoint}/execute-command", jsonContent);
-                var responseContent = await response.Content.ReadAsStringAsync();
 
-                Debug.WriteLine($"AI Response: {responseContent}");
+                var responseStream = await response.Content.ReadAsStreamAsync();
+                using (var reader = new StreamReader(responseStream))
+                {
+                    string line;
+                    StringBuilder fullResponse = new StringBuilder();
 
-                var aiResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseContent);
-                if (aiResponse.ContainsKey("response"))
-                {
-                    AppendToChatHistory("System: " + aiResponse["response"]);
-                }
-                else if (aiResponse.ContainsKey("error"))
-                {
-                    AppendToChatHistory("Error: " + aiResponse["error"]);
+                    // Read the response stream and accumulate chunks
+                    while ((line = await reader.ReadLineAsync()) != null)
+                    {
+                        fullResponse.Append(line);
+                    }
+
+                    // After accumulating all chunks, append the final response
+                    AppendToChatHistory("AI: " + fullResponse.ToString().Trim());
                 }
             }
             catch (Exception ex)
             {
                 AppendToChatHistory("Error: " + ex.Message);
+                Debug.WriteLine("Error sending message: " + ex.Message);
             }
         }
+
+
+
+
+
 
         private void AppendToChatHistory(string message)
         {
@@ -225,33 +211,6 @@ namespace VisioPlugin
 
             chatHistory.AppendText(message + Environment.NewLine);
             chatHistory.ScrollToCaret();
-        }
-
-        // Communicate with the FastAPI server running locally on Python
-        private async Task<dynamic> GetAIResponseFromServer(string message)
-        {
-            try
-            {
-                var requestData = new
-                {
-                    command = message,
-                    // Corrected the syntax issue here by adding a comma
-                    @params = new { model = selectedModel } // `params` is a reserved keyword, so it's escaped with `@`
-                };
-
-                var jsonContent = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
-                Debug.WriteLine($"Sending Payload: {JsonConvert.SerializeObject(requestData)}");
-                var response = await httpClient.PostAsync("http://127.0.0.1:8000/execute-command", jsonContent);
-                response.EnsureSuccessStatusCode();
-
-                string responseBody = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<dynamic>(responseBody);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error in GetAIResponseFromServer: {ex.Message}");
-                return null;
-            }
         }
 
         private void ExecuteVisioCommand(dynamic commandResponse)
@@ -266,7 +225,7 @@ namespace VisioPlugin
             }
             else
             {
-                AppendMessage("System", "Unknown command received.");
+                AppendToChatHistory("System: Unknown command received.");
             }
         }
 
@@ -280,25 +239,12 @@ namespace VisioPlugin
                 if (shape != null)
                 {
                     libraryManager.AddShapeToDocument(category, shape, x, y);
-                    AppendMessage("System", $"Created shape '{shape}' from category '{category}' at position ({x}, {y})");
+                    AppendToChatHistory($"System: Created shape '{shape}' from category '{category}' at position ({x}, {y})");
                     return;
                 }
             }
 
-            AppendMessage("System", $"No shapes found matching '{shapeType}'.");
-        }
-
-        private void AppendMessage(string sender, string message)
-        {
-            if (InvokeRequired)
-            {
-                BeginInvoke(new Action(() => AppendMessage(sender, message)));
-            }
-            else
-            {
-                chatHistory.AppendText($"{sender}: {message}\n\n");
-                chatHistory.ScrollToCaret();
-            }
+            AppendToChatHistory($"System: No shapes found matching '{shapeType}'.");
         }
 
         public void UpdateAvailableModels(string[] models)
@@ -320,10 +266,10 @@ namespace VisioPlugin
                 modelDropdown.SelectedIndex = 0;
             }
         }
-    }
 
-    public class ModelResponse
-    {
-        public List<string> Models { get; set; }
+        public class ModelResponse
+        {
+            public List<string> Models { get; set; }
+        }
     }
 }
