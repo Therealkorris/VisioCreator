@@ -2,12 +2,12 @@
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Net.Http;
+using Newtonsoft.Json;
 using Visio = Microsoft.Office.Interop.Visio;
-using OllamaSharp;
-using OllamaSharp.Models;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Http;
+using System.Text;
 using System.Collections.Generic;
 
 namespace VisioPlugin
@@ -20,35 +20,34 @@ namespace VisioPlugin
         private ComboBox modelDropdown;
         private Label modelLabel;
         private Visio.Application visioApplication;
-        private OllamaApiClient ollamaClient;
         private string selectedModel;
         private string[] availableModels;
         private LibraryManager libraryManager;
+        private static readonly HttpClient httpClient = new HttpClient();
 
-        public AIChatPane(Visio.Application visioApp, OllamaApiClient ollamaClient, string initialModel)
+        public AIChatPane(Visio.Application visioApp, string initialModel)
         {
             visioApplication = visioApp;
-            this.ollamaClient = ollamaClient;
             this.selectedModel = initialModel;
             libraryManager = new LibraryManager(visioApp);
             libraryManager.LoadLibraries();
             InitializeComponent();
-            LoadAvailableModels();
+
+            // Load models asynchronously, without blocking the UI
+            _ = LoadAvailableModelsAsync(); // Fire and forget, UI continues to load
         }
 
         private void InitializeComponent()
         {
-            // Initialize chat history
             chatHistory = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                BackColor = Color.LightYellow, // Set background color
-                Font = new Font("Arial", 10),  // Set font style
+                BackColor = Color.LightYellow,
+                Font = new Font("Arial", 10),
                 BorderStyle = BorderStyle.None
             };
 
-            // Initialize chat input
             chatInput = new TextBox
             {
                 Dock = DockStyle.Bottom,
@@ -57,9 +56,8 @@ namespace VisioPlugin
                 Font = new Font("Arial", 10),
                 BorderStyle = BorderStyle.FixedSingle
             };
-            chatInput.KeyDown += ChatInput_KeyDown; // Add key press event
+            chatInput.KeyDown += ChatInput_KeyDown;
 
-            // Initialize send button
             sendButton = new Button
             {
                 Text = "Send",
@@ -72,7 +70,6 @@ namespace VisioPlugin
             };
             sendButton.Click += SendButton_Click;
 
-            // Initialize model label
             modelLabel = new Label
             {
                 Text = "Select AI Model:",
@@ -82,17 +79,15 @@ namespace VisioPlugin
                 ForeColor = Color.SteelBlue
             };
 
-            // Initialize model dropdown
             modelDropdown = new ComboBox
             {
                 Dock = DockStyle.Top,
                 Height = 30,
                 Font = new Font("Arial", 10),
-                DropDownStyle = ComboBoxStyle.DropDownList // Set dropdown style
+                DropDownStyle = ComboBoxStyle.DropDownList
             };
             modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged;
 
-            // Add controls to the form
             Controls.Add(chatHistory);
             Controls.Add(chatInput);
             Controls.Add(sendButton);
@@ -102,21 +97,30 @@ namespace VisioPlugin
             this.Layout += (sender, e) => PerformLayout();
         }
 
-        // Load available models and populate the dropdown
-        private async void LoadAvailableModels()
+        private async Task LoadAvailableModelsAsync()
         {
             try
             {
-                var models = await ollamaClient.ListLocalModels();
-                if (models != null && models.Any())
+                HttpResponseMessage response = await httpClient.GetAsync("http://127.0.0.1:8000/models");
+                response.EnsureSuccessStatusCode();
+
+                string responseBody = await response.Content.ReadAsStringAsync();
+
+                // Parse the response using a strongly typed class
+                var modelsResponse = JsonConvert.DeserializeObject<ModelsResponse>(responseBody);
+
+                if (modelsResponse != null && modelsResponse.Models.Any())
                 {
-                    availableModels = models.Select(m => m.Name).ToArray();
-                    modelDropdown.Items.AddRange(availableModels);
-                    modelDropdown.SelectedItem = selectedModel;  // Set the default model
+                    // Populate the dropdown with models
+                    Invoke(new Action(() => {
+                        modelDropdown.Items.Clear();
+                        modelDropdown.Items.AddRange(modelsResponse.Models.ToArray());
+                        modelDropdown.SelectedItem = selectedModel; // Set the default
+                    }));
                 }
                 else
                 {
-                    MessageBox.Show("No models available. Please check your Ollama installation.");
+                    MessageBox.Show("No models available.");
                 }
             }
             catch (Exception ex)
@@ -125,81 +129,120 @@ namespace VisioPlugin
             }
         }
 
-        // Update the selected model when dropdown selection changes
+
+        // Define the class to match the API response
+        public class ModelsResponse
+        {
+            public List<string> Models { get; set; }
+        }
+
+
         private void ModelDropdown_SelectedIndexChanged(object sender, EventArgs e)
         {
             selectedModel = modelDropdown.SelectedItem?.ToString();
             Debug.WriteLine($"Selected model updated to: {selectedModel}");
         }
 
-        // Handle key press for sending message on Enter and allowing new lines on Shift+Enter
         private void ChatInput_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter && !e.Shift)
             {
-                e.SuppressKeyPress = true;  // Prevent the "ding" sound
-                SendMessage(); // Send the message on Enter
+                e.SuppressKeyPress = true;
+                SendMessage();
             }
         }
 
-        // Send the message and get a response from the selected model
         private void SendButton_Click(object sender, EventArgs e)
         {
             SendMessage();
         }
 
-        // Encapsulate message sending logic
-        private void SendMessage()
+        private async void SendMessage()
         {
             string userMessage = chatInput.Text.Trim();
             if (!string.IsNullOrEmpty(userMessage))
             {
                 AppendMessage("User", userMessage);
                 chatInput.Clear();
-
                 sendButton.Enabled = false;
-                _ = GetAIResponse(userMessage);
+
+                // Send message to AI and get the response
+                var aiResponse = await GetAIResponseFromServer(userMessage);
+
+                if (aiResponse != null)
+                {
+                    Debug.WriteLine("AI Response: " + JsonConvert.SerializeObject(aiResponse));  // Debugging info
+                    // Parse response and handle command execution
+                    ExecuteVisioCommand(aiResponse);
+                }
+                else
+                {
+                    AppendMessage("System", "No response from AI.");
+                }
+
+                sendButton.Enabled = true;
             }
         }
 
-        private async Task<string> GetAIResponse(string userMessage)
+        private async Task<dynamic> GetAIResponseFromServer(string message)
         {
-            string aiResponse = "";
             try
             {
-                var request = new GenerateRequest
+                var requestData = new
                 {
-                    Model = selectedModel,
-                    Prompt = userMessage
+                    command = message,
+                    @params = new { model = selectedModel }
                 };
 
-                AppendMessage("AI", "");  // Create a placeholder for streaming
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(requestData), Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync("http://127.0.0.1:8000/execute-command", jsonContent);
+                response.EnsureSuccessStatusCode();
 
-                await foreach (var stream in ollamaClient.Generate(request))
-                {
-                    aiResponse += stream.Response;
-
-                    // Update the last message instead of appending a new one
-                    UpdateLastMessage("AI", aiResponse);
-                }
-
-                // Handle AI command
-                HandleAICommand(aiResponse);
-            }
-            catch (HttpRequestException httpEx)
-            {
-                aiResponse = $"Error getting AI response: {httpEx.Message}";
+                string responseBody = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<dynamic>(responseBody);
             }
             catch (Exception ex)
             {
-                aiResponse = $"Unexpected error: {ex.Message}";
+                AppendMessage("System", $"Error: {ex.Message}");
+                Debug.WriteLine($"Error in GetAIResponseFromServer: {ex.Message}");  // Debugging info
+                return null;
             }
-
-            sendButton.Enabled = true;
-            return aiResponse;
         }
 
-        // Method to append a new message (as before)
+        private void ExecuteVisioCommand(dynamic commandResponse)
+        {
+            if (commandResponse?.result?.action == "create_shape")
+            {
+                string shape = commandResponse.result.shape;
+                double x = commandResponse.result.position.x;
+                double y = commandResponse.result.position.y;
+
+                CreateShapeFromLibrary(shape, x, y);
+            }
+            else
+            {
+                AppendMessage("System", "Unknown command received.");
+            }
+        }
+
+        private void CreateShapeFromLibrary(string shapeType, double x, double y)
+        {
+            var categories = libraryManager.GetCategories();
+            foreach (var category in categories)
+            {
+                var shapes = libraryManager.GetShapesInCategory(category);
+                var shape = shapes.FirstOrDefault(s => s.ToLower().Contains(shapeType));
+                if (shape != null)
+                {
+                    libraryManager.AddShapeToDocument(category, shape, x, y);
+                    AppendMessage("System", $"Created shape '{shape}' from category '{category}' at position ({x}, {y})");
+                    return;
+                }
+            }
+
+            AppendMessage("System", $"No shapes found matching '{shapeType}'.");
+        }
+
         private void AppendMessage(string sender, string message)
         {
             if (InvokeRequired)
@@ -211,68 +254,6 @@ namespace VisioPlugin
                 chatHistory.AppendText($"{sender}: {message}\n\n");
                 chatHistory.ScrollToCaret();
             }
-        }
-
-        // New method to update the last message for streaming
-        private void UpdateLastMessage(string sender, string message)
-        {
-            if (InvokeRequired)
-            {
-                BeginInvoke(new Action(() => UpdateLastMessage(sender, message)));
-            }
-            else
-            {
-                int lastMessageIndex = chatHistory.Text.LastIndexOf($"{sender}: ");
-                if (lastMessageIndex >= 0)
-                {
-                    chatHistory.Select(lastMessageIndex, chatHistory.Text.Length - lastMessageIndex);
-                    chatHistory.SelectedText = $"{sender}: {message}\n\n";
-                }
-                chatHistory.ScrollToCaret();
-            }
-        }
-
-        // New method to handle AI commands
-        private void HandleAICommand(string command)
-        {
-            command = command.ToLower();
-
-            // Handle commands like "create circle", "create arrow", etc.
-            if (command.Contains("create"))
-            {
-                if (command.Contains("circle"))
-                {
-                    CreateShapeFromLibrary("circle");
-                }
-                else if (command.Contains("arrow"))
-                {
-                    CreateShapeFromLibrary("arrow");
-                }
-                else
-                {
-                    AppendMessage("System", "Shape type not recognized.");
-                }
-            }
-        }
-
-        private void CreateShapeFromLibrary(string shapeType)
-        {
-            var categories = libraryManager.GetCategories();
-            foreach (var category in categories)
-            {
-                var shapes = libraryManager.GetShapesInCategory(category);
-
-                // Search for a shape matching the requested type (circle, arrow, etc.)
-                var shape = shapes.FirstOrDefault(s => s.ToLower().Contains(shapeType));
-                if (shape != null)
-                {
-                    libraryManager.AddShapeToDocument(category, shape, 5.0, 5.0);
-                    AppendMessage("System", $"Created shape '{shape}' from category '{category}'");
-                    return;
-                }
-            }
-
-            AppendMessage("System", $"No shapes found matching '{shapeType}'.");
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿// ThisAddIn.cs
-using System;
+﻿using System;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
@@ -7,11 +6,12 @@ using System.Threading.Tasks;
 using Office = Microsoft.Office.Core;
 using Visio = Microsoft.Office.Interop.Visio;
 using Microsoft.Office.Tools.Ribbon;
-using OllamaSharp;
-using OllamaSharp.Models;
 using System.Windows.Forms;
-using System.Threading;
 using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace VisioPlugin
 {
@@ -23,11 +23,12 @@ namespace VisioPlugin
         private LibraryManager libraryManager;
         private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
-        private string apiEndpoint = "http://localhost:11434";
+        private string apiEndpoint = "http://localhost:11434"; // API for Ollama
+        private string pythonApiEndpoint = "http://localhost:8000"; // Python FastAPI endpoint
         public bool isConnected = false;
         private string[] availableModels = new string[0];
-        private OllamaApiClient ollamaClient;
-        private string selectedModel = "llama3.1:8b";
+        private HttpClient httpClient = new HttpClient();
+        private string selectedModel = "llama3.1:8b"; // Default model
         private AIChatPane aiChatPane;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
@@ -116,36 +117,64 @@ namespace VisioPlugin
             apiEndpoint = text;
         }
 
-        public async void OnConnectButtonClick(Office.IRibbonControl control)
+        public void OnConnectButtonClick(Office.IRibbonControl control)
+        {
+            try
+            {
+                Debug.WriteLine("Starting connection to API...");
+                // Trigger the task without blocking the UI
+                Task.Run(async () => await LoadModelsAsync()); // Background async task
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unexpected error: {ex.Message}");
+                MessageBox.Show($"Unexpected error: {ex.Message}");
+            }
+        }
+
+
+        private async Task LoadModelsAsync()
         {
             try
             {
                 var uri = new Uri(apiEndpoint);
-                ollamaClient = new OllamaApiClient(uri);
+                var response = await httpClient.GetAsync($"{pythonApiEndpoint}/models");
+                var responseContent = await response.Content.ReadAsStringAsync();
 
-                var models = await ollamaClient.ListLocalModels();
+                // Log the raw response
+                Debug.WriteLine("Raw API Response: " + responseContent);
 
+                // Deserialize using Newtonsoft.Json
+                var modelResponse = JsonConvert.DeserializeObject<ModelResponse>(responseContent);
+
+                // Log the deserialized object
+                Debug.WriteLine("Deserialized ModelResponse: " + (modelResponse?.Models?.Count ?? 0) + " models found.");
+
+                // Ensure the response contains models
+                if (modelResponse == null || modelResponse.Models == null || !modelResponse.Models.Any())
+                {
+                    Debug.WriteLine("Error: No models found.");
+                    MessageBox.Show("No AI models available. Please check your Ollama installation.");
+                    return;
+                }
+
+                // UI update must happen on the main thread (InvokeRequired pattern)
                 uiControl.Invoke((MethodInvoker)(() =>
                 {
-                    if (models != null && models.Any())
-                    {
-                        isConnected = true;
-                        availableModels = models.Select(m => m.Name).ToArray();
-                        ShowAIChatPane();
-                    }
-                    else
-                    {
-                        isConnected = false;
-                        MessageBox.Show("No AI models available. Please check your Ollama installation.");
-                    }
+                    isConnected = true;
+                    availableModels = modelResponse.Models.ToArray(); // Store available models
+                    Debug.WriteLine("Models loaded successfully.");
 
+                    // Invalidate and update Ribbon to show the model dropdown
                     Ribbon?.InvalidateControl("ConnectionStatus");
                     Ribbon?.InvalidateControl("ModelSelectionDropDown");
+
+                    ShowAIChatPane(); // Load the AI chat window
                 }));
             }
             catch (HttpRequestException httpEx)
             {
-                Debug.WriteLine($"Error connecting to Ollama API: {httpEx.Message}");
+                Debug.WriteLine($"Error connecting to API: {httpEx.Message}");
                 MessageBox.Show($"Error connecting to AI: {httpEx.Message}");
             }
             catch (Exception ex)
@@ -155,8 +184,15 @@ namespace VisioPlugin
             }
         }
 
+        // Helper class to deserialize the models response
+        public class ModelResponse
+        {
+            public List<string> Models { get; set; }
+        }
+
         public string GetModelLabel(Office.IRibbonControl control, int index)
         {
+            // Ensure the index is within bounds and there are available models
             if (availableModels != null && index >= 0 && index < availableModels.Length)
             {
                 return availableModels[index];
@@ -166,30 +202,39 @@ namespace VisioPlugin
 
         public int GetModelCount(Office.IRibbonControl control)
         {
-            return availableModels?.Length ?? 0;
+            return availableModels?.Length ?? 0;  // Return the number of available models
         }
 
-        public void OnModelSelectionChange(Office.IRibbonControl control, string selectedItemId)
+        public async void OnModelSelectionChange(Office.IRibbonControl control, string selectedItemId)
         {
             Debug.WriteLine($"Model selected: {selectedItemId}");
             selectedModel = selectedItemId;  // Store the selected model
+
+            // Send model selection to the Python backend
+            await SendModelSelectionToPython(selectedModel);
         }
 
-        private async Task LoadAvailableModels()
+        private async Task SendModelSelectionToPython(string model)
         {
             try
             {
-                var models = await ollamaClient.ListLocalModels();
+                var modelSelectionPayload = new { model = model };
+                // Use Newtonsoft.Json to serialize the payload
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(modelSelectionPayload), Encoding.UTF8, "application/json");
 
-                if (models != null && models.Any())
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/set-model", jsonContent);
+                if (response.IsSuccessStatusCode)
                 {
-                    availableModels = models.Select(model => model.Name).ToArray();
-                    Ribbon?.InvalidateControl("ModelSelectionDropDown");
+                    Debug.WriteLine("Model successfully updated on Python backend.");
+                }
+                else
+                {
+                    Debug.WriteLine($"Error updating model on Python backend: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                availableModels = new string[0];
+                Debug.WriteLine($"Error communicating with Python backend: {ex.Message}");
             }
         }
 
@@ -197,7 +242,7 @@ namespace VisioPlugin
         {
             if (aiChatPane == null || aiChatPane.IsDisposed)
             {
-                aiChatPane = new AIChatPane(visioApplication, ollamaClient, selectedModel);  // Pass selectedModel
+                aiChatPane = new AIChatPane(visioApplication, selectedModel);  // Pass selectedModel
                 aiChatPane.FormClosed += (sender, e) => aiChatPane = null;
 
                 IntPtr visioHandle = new IntPtr(visioApplication.WindowHandle32);
