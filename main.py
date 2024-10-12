@@ -1,30 +1,20 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, File, UploadFile, WebSocket, HTTPException, Form, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 import requests
-from typing import List, Dict
-import logging
 import json
+import logging
 import asyncio
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 
-class Query(BaseModel):
-    prompt: str
-    model: str = "llama3.2"
-
-class Conversation(BaseModel):
-    id: str
-    messages: List[Dict[str, str]] = []
-
-conversations: Dict[str, Conversation] = {}
-
+# Health check endpoint
 @app.get("/healthcheck")
 async def healthcheck():
     return {"status": "running"}
 
+# List models from AI backend
 @app.get("/models")
 async def list_models():
     try:
@@ -32,16 +22,18 @@ async def list_models():
         response.raise_for_status()
         models_data = response.json()["models"]
         model_names = [model["name"] for model in models_data]
-        print(f"Available models: {model_names}")  # Debugging info
+        logging.info(f"Available models: {model_names}")
         return {"models": model_names}
     except requests.RequestException as e:
+        logging.error(f"Error fetching models: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching models: {str(e)}")
 
-
-# AI response streaming generator
+# AI response streaming generator for text input
 async def ai_response_stream(prompt: str, model: str):
     try:
+        logging.info(f"Sending to AI API - Prompt: {prompt}, Model: {model}")
         response = requests.post(f"http://localhost:11434/api/generate", json={"model": model, "prompt": prompt}, stream=True)
+        response.raise_for_status()
 
         # Process the response as a stream of JSON fragments
         for chunk in response.iter_lines():
@@ -52,38 +44,51 @@ async def ai_response_stream(prompt: str, model: str):
                     ai_result = json.loads(decoded_chunk)
                     content = ai_result.get('response', '')
                     if content:
+                        logging.info(f"AI Response Chunk: {content}")
                         yield f"{content}\n"
                 except json.JSONDecodeError as e:
                     logging.error(f"Error parsing chunk: {e}")
                     continue
-
     except requests.RequestException as e:
+        logging.error(f"Error communicating with AI: {str(e)}")
         yield f"Error communicating with AI: {str(e)}"
 
-# Main chat endpoint with streaming response
-@app.post("/execute-command")
-async def execute_command(request_data: dict):
-    # Log the raw request data for debugging
-    print(f"Received request data: {request_data}")
-
-    prompt = request_data.get("prompt")
-    model = request_data.get("model", "llama3:latest")
-    
-    if not prompt:
-        return {"error": "Prompt is missing"}
-
-    # Stream the AI response back to the client
+# Endpoint for handling text-only prompts
+@app.post("/text-prompt")
+async def handle_text_prompt(prompt: str = Form(...), model: str = Form("llama3.2")):
+    logging.info(f"Received text prompt: {prompt} for model: {model}")
     return StreamingResponse(ai_response_stream(prompt, model), media_type="text/plain")
 
+# Endpoint for handling image + text multimodal prompts
+@app.post("/image-prompt")
+async def handle_image_prompt(prompt: str = Form(...), file: UploadFile = File(...), model: str = Form("llama3.2")):
+    logging.info(f"Received image prompt: {prompt}, model: {model}, file: {file.filename}")
+    files = {"file": (file.filename, await file.read(), file.content_type)}
+    response = requests.post(f"http://localhost:11434/api/generate", data={"prompt": prompt, "model": model}, files=files)
+    return response.json()
 
-# Additional route for handling Visio-specific commands
+# WebSocket for Visio-specific commands
+@app.websocket("/ws/visio-command")
+async def websocket_visio_command(websocket: WebSocket):
+    """Handles Visio-specific commands through WebSocket."""
+    await websocket.accept()
+    while True:
+        try:
+            data = await websocket.receive_text()
+            logging.info(f"Received Visio command: {data}")
+            # Placeholder for Visio command handling
+            await websocket.send_text(f"Processed command: {data}")
+        except WebSocketDisconnect:
+            logging.info("WebSocket disconnected")
+            break
+
+# Additional route for handling Visio-specific commands over HTTP
 @app.post("/handle-visio-command")
 async def handle_visio_command(request_data: dict):
-    # Logic for handling Visio actions
     command = request_data.get("command")
-    # process Visio commands like create_shape etc.
+    logging.info(f"Received Visio command: {command}")
+    # Process Visio commands like create_shape etc.
     return {"status": "Processed Visio command"}
-
 
 if __name__ == "__main__":
     import uvicorn

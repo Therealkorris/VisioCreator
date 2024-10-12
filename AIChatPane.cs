@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http.Headers;
 
 namespace VisioPlugin
 {
@@ -169,24 +170,33 @@ namespace VisioPlugin
 
             try
             {
-                var payload = new { prompt = userMessage, model = selectedModel };
-                var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/execute-command", jsonContent);
+                // Prepare the form content to match what FastAPI expects
+                var content = new MultipartFormDataContent();
+                content.Add(new StringContent(userMessage), "prompt");
+                content.Add(new StringContent(selectedModel), "model");
 
+                // Send the request to FastAPI server
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/text-prompt", content);
+
+                // Log request data for debugging
+                Debug.WriteLine($"Sent message: {userMessage}, model: {selectedModel}");
+
+                // Process the response stream
                 var responseStream = await response.Content.ReadAsStreamAsync();
                 using (var reader = new StreamReader(responseStream))
                 {
                     string line;
                     StringBuilder fullResponse = new StringBuilder();
 
-                    // Read the response stream and accumulate chunks
+                    // Read the response and accumulate the full response
                     while ((line = await reader.ReadLineAsync()) != null)
                     {
                         fullResponse.Append(line);
                     }
 
-                    // After accumulating all chunks, append the final response
+                    // Append the AI response to chat history
                     AppendToChatHistory("AI: " + fullResponse.ToString().Trim());
+                    Debug.WriteLine($"AI Response: {fullResponse.ToString().Trim()}");
                 }
             }
             catch (Exception ex)
@@ -196,10 +206,54 @@ namespace VisioPlugin
             }
         }
 
+        private async Task SendMessageWithImage(string imagePath)
+        {
+            string userMessage = chatInput.Text.Trim();
+            if (string.IsNullOrEmpty(userMessage)) return;
 
+            AppendToChatHistory("User: " + userMessage);
+            chatInput.Clear();
 
+            try
+            {
+                var content = new MultipartFormDataContent();
+                content.Add(new StringContent(userMessage), "prompt");
+                content.Add(new StringContent(selectedModel), "model");
 
+                // Attach the image if provided
+                if (!string.IsNullOrEmpty(imagePath))
+                {
+                    var imageContent = new ByteArrayContent(File.ReadAllBytes(imagePath));
+                    imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg"); // or "image/png"
+                    content.Add(imageContent, "file", Path.GetFileName(imagePath));
+                }
 
+                // Send the request to FastAPI server
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/image-prompt", content);
+
+                // Log the request and response for debugging
+                Debug.WriteLine($"Sent prompt: {userMessage}, model: {selectedModel}, image: {Path.GetFileName(imagePath)}");
+
+                // Read the response from FastAPI
+                var responseStream = await response.Content.ReadAsStreamAsync();
+                using (var reader = new StreamReader(responseStream))
+                {
+                    string line;
+                    StringBuilder fullResponse = new StringBuilder();
+                    while ((line = await reader.ReadLineAsync()) != null)
+                    {
+                        fullResponse.Append(line);
+                    }
+                    AppendToChatHistory("AI: " + fullResponse.ToString().Trim());
+                    Debug.WriteLine($"AI Response: {fullResponse.ToString().Trim()}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory("Error: " + ex.Message);
+                Debug.WriteLine("Error sending message: " + ex.Message);
+            }
+        }
 
         private void AppendToChatHistory(string message)
         {
@@ -265,6 +319,7 @@ namespace VisioPlugin
             {
                 modelDropdown.SelectedIndex = 0;
             }
+            Debug.WriteLine($"Updated available models in dropdown: {string.Join(", ", models)}");
         }
 
         public class ModelResponse
