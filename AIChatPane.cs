@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Threading.Tasks;
@@ -8,7 +8,6 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text;
-using System.Net.Http.Headers;
 
 namespace VisioPlugin
 {
@@ -100,7 +99,7 @@ namespace VisioPlugin
             Controls.Add(modelLabel);
         }
 
-        // Now we're using the available models from the ThisAddIn's list
+        // Populate the model dropdown with the available models from the ThisAddIn's list
         private void PopulateModelDropdown()
         {
             modelDropdown.Items.Clear();
@@ -170,36 +169,29 @@ namespace VisioPlugin
         {
             string userMessage = chatInput.Text.Trim();
             if (string.IsNullOrEmpty(userMessage)) return;
+
             AppendToChatHistory("User: " + userMessage);
             chatInput.Clear();
 
             try
             {
-                // Prepare the form content to match what FastAPI expects
                 var content = new MultipartFormDataContent();
                 content.Add(new StringContent(userMessage), "prompt");
                 content.Add(new StringContent(selectedModel), "model");
 
-                // Send the request to FastAPI server
                 var response = await httpClient.PostAsync($"{pythonApiEndpoint}/text-prompt", content);
+                var responseString = await response.Content.ReadAsStringAsync();
 
-                // Accumulate the response instead of processing chunks individually
-                var responseStream = await response.Content.ReadAsStreamAsync();
-                using (var reader = new StreamReader(responseStream))
+                // Deserialize the JSON and extract only the 'response' part
+                var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseString);
+                if (jsonResponse != null && jsonResponse.ContainsKey("response"))
                 {
-                    StringBuilder fullResponse = new StringBuilder();
-                    string line;
-
-                    // Read the response and accumulate the full response
-                    while ((line = await reader.ReadLineAsync()) != null)
-                    {
-                        fullResponse.Append(line);
-                    }
-
-                    // Append the AI response to chat history after all chunks are received
-                    string fullResponseString = fullResponse.ToString().Trim();
-                    AppendToChatHistory("AI: " + fullResponseString);
-                    Debug.WriteLine($"AI Response: {fullResponseString}");
+                    // Append only the clean response to chat history
+                    AppendToChatHistory("AI: " + jsonResponse["response"].Trim());
+                }
+                else
+                {
+                    AppendToChatHistory("Error: Invalid response from AI.");
                 }
             }
             catch (Exception ex)
@@ -219,7 +211,7 @@ namespace VisioPlugin
 
                 // Add the image file
                 var imageContent = new ByteArrayContent(File.ReadAllBytes(imagePath));
-                imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg"); // Adjust for the file type
+                imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg"); // Adjust for the file type
                 content.Add(imageContent, "file", Path.GetFileName(imagePath));
 
                 // Add the prompt and model as form data
@@ -239,7 +231,6 @@ namespace VisioPlugin
                 Debug.WriteLine("Error sending image: " + ex.Message);
             }
         }
-
 
         private void AppendToChatHistory(string message)
         {
