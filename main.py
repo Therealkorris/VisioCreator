@@ -1,24 +1,23 @@
-from fastapi import FastAPI, WebSocket, HTTPException, Form, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Form, WebSocket, WebSocketDisconnect
 import requests
 import json
 import logging
 from agent import VisioAgent
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # DEBUG level for detailed logs
 app = FastAPI()
 
 visio_agent = VisioAgent()
 
-# Health check endpoint
 @app.get("/healthcheck")
 async def healthcheck():
+    logging.debug("Health check endpoint hit")
     return {"status": "running"}
 
-# List models from AI backend
 @app.get("/models")
 async def list_models():
     try:
+        logging.debug("Fetching available models from AI backend")
         response = requests.get("http://localhost:11434/api/tags")
         response.raise_for_status()
         models_data = response.json()["models"]
@@ -29,59 +28,59 @@ async def list_models():
         logging.error(f"Error fetching models: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching models: {str(e)}")
 
-
-@app.post("/text-prompt")
-async def handle_text_prompt(prompt: str = Form(...), model: str = Form("llama3.2")):
+@app.post("/test-visio-command")
+async def test_visio_command():
     try:
-        logging.info(f"Received text prompt: {prompt} for model: {model}")
+        logging.debug("Generating a test command for Visio")
+        test_command = {
+            "action": "create_shape",
+            "shape": "Circle",
+            "x": 200,
+            "y": 200,
+            "width": 50,
+            "height": 50,
+            "color": "blue"
+        }
+        logging.info(f"Test Command: {test_command}")
+
+        return {"status": "success", "command": test_command}
+    except Exception as e:
+        logging.error(f"Error in generating test command: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error in generating test command")
+
+@app.post("/agent-prompt")
+async def handle_agent_prompt(prompt: str = Form(...), model: str = Form("llama3.2")):
+    try:
+        logging.debug(f"Processing AI prompt: {prompt} for model: {model}")
         
-        # Send request to AI API
-        payload = {"model": model, "prompt": prompt}
-        response = requests.post(f"http://localhost:11434/api/generate", json=payload, stream=True)
-        response.raise_for_status()
+        ai_responses = await ai_response_stream(prompt, model)
+        command_text = ai_responses.strip()
 
-        # Read and process each chunk of the streamed response as separate JSON objects
-        full_response = ""
-        for chunk in response.iter_lines():
-            if chunk:
-                decoded_chunk = json.loads(chunk.decode('utf-8'))
-                # Append only the 'response' field to the final response
-                if 'response' in decoded_chunk:
-                    full_response += decoded_chunk['response'] + " "
+        logging.info(f"AI Command received: {command_text}")
+        command_type, command_data = visio_agent.parse_command(command_text)
 
-        # Log and return the clean AI response
-        clean_response = full_response.strip()
-        logging.info(f"AI Response Processed: {clean_response}")
-        return {"response": clean_response}
-
-    except requests.RequestException as e:
-        logging.error(f"Error communicating with AI: {str(e)}")
-        return {"response": f"Error communicating with AI: {str(e)}"}
-
-
-    except requests.RequestException as e:
-        logging.error(f"Error communicating with AI: {str(e)}")
-        return {"response": f"Error communicating with AI: {str(e)}"}
-
-
-
+        if command_type and command_data:
+            logging.info(f"Executing command {command_type} with data {command_data}")
+            agent_response = visio_agent.execute_command(command_type, command_data)
+            return {"agent_response": agent_response}
+        else:
+            logging.warning("Failed to parse or execute AI command")
+            return {"error": "Failed to parse or execute command."}
+    except Exception as e:
+        logging.error(f"Error processing AI prompt: {str(e)}")
+        return {"error": f"Error processing AI prompt: {str(e)}"}
 
 async def ai_response_stream(prompt: str, model: str):
     try:
         logging.info(f"Sending to AI API - Prompt: {prompt}, Model: {model}")
         response = requests.post(f"http://localhost:11434/api/generate", 
                                  json={"model": model, "prompt": prompt}, 
-                                 stream=False)  # Set stream to False to get full response
+                                 stream=False)
         response.raise_for_status()
 
-        # Process the response JSON
         ai_response = response.json()
 
-        # Extract only the 'response' field and return it
-        full_response = ""
-        for chunk in ai_response:
-            if 'response' in chunk:
-                full_response += chunk['response']
+        full_response = ai_response.get("response", "")
 
         logging.info(f"AI Response Received: {full_response.strip()}")
         return full_response.strip()
@@ -90,40 +89,25 @@ async def ai_response_stream(prompt: str, model: str):
         logging.error(f"Error communicating with AI: {str(e)}")
         return f"Error communicating with AI: {str(e)}"
 
-
-# Agent-based processing of commands for Visio interaction
-@app.post("/agent-prompt")
-async def handle_agent_prompt(prompt: str = Form(...), model: str = Form("llama3.2")):
-    logging.info(f"Received agent prompt: {prompt} for model: {model}")
-    
-    # Fetch AI response stream
-    ai_responses = []
-    async for response in ai_response_stream(prompt, model):
-        ai_responses.append(response)
-
-    # Join the responses to form a single command text
-    command_text = ''.join(ai_responses)
-    logging.info(f"AI Command received: {command_text}")
-
-    # Use the agent to parse and execute the command
-    command_type, command_data = visio_agent.parse_command(command_text)
-    if command_type and command_data:
-        agent_response = visio_agent.execute_command(command_type, command_data)
-        return {"agent_response": agent_response}
-    else:
-        return {"error": "Failed to parse or execute command."}
-
-# This function processes AI-generated commands and executes Visio actions
+# Define process_visio_agent_command to handle Visio commands
 def process_visio_agent_command(command):
-    if "create_shape" in command:
-        shape = command.get('shape', 'default_shape')
-        x = command.get('x', 1.0)
-        y = command.get('y', 1.0)
-        logging.info(f"Creating shape: {shape} at ({x}, {y}) in Visio.")
-        return f"Shape '{shape}' created at coordinates ({x}, {y})."
-    return "Command not recognized."
+    try:
+        # Example command structure - assuming the command is JSON formatted
+        command_data = json.loads(command)
 
-# WebSocket for Visio-specific commands
+        # Determine the command type and pass it to the VisioAgent for execution
+        if 'create_shape' in command_data:
+            return visio_agent.execute_command('create_shape', command_data['create_shape'])
+        elif 'connect_shapes' in command_data:
+            return visio_agent.execute_command('connect_shapes', command_data['connect_shapes'])
+        elif 'modify_properties' in command_data:
+            return visio_agent.execute_command('modify_properties', command_data['modify_properties'])
+        else:
+            return {"error": "Unrecognized command"}
+    except Exception as e:
+        logging.error(f"Error processing Visio command: {str(e)}")
+        return {"error": f"Error processing command: {str(e)}"}
+
 @app.websocket("/ws/visio-command")
 async def websocket_visio_command(websocket: WebSocket):
     await websocket.accept()

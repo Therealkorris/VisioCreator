@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text;
+using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
 {
@@ -167,31 +168,40 @@ namespace VisioPlugin
         // Send a message to the AI and accumulate the response
         private async Task SendMessage()
         {
-            string userMessage = chatInput.Text.Trim();
-            if (string.IsNullOrEmpty(userMessage)) return;
-
-            AppendToChatHistory("User: " + userMessage);
-            chatInput.Clear();
-
             try
             {
+                string userMessage = chatInput.Text.Trim();
+                if (string.IsNullOrEmpty(userMessage)) return;
+
+                AppendToChatHistory("User: " + userMessage);
+                chatInput.Clear();
+
                 var content = new MultipartFormDataContent();
                 content.Add(new StringContent(userMessage), "prompt");
                 content.Add(new StringContent(selectedModel), "model");
 
-                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/text-prompt", content);
+                // Log before sending message
+                Debug.WriteLine($"Sending message to backend: {userMessage}");
+
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/test-visio-command", content);
                 var responseString = await response.Content.ReadAsStringAsync();
 
-                // Deserialize the JSON and extract only the 'response' part
-                var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseString);
-                if (jsonResponse != null && jsonResponse.ContainsKey("response"))
+                // Log after receiving response
+                Debug.WriteLine($"Received response from backend: {responseString}");
+
+                AppendToChatHistory("AI: " + responseString.Trim());
+
+                // Parse the response and execute the Visio command
+                var commandResponse = JsonConvert.DeserializeObject<dynamic>(responseString);
+                if (commandResponse.status == "success" && commandResponse.command != null)
                 {
-                    // Append only the clean response to chat history
-                    AppendToChatHistory("AI: " + jsonResponse["response"].Trim());
-                }
-                else
-                {
-                    AppendToChatHistory("Error: Invalid response from AI.");
+                    await ExecuteVisioCommand(
+                        commandResponse.command.shape.ToString(),
+                        (float)commandResponse.command.x,
+                        (float)commandResponse.command.y,
+                        (float)commandResponse.command.width,
+                        (float)commandResponse.command.height
+                    );
                 }
             }
             catch (Exception ex)
@@ -211,11 +221,11 @@ namespace VisioPlugin
 
                 // Add the image file
                 var imageContent = new ByteArrayContent(File.ReadAllBytes(imagePath));
-                imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg"); // Adjust for the file type
+                imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
                 content.Add(imageContent, "file", Path.GetFileName(imagePath));
 
                 // Add the prompt and model as form data
-                content.Add(new StringContent("Image analysis prompt"), "prompt"); // Example prompt
+                content.Add(new StringContent("Image analysis prompt"), "prompt");
                 content.Add(new StringContent(selectedModel), "model");
 
                 // Send the request to FastAPI server
@@ -230,6 +240,45 @@ namespace VisioPlugin
                 AppendToChatHistory("Error: " + ex.Message);
                 Debug.WriteLine("Error sending image: " + ex.Message);
             }
+        }
+
+        // Execute Visio command via BackendCommunication
+        private Task ExecuteVisioCommand(string shape, float x, float y, float width, float height)
+        {
+            try
+            {
+                // Execute the Visio command
+                Visio.Application visioApp = Globals.ThisAddIn.Application;
+                Visio.Page activePage = visioApp.ActivePage;
+
+                // Open the basic shapes stencil
+                Visio.Documents visioDocuments = visioApp.Documents;
+                Visio.Document basicShapesDoc = visioDocuments.OpenEx("BASIC_U.VSSX", (short)Visio.VisOpenSaveArgs.visOpenHidden);
+
+                // Find the master shape
+                Visio.Master shapemaster = basicShapesDoc.Masters.ItemU[shape];
+                if (shapemaster == null)
+                {
+                    AppendToChatHistory($"Error: Shape '{shape}' not found in the basic shapes stencil.");
+                    return Task.CompletedTask;
+                }
+
+                // Drop the shape onto the page
+                Visio.Shape newShape = activePage.Drop(shapemaster, x, y);
+
+                // Resize the shape
+                newShape.Resize(Visio.VisResizeDirection.visResizeDirE, width / newShape.Cells["Width"].ResultIU, Visio.VisUnitCodes.visInches);
+                newShape.Resize(Visio.VisResizeDirection.visResizeDirN, height / newShape.Cells["Height"].ResultIU, Visio.VisUnitCodes.visInches);
+
+                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}, {y}) with dimensions {width}x{height}");
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory("Error executing Visio command: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("Error executing Visio command: " + ex.Message);
+            }
+
+            return Task.CompletedTask;
         }
 
         private void AppendToChatHistory(string message)

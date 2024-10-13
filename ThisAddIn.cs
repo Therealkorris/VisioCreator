@@ -23,12 +23,12 @@ namespace VisioPlugin
         private LibraryManager libraryManager;
         private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
-        private string apiEndpoint = "http://localhost:11434"; // API for Ollama
-        private string pythonApiEndpoint = "http://localhost:8000"; // Python FastAPI endpoint
+        private string apiEndpoint = "http://localhost:11434";
+        private string pythonApiEndpoint = "http://localhost:8000";
         public bool isConnected = false;
         private string[] availableModels = new string[0];
         private HttpClient httpClient = new HttpClient();
-        private string selectedModel = "llama3.1:8b"; // Default model
+        private string selectedModel = "llama3.1:8b";
         private AIChatPane aiChatPane;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
@@ -122,7 +122,6 @@ namespace VisioPlugin
             try
             {
                 Debug.WriteLine("Starting connection to API...");
-                // Trigger the task without blocking the UI
                 Task.Run(async () => await LoadModelsAsync()); // Background async task
             }
             catch (Exception ex)
@@ -149,7 +148,6 @@ namespace VisioPlugin
                 // Log the deserialized object
                 Debug.WriteLine("Deserialized ModelResponse: " + (modelResponse?.Models?.Count ?? 0) + " models found.");
 
-                // Ensure the response contains models
                 if (modelResponse == null || modelResponse.Models == null || !modelResponse.Models.Any())
                 {
                     Debug.WriteLine("Error: No models found.");
@@ -157,14 +155,11 @@ namespace VisioPlugin
                     return;
                 }
 
-                // UI update must happen on the main thread (InvokeRequired pattern)
                 uiControl.Invoke((MethodInvoker)(() =>
                 {
                     isConnected = true;
                     availableModels = modelResponse.Models.ToArray(); // Store available models
                     Debug.WriteLine("Models loaded successfully.");
-
-                    // Invalidate and update Ribbon to show the model dropdown
                     Ribbon?.InvalidateControl("ConnectionStatus");
                     Ribbon?.InvalidateControl("ModelSelectionDropDown");
 
@@ -183,7 +178,6 @@ namespace VisioPlugin
             }
         }
 
-        // Helper class to deserialize the models response
         public class ModelResponse
         {
             public List<string> Models { get; set; }
@@ -191,7 +185,6 @@ namespace VisioPlugin
 
         public string GetModelLabel(Office.IRibbonControl control, int index)
         {
-            // Ensure the index is within bounds and there are available models
             if (availableModels != null && index >= 0 && index < availableModels.Length)
             {
                 return availableModels[index];
@@ -201,15 +194,14 @@ namespace VisioPlugin
 
         public int GetModelCount(Office.IRibbonControl control)
         {
-            return availableModels?.Length ?? 0;  // Return the number of available models
+            return availableModels?.Length ?? 0;
         }
 
         public async void OnModelSelectionChange(Office.IRibbonControl control, string selectedItemId)
         {
             Debug.WriteLine($"Model selected: {selectedItemId}");
-            selectedModel = selectedItemId;  // Store the selected model
+            selectedModel = selectedItemId;
 
-            // Send model selection to the Python backend
             await SendModelSelectionToPython(selectedModel);
         }
 
@@ -218,7 +210,6 @@ namespace VisioPlugin
             try
             {
                 var modelSelectionPayload = new { model = model };
-                // Use Newtonsoft.Json to serialize the payload
                 var jsonContent = new StringContent(JsonConvert.SerializeObject(modelSelectionPayload), Encoding.UTF8, "application/json");
 
                 var response = await httpClient.PostAsync($"{pythonApiEndpoint}/set-model", jsonContent);
@@ -259,7 +250,6 @@ namespace VisioPlugin
                 aiChatPane.BringToFront();
             }
         }
-
 
         public class WindowWrapper : IWin32Window
         {

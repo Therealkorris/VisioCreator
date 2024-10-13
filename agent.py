@@ -5,7 +5,6 @@ logging.basicConfig(level=logging.INFO)
 
 class VisioAgent:
     def __init__(self):
-        # Define supported commands
         self.commands = {
             "create_shape": self.create_shape,
             "connect_shapes": self.connect_shapes,
@@ -13,9 +12,6 @@ class VisioAgent:
         }
 
     def parse_command(self, command_text):
-        """
-        Use LangGraph's response to determine the appropriate Visio command.
-        """
         logging.info(f"VisioAgent: Parsing command.")
 
         if "create a circle" in command_text.lower():
@@ -35,8 +31,13 @@ class VisioAgent:
             return {"error": f"Unsupported command '{command_type}'"}
 
     def create_shape(self, command_data):
-        shape, x, y, color = command_data
+        if len(command_data) == 3:
+            shape, x, y = command_data
+            color = "default_color"  # Set a default color if not provided
+        else:
+            shape, x, y, color = command_data
         return create_shape(shape, x, y, color)
+
 
     def connect_shapes(self, command_data):
         shape1, shape2 = command_data
