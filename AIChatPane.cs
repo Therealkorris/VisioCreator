@@ -194,18 +194,30 @@ namespace VisioPlugin
 
                 AppendToChatHistory("AI: " + responseString.Trim());
 
-                // Parse the response and execute the Visio command
+                // Parse the response and execute the Visio command(s)
                 var commandResponse = JsonConvert.DeserializeObject<dynamic>(responseString);
-                if (commandResponse?.response != null && commandResponse.response.action == "create_shape")
+                if (commandResponse?.response != null)
                 {
-                    string shape = commandResponse.response.shape;
-                    float x = (float)commandResponse.response.x;
-                    float y = (float)commandResponse.response.y;
-                    float width = (float)commandResponse.response.width;
-                    float height = (float)commandResponse.response.height;
+                    foreach (var command in commandResponse.response)
+                    {
+                        string action = command.action;
+                        if (action == "create_shape")
+                        {
+                            string shape = command.shape;
+                            float x = (float)command.x;
+                            float y = (float)command.y;
+                            float? width = command.width != null ? (float?)command.width : null;
+                            float? height = command.height != null ? (float?)command.height : null;
+                            float? radius = command.radius != null ? (float?)command.radius : null;
 
-                    // Execute the Visio command
-                    await ExecuteVisioCommand(shape, x, y, width, height);
+                            // Execute the Visio command
+                            await ExecuteVisioCommand(shape, x, y, width, height, radius);
+                        }
+                        else if (action == "set_color")
+                        {
+                            // Handle color setting (if applicable to the shapes)
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -247,52 +259,67 @@ namespace VisioPlugin
         }
 
         // Execute Visio command via BackendCommunication
-        private Task ExecuteVisioCommand(string shape, float x, float y, float width, float height)
-{
-    try
-    {
-        Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%, Width={width}%, Height={height}%");
-
-        string category = FindCategoryForShape(shape);
-        Debug.WriteLine($"Category found for shape: {category}");
-
-        if (string.IsNullOrEmpty(category))
+        private Task ExecuteVisioCommand(string shape, float x, float y, float? width = null, float? height = null, float? radius = null)
         {
-            AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
-            Debug.WriteLine($"Error: Shape '{shape}' not found in any category.");
+            try
+            {
+                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%");
+
+                string category = FindCategoryForShape(shape);
+                Debug.WriteLine($"Category found for shape: {category}");
+
+                if (string.IsNullOrEmpty(category))
+                {
+                    AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
+                    Debug.WriteLine($"Error: Shape '{shape}' not found in any category.");
+                    return Task.CompletedTask;
+                }
+
+                // Convert percentage to Visio units
+                var activePage = Globals.ThisAddIn.Application.ActivePage;
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                // Calculate position of the shape (center or top-left corner depending on the shape type)
+                double visioX = (x / 100.0) * pageWidth;
+                double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
+
+                // If radius is provided, assume it's a circle and calculate dimensions based on radius
+                if (radius.HasValue)
+                {
+                    double visioRadius = (radius.Value / 100.0) * Math.Min(pageWidth, pageHeight); // Use smaller of width/height for radius
+                    Debug.WriteLine($"Adding circle with radius {visioRadius} at ({visioX}, {visioY})");
+
+                    libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioRadius * 2, visioRadius * 2); // width and height = 2 * radius
+                }
+                else if (width.HasValue && height.HasValue)
+                {
+                    // If width and height are provided, it's a rectangle or other shape
+                    double visioWidth = (width.Value / 100.0) * pageWidth;
+                    double visioHeight = (height.Value / 100.0) * pageHeight;
+
+                    Debug.WriteLine($"Adding shape {shape} at ({visioX}, {visioY}) with dimensions {visioWidth}x{visioHeight}");
+                    libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioWidth, visioHeight);
+                }
+                else
+                {
+                    // Error handling for missing shape dimensions
+                    Debug.WriteLine("Error: Invalid shape dimensions provided.");
+                    AppendToChatHistory("Error: Invalid shape dimensions provided.");
+                    return Task.CompletedTask;
+                }
+
+                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%)");
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory("Error executing Visio command: " + ex.Message);
+                Debug.WriteLine($"Error executing Visio command: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+            }
+
             return Task.CompletedTask;
         }
-
-        // Convert percentage to Visio units
-        var activePage = Globals.ThisAddIn.Application.ActivePage;
-        double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-        double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-        // Calculate position of the shape (top-left corner)
-        double visioX = (x / 100.0) * pageWidth;
-        double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
-        double visioWidth = (width / 100.0) * pageWidth;
-        double visioHeight = (height / 100.0) * pageHeight;
-
-        // Ensure the shape is within the page boundaries
-        visioX = Math.Max(0, Math.Min(visioX, pageWidth - visioWidth));
-        visioY = Math.Max(0, Math.Min(visioY, pageHeight - visioHeight));
-
-        Debug.WriteLine($"Adjusted shape coordinates: X={visioX}, Y={visioY}, Width={visioWidth}, Height={visioHeight}");
-        libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioWidth, visioHeight);
-        Debug.WriteLine("Shape added to document successfully");
-
-        AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%) with dimensions {width}%x{height}%");
-    }
-    catch (Exception ex)
-    {
-        AppendToChatHistory("Error executing Visio command: " + ex.Message);
-        Debug.WriteLine($"Error executing Visio command: {ex.Message}");
-        Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-    }
-
-    return Task.CompletedTask;
-}
 
         private string FindCategoryForShape(string shapeName)
         {
