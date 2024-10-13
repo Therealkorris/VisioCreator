@@ -266,8 +266,6 @@ namespace VisioPlugin
                 Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%");
 
                 string category = FindCategoryForShape(shape);
-                Debug.WriteLine($"Category found for shape: {category}");
-
                 if (string.IsNullOrEmpty(category))
                 {
                     AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
@@ -280,21 +278,18 @@ namespace VisioPlugin
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                // Calculate position of the shape (center or top-left corner depending on the shape type)
+                // Calculate position of the shape (top-left corner)
                 double visioX = (x / 100.0) * pageWidth;
                 double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
 
-                // If radius is provided, assume it's a circle and calculate dimensions based on radius
                 if (radius.HasValue)
                 {
                     double visioRadius = (radius.Value / 100.0) * Math.Min(pageWidth, pageHeight); // Use smaller of width/height for radius
                     Debug.WriteLine($"Adding circle with radius {visioRadius} at ({visioX}, {visioY})");
-
                     libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioRadius * 2, visioRadius * 2); // width and height = 2 * radius
                 }
                 else if (width.HasValue && height.HasValue)
                 {
-                    // If width and height are provided, it's a rectangle or other shape
                     double visioWidth = (width.Value / 100.0) * pageWidth;
                     double visioHeight = (height.Value / 100.0) * pageHeight;
 
@@ -303,9 +298,8 @@ namespace VisioPlugin
                 }
                 else
                 {
-                    // Error handling for missing shape dimensions
-                    Debug.WriteLine("Error: Invalid shape dimensions provided.");
-                    AppendToChatHistory("Error: Invalid shape dimensions provided.");
+                    AppendToChatHistory($"Error: Invalid shape dimensions provided for {shape}.");
+                    Debug.WriteLine($"Error: Invalid shape dimensions provided for {shape}.");
                     return Task.CompletedTask;
                 }
 
@@ -328,7 +322,6 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"Checking category: {category}");
                 var shapes = libraryManager.GetShapesInCategory(category);
-                Debug.WriteLine($"Shapes in category {category}: {string.Join(", ", shapes)}");
                 if (shapes.Any(s => string.Equals(s, shapeName, StringComparison.OrdinalIgnoreCase)))
                 {
                     Debug.WriteLine($"Shape '{shapeName}' found in category: {category}");
