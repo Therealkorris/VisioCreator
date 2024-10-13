@@ -248,47 +248,51 @@ namespace VisioPlugin
 
         // Execute Visio command via BackendCommunication
         private Task ExecuteVisioCommand(string shape, float x, float y, float width, float height)
+{
+    try
+    {
+        Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%, Width={width}%, Height={height}%");
+
+        string category = FindCategoryForShape(shape);
+        Debug.WriteLine($"Category found for shape: {category}");
+
+        if (string.IsNullOrEmpty(category))
         {
-            try
-            {
-                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%, Width={width}%, Height={height}%");
-
-                string category = FindCategoryForShape(shape);
-                Debug.WriteLine($"Category found for shape: {category}");
-
-                if (string.IsNullOrEmpty(category))
-                {
-                    AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
-                    Debug.WriteLine($"Error: Shape '{shape}' not found in any category.");
-                    return Task.CompletedTask;
-                }
-
-                // Convert percentage to Visio units
-                var activePage = Globals.ThisAddIn.Application.ActivePage;
-                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-                // Calculate position of the shape (top-left corner)
-                double visioX = (x / 100.0) * pageWidth;
-                double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
-                double visioWidth = (width / 100.0) * pageWidth;
-                double visioHeight = (height / 100.0) * pageHeight;
-
-                Debug.WriteLine($"Attempting to add shape to document: Category={category}, Shape={shape}, X={visioX}, Y={visioY}, Width={visioWidth}, Height={visioHeight}");
-                libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioWidth, visioHeight);
-                Debug.WriteLine("Shape added to document successfully");
-
-                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%) with dimensions {width}%x{height}%");
-            }
-            catch (Exception ex)
-            {
-                AppendToChatHistory("Error executing Visio command: " + ex.Message);
-                Debug.WriteLine($"Error executing Visio command: {ex.Message}");
-                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-            }
-
+            AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
+            Debug.WriteLine($"Error: Shape '{shape}' not found in any category.");
             return Task.CompletedTask;
         }
+
+        // Convert percentage to Visio units
+        var activePage = Globals.ThisAddIn.Application.ActivePage;
+        double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+        double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+        // Calculate position of the shape (top-left corner)
+        double visioX = (x / 100.0) * pageWidth;
+        double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
+        double visioWidth = (width / 100.0) * pageWidth;
+        double visioHeight = (height / 100.0) * pageHeight;
+
+        // Ensure the shape is within the page boundaries
+        visioX = Math.Max(0, Math.Min(visioX, pageWidth - visioWidth));
+        visioY = Math.Max(0, Math.Min(visioY, pageHeight - visioHeight));
+
+        Debug.WriteLine($"Adjusted shape coordinates: X={visioX}, Y={visioY}, Width={visioWidth}, Height={visioHeight}");
+        libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioWidth, visioHeight);
+        Debug.WriteLine("Shape added to document successfully");
+
+        AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%) with dimensions {width}%x{height}%");
+    }
+    catch (Exception ex)
+    {
+        AppendToChatHistory("Error executing Visio command: " + ex.Message);
+        Debug.WriteLine($"Error executing Visio command: {ex.Message}");
+        Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+    }
+
+    return Task.CompletedTask;
+}
 
         private string FindCategoryForShape(string shapeName)
         {
