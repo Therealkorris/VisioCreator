@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
@@ -43,7 +43,6 @@ namespace VisioPlugin
                     foreach (Visio.Master master in stencilDoc.Masters)
                     {
                         categories[category].AddShape(master.Name, master);
-                        //Debug.WriteLine($"Added shape: {master.Name} to category: {category}");
                     }
                 }
             }
@@ -51,12 +50,10 @@ namespace VisioPlugin
 
         private void LoadAllStencilDocuments()
         {
-            // Get all open stencil documents (this includes the built-in and user-added stencils)
             foreach (Visio.Document doc in visioApplication.Documents)
             {
                 if (doc.Type == Visio.VisDocumentTypes.visTypeStencil)
                 {
-                    //Debug.WriteLine($"Loading stencil: {doc.Name}");
                     string category = doc.Name;
                     if (!categories.ContainsKey(category))
                     {
@@ -66,7 +63,6 @@ namespace VisioPlugin
                     foreach (Visio.Master master in doc.Masters)
                     {
                         categories[category].AddShape(master.Name, master);
-                        //Debug.WriteLine($"Added shape: {master.Name} to category: {category}");
                     }
                 }
             }
@@ -78,15 +74,12 @@ namespace VisioPlugin
             {
                 LoadLibraries();
             }
-            return categories.Keys.ToList();
+            return categories.Keys;
         }
 
         public IEnumerable<string> GetShapesInCategory(string categoryName)
         {
-            // Assuming we have a way to load the library
             var shapes = new List<string>();
-
-            // Example of loading shapes from a specific stencil or category
             var stencil = visioApplication.Documents.OpenEx(categoryName, (short)Visio.VisOpenSaveArgs.visOpenDocked);
 
             foreach (Visio.Master master in stencil.Masters)
@@ -97,25 +90,24 @@ namespace VisioPlugin
             return shapes;
         }
 
-        public void AddShapeToDocument(string categoryName, string shapeName, double x, double y)
+        public void AddShapeToDocument(string categoryName, string shapeName, double x, double y, double width, double height)
         {
-            Debug.WriteLine($"Adding shape: {shapeName} from category: {categoryName} at ({x}, {y})");
-            
-            // Open the stencil that contains the shapes
-            var stencil = visioApplication.Documents.OpenEx(categoryName, (short)Visio.VisOpenSaveArgs.visOpenDocked);
+            Debug.WriteLine($"Adding shape: {shapeName} from category: {categoryName} at ({x}, {y}) with size ({width}, {height})");
 
-            // Find the master shape by name
+            var activePage = visioApplication.ActivePage;
+
+            // Open the stencil to get the master (shape template)
+            var stencil = visioApplication.Documents.OpenEx(categoryName, (short)Visio.VisOpenSaveArgs.visOpenDocked);
             var master = stencil.Masters[shapeName];
 
-            // Add the shape to the active page at the specified position
-            var activePage = visioApplication.ActivePage;
-            var shape = activePage.Drop(master, x / 100, y / 100);  // Divide by 100 to scale down
+            // Drop the shape on the active Visio page
+            var shape = activePage.Drop(master, x, y);
 
             Debug.WriteLine($"Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
-            
-            // Set a fixed size for the shape
-            shape.Cells["Width"].ResultIU = 1;  // 1 inch width
-            shape.Cells["Height"].ResultIU = 1;  // 1 inch height
+
+            // Adjust size if provided
+            shape.Cells["Width"].ResultIU = width;
+            shape.Cells["Height"].ResultIU = height;
 
             Debug.WriteLine($"Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
         }

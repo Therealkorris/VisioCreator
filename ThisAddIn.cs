@@ -105,9 +105,28 @@ namespace VisioPlugin
                     Random random = new Random();
                     string randomShape = shapes[random.Next(shapes.Length)];
                     var activePage = visioApplication.ActivePage;
-                    double randomX = random.NextDouble() * activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                    double randomY = random.NextDouble() * activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-                    libraryManager.AddShapeToDocument(CurrentCategory, randomShape, randomX, randomY);
+                    double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                    double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                    // Calculate random position (in page units)
+                    double randomX = random.NextDouble() * pageWidth;
+                    double randomY = random.NextDouble() * pageHeight;
+
+                    // Calculate a reasonable size for the shape (e.g., 5-10% of page width)
+                    double minSize = Math.Min(pageWidth, pageHeight) * 0.05;
+                    double maxSize = Math.Min(pageWidth, pageHeight) * 0.1;
+                    double randomWidth = minSize + (random.NextDouble() * (maxSize - minSize));
+                    double randomHeight = minSize + (random.NextDouble() * (maxSize - minSize));
+
+                    // Convert to percentage of page size (as expected by AddShapeToDocument)
+                    double xPercent = (randomX / pageWidth) * 100;
+                    double yPercent = (randomY / pageHeight) * 100;
+                    double widthPercent = (randomWidth / pageWidth) * 100;
+                    double heightPercent = (randomHeight / pageHeight) * 100;
+
+                    libraryManager.AddShapeToDocument(CurrentCategory, randomShape, xPercent, yPercent, widthPercent, heightPercent);
+
+                    Debug.WriteLine($"Added random shape: {randomShape} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
                 }
             }
         }

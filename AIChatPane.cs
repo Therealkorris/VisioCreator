@@ -186,7 +186,7 @@ namespace VisioPlugin
                 // Log before sending message
                 Debug.WriteLine($"Sending message to backend: {userMessage}");
 
-                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/test-visio-command", content);
+                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/agent-prompt", content);
                 var responseString = await response.Content.ReadAsStringAsync();
 
                 // Log after receiving response
@@ -196,15 +196,16 @@ namespace VisioPlugin
 
                 // Parse the response and execute the Visio command
                 var commandResponse = JsonConvert.DeserializeObject<dynamic>(responseString);
-                if (commandResponse.status == "success" && commandResponse.command != null)
+                if (commandResponse?.response != null && commandResponse.response.action == "create_shape")
                 {
-                    await ExecuteVisioCommand(
-                        commandResponse.command.shape.ToString(),
-                        (float)commandResponse.command.x,
-                        (float)commandResponse.command.y,
-                        (float)commandResponse.command.width,
-                        (float)commandResponse.command.height
-                    );
+                    string shape = commandResponse.response.shape;
+                    float x = (float)commandResponse.response.x;
+                    float y = (float)commandResponse.response.y;
+                    float width = (float)commandResponse.response.width;
+                    float height = (float)commandResponse.response.height;
+
+                    // Execute the Visio command
+                    await ExecuteVisioCommand(shape, x, y, width, height);
                 }
             }
             catch (Exception ex)
@@ -250,9 +251,8 @@ namespace VisioPlugin
         {
             try
             {
-                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}, Y={y}, Width={width}, Height={height}");
+                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%, Width={width}%, Height={height}%");
 
-                // Find the appropriate category for the shape
                 string category = FindCategoryForShape(shape);
                 Debug.WriteLine($"Category found for shape: {category}");
 
@@ -263,25 +263,22 @@ namespace VisioPlugin
                     return Task.CompletedTask;
                 }
 
-                // Add the shape to the document using LibraryManager
-                Debug.WriteLine($"Attempting to add shape to document: Category={category}, Shape={shape}, X={x}, Y={y}");
-                libraryManager.AddShapeToDocument(category, shape, x, y);
+                // Convert percentage to Visio units
+                var activePage = Globals.ThisAddIn.Application.ActivePage;
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                // Calculate position of the shape (top-left corner)
+                double visioX = (x / 100.0) * pageWidth;
+                double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
+                double visioWidth = (width / 100.0) * pageWidth;
+                double visioHeight = (height / 100.0) * pageHeight;
+
+                Debug.WriteLine($"Attempting to add shape to document: Category={category}, Shape={shape}, X={visioX}, Y={visioY}, Width={visioWidth}, Height={visioHeight}");
+                libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioWidth, visioHeight);
                 Debug.WriteLine("Shape added to document successfully");
 
-                // Get the added shape (assuming it's the last shape added to the active page)
-                Visio.Shape newShape = Globals.ThisAddIn.Application.ActivePage.Shapes.Cast<Visio.Shape>().Last();
-                Debug.WriteLine($"Retrieved new shape: {newShape.Name}");
-
-                // Resize the shape
-                Debug.WriteLine($"Resizing shape: Current Width={newShape.Cells["Width"].ResultIU}, Current Height={newShape.Cells["Height"].ResultIU}");
-                newShape.Resize(Visio.VisResizeDirection.visResizeDirE, width / newShape.Cells["Width"].ResultIU, Visio.VisUnitCodes.visInches);
-                newShape.Resize(Visio.VisResizeDirection.visResizeDirN, height / newShape.Cells["Height"].ResultIU, Visio.VisUnitCodes.visInches);
-                Debug.WriteLine($"Shape resized: New Width={newShape.Cells["Width"].ResultIU}, New Height={newShape.Cells["Height"].ResultIU}");
-
-                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}, {y}) with dimensions {width}x{height}");
-
-                Globals.ThisAddIn.Application.ActiveWindow.Page.Drop(Globals.ThisAddIn.Application.Documents.OpenEx("BASIC_U.VSSX", (short)Visio.VisOpenSaveArgs.visOpenHidden).Masters.ItemU["Dynamic connector"], 0, 0);
-                Globals.ThisAddIn.Application.ActiveWindow.Page.Shapes.ItemFromID[Globals.ThisAddIn.Application.ActiveWindow.Page.Shapes.Count].Delete();
+                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%) with dimensions {width}%x{height}%");
             }
             catch (Exception ex)
             {

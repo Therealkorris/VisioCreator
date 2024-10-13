@@ -1,7 +1,3 @@
-C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.csproj.AssemblyReference.cache
-C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.Properties.Resources.resources
-C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.csproj.GenerateResource.cache
-C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.csproj.CoreCompileInputs.cache
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\VisioPlugin.dll.config
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\VisioPlugin.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\VisioPlugin.pdb
@@ -9,6 +5,7 @@ C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\VisioPlugin.dll.ma
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\VisioPlugin.vsto
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Microsoft.Bcl.AsyncInterfaces.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Microsoft.Office.Tools.Common.v4.0.Utilities.dll
+C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Newtonsoft.Json.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\OllamaSharp.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Buffers.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Memory.dll
@@ -19,6 +16,7 @@ C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Text.Json.d
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Threading.Tasks.Extensions.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.ValueTuple.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Microsoft.Bcl.AsyncInterfaces.xml
+C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Newtonsoft.Json.xml
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Buffers.xml
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Memory.xml
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Numerics.Vectors.xml
@@ -27,8 +25,10 @@ C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Text.Encodi
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Text.Json.xml
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.Threading.Tasks.Extensions.xml
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\System.ValueTuple.xml
+C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.csproj.AssemblyReference.cache
+C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.Properties.Resources.resources
+C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.csproj.GenerateResource.cache
+C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.csproj.CoreCompileInputs.cache
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlu.DF94478C.Up2Date
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.dll
 C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\obj\Debug\VisioPlugin.pdb
-C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Newtonsoft.Json.dll
-C:\Users\jonas\source\repos\VisioPlugin\VisioPlugin\bin\Debug\Newtonsoft.Json.xml
