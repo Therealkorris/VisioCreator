@@ -250,30 +250,44 @@ namespace VisioPlugin
         {
             try
             {
+                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}, Y={y}, Width={width}, Height={height}");
+
                 // Find the appropriate category for the shape
                 string category = FindCategoryForShape(shape);
+                Debug.WriteLine($"Category found for shape: {category}");
+
                 if (string.IsNullOrEmpty(category))
                 {
                     AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
+                    Debug.WriteLine($"Error: Shape '{shape}' not found in any category.");
                     return Task.CompletedTask;
                 }
 
                 // Add the shape to the document using LibraryManager
+                Debug.WriteLine($"Attempting to add shape to document: Category={category}, Shape={shape}, X={x}, Y={y}");
                 libraryManager.AddShapeToDocument(category, shape, x, y);
+                Debug.WriteLine("Shape added to document successfully");
 
                 // Get the added shape (assuming it's the last shape added to the active page)
                 Visio.Shape newShape = Globals.ThisAddIn.Application.ActivePage.Shapes.Cast<Visio.Shape>().Last();
+                Debug.WriteLine($"Retrieved new shape: {newShape.Name}");
 
                 // Resize the shape
+                Debug.WriteLine($"Resizing shape: Current Width={newShape.Cells["Width"].ResultIU}, Current Height={newShape.Cells["Height"].ResultIU}");
                 newShape.Resize(Visio.VisResizeDirection.visResizeDirE, width / newShape.Cells["Width"].ResultIU, Visio.VisUnitCodes.visInches);
                 newShape.Resize(Visio.VisResizeDirection.visResizeDirN, height / newShape.Cells["Height"].ResultIU, Visio.VisUnitCodes.visInches);
+                Debug.WriteLine($"Shape resized: New Width={newShape.Cells["Width"].ResultIU}, New Height={newShape.Cells["Height"].ResultIU}");
 
                 AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}, {y}) with dimensions {width}x{height}");
+
+                Globals.ThisAddIn.Application.ActiveWindow.Page.Drop(Globals.ThisAddIn.Application.Documents.OpenEx("BASIC_U.VSSX", (short)Visio.VisOpenSaveArgs.visOpenHidden).Masters.ItemU["Dynamic connector"], 0, 0);
+                Globals.ThisAddIn.Application.ActiveWindow.Page.Shapes.ItemFromID[Globals.ThisAddIn.Application.ActiveWindow.Page.Shapes.Count].Delete();
             }
             catch (Exception ex)
             {
                 AppendToChatHistory("Error executing Visio command: " + ex.Message);
-                System.Diagnostics.Debug.WriteLine("Error executing Visio command: " + ex.Message);
+                Debug.WriteLine($"Error executing Visio command: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
 
             return Task.CompletedTask;
@@ -281,14 +295,19 @@ namespace VisioPlugin
 
         private string FindCategoryForShape(string shapeName)
         {
+            Debug.WriteLine($"Searching for category of shape: {shapeName}");
             foreach (var category in libraryManager.GetCategories())
             {
+                Debug.WriteLine($"Checking category: {category}");
                 var shapes = libraryManager.GetShapesInCategory(category);
+                Debug.WriteLine($"Shapes in category {category}: {string.Join(", ", shapes)}");
                 if (shapes.Any(s => string.Equals(s, shapeName, StringComparison.OrdinalIgnoreCase)))
                 {
+                    Debug.WriteLine($"Shape '{shapeName}' found in category: {category}");
                     return category;
                 }
             }
+            Debug.WriteLine($"Shape '{shapeName}' not found in any category");
             return null;
         }
 

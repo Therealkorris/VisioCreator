@@ -99,6 +99,8 @@ namespace VisioPlugin
 
         public void AddShapeToDocument(string categoryName, string shapeName, double x, double y)
         {
+            Debug.WriteLine($"Adding shape: {shapeName} from category: {categoryName} at ({x}, {y})");
+            
             // Open the stencil that contains the shapes
             var stencil = visioApplication.Documents.OpenEx(categoryName, (short)Visio.VisOpenSaveArgs.visOpenDocked);
 
@@ -107,7 +109,15 @@ namespace VisioPlugin
 
             // Add the shape to the active page at the specified position
             var activePage = visioApplication.ActivePage;
-            activePage.Drop(master, x, y);
+            var shape = activePage.Drop(master, x / 100, y / 100);  // Divide by 100 to scale down
+
+            Debug.WriteLine($"Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
+            
+            // Set a fixed size for the shape
+            shape.Cells["Width"].ResultIU = 1;  // 1 inch width
+            shape.Cells["Height"].ResultIU = 1;  // 1 inch height
+
+            Debug.WriteLine($"Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
         }
     }
 
