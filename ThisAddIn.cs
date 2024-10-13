@@ -232,7 +232,7 @@ namespace VisioPlugin
         {
             if (aiChatPane == null || aiChatPane.IsDisposed)
             {
-                aiChatPane = new AIChatPane(selectedModel, pythonApiEndpoint, availableModels);
+                aiChatPane = new AIChatPane(selectedModel, pythonApiEndpoint, availableModels, libraryManager);
                 aiChatPane.FormClosed += (sender, e) => aiChatPane = null;
 
                 IntPtr visioHandle = new IntPtr(visioApplication.WindowHandle32);

@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
@@ -23,13 +24,15 @@ namespace VisioPlugin
         private string selectedModel;
         private string pythonApiEndpoint;
         private string[] availableModels;
+        private LibraryManager libraryManager;
 
         // Constructor now accepts available models from ThisAddIn
-        public AIChatPane(string model, string apiEndpoint, string[] models)
+        public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
             selectedModel = model;
             pythonApiEndpoint = apiEndpoint;
             availableModels = models; // Use the models passed from ThisAddIn
+            this.libraryManager = libraryManager;
             InitializeComponent();
             PopulateModelDropdown();  // Populate dropdown with models
         }
@@ -247,24 +250,19 @@ namespace VisioPlugin
         {
             try
             {
-                // Execute the Visio command
-                Visio.Application visioApp = Globals.ThisAddIn.Application;
-                Visio.Page activePage = visioApp.ActivePage;
-
-                // Open the basic shapes stencil
-                Visio.Documents visioDocuments = visioApp.Documents;
-                Visio.Document basicShapesDoc = visioDocuments.OpenEx("BASIC_U.VSSX", (short)Visio.VisOpenSaveArgs.visOpenHidden);
-
-                // Find the master shape
-                Visio.Master shapemaster = basicShapesDoc.Masters.ItemU[shape];
-                if (shapemaster == null)
+                // Find the appropriate category for the shape
+                string category = FindCategoryForShape(shape);
+                if (string.IsNullOrEmpty(category))
                 {
-                    AppendToChatHistory($"Error: Shape '{shape}' not found in the basic shapes stencil.");
+                    AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
                     return Task.CompletedTask;
                 }
 
-                // Drop the shape onto the page
-                Visio.Shape newShape = activePage.Drop(shapemaster, x, y);
+                // Add the shape to the document using LibraryManager
+                libraryManager.AddShapeToDocument(category, shape, x, y);
+
+                // Get the added shape (assuming it's the last shape added to the active page)
+                Visio.Shape newShape = Globals.ThisAddIn.Application.ActivePage.Shapes.Cast<Visio.Shape>().Last();
 
                 // Resize the shape
                 newShape.Resize(Visio.VisResizeDirection.visResizeDirE, width / newShape.Cells["Width"].ResultIU, Visio.VisUnitCodes.visInches);
@@ -279,6 +277,19 @@ namespace VisioPlugin
             }
 
             return Task.CompletedTask;
+        }
+
+        private string FindCategoryForShape(string shapeName)
+        {
+            foreach (var category in libraryManager.GetCategories())
+            {
+                var shapes = libraryManager.GetShapesInCategory(category);
+                if (shapes.Any(s => string.Equals(s, shapeName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return category;
+                }
+            }
+            return null;
         }
 
         private void AppendToChatHistory(string message)
