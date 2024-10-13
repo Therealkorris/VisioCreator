@@ -41,7 +41,6 @@ async def websocket_visio_command(websocket: WebSocket):
             logging.info("WebSocket disconnected")
             break
 
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

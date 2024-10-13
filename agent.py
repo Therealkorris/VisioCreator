@@ -2,6 +2,8 @@ import logging
 import requests
 import json
 from tools import create_shape, connect_shapes, modify_shape_properties
+from qdrant_db import initialize_qdrant_client, store_model_in_qdrant, store_action_in_qdrant, fetch_data_from_qdrant, search_similar_actions
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -12,6 +14,25 @@ class VisioAgent:
             "connect_shapes": self.connect_shapes,
             "modify_properties": self.modify_properties,
         }
+        self.qdrant_client = initialize_qdrant_client()
+
+    # Ollama embedding generation
+    def generate_ollama_embedding(self, text: str, model: str = "mxbai-embed-large"):
+        url = "http://localhost:11434/api/embed"
+        headers = {"Content-Type": "application/json"}
+        
+        payload = {
+            "model": model,
+            "prompt": text
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            embedding_data = response.json()
+            return embedding_data.get("embedding", [])
+        else:
+            raise Exception(f"Failed to generate embeddings: {response.status_code}, {response.text}")
 
     def parse_command(self, command_text):
         logging.info(f"VisioAgent: Parsing command.")
@@ -34,30 +55,43 @@ class VisioAgent:
         x = command_data.get('x')
         y = command_data.get('y')
         color = command_data.get('color', 'default')
-        
+
         # Handle radius for circles
         if 'radius' in command_data:
             radius = command_data.get('radius')
-            return create_shape(shape, x, y, radius * 2, radius * 2, color)
-        
-        # Handle width and height for other shapes
-        width = command_data.get('width')
-        height = command_data.get('height')
-        return create_shape(shape, x, y, width, height, color)
+            result = create_shape(shape, x, y, radius * 2, radius * 2, color)
+        else:
+            width = command_data.get('width')
+            height = command_data.get('height')
+            result = create_shape(shape, x, y, width, height, color)
 
-
+        # Generate embedding for action and store it
+        action_embedding = self.generate_ollama_embedding(json.dumps(command_data))
+        store_action_in_qdrant(self.qdrant_client, f"{shape}_{x}_{y}", "create_shape", action_embedding)  # Ensure to pass 'action_embedding'
+        return result
 
     def connect_shapes(self, command_data):
         shape1 = command_data.get('shape1')
         shape2 = command_data.get('shape2')
-        return connect_shapes(shape1, shape2)
+        result = connect_shapes(shape1, shape2)
+
+        action_embedding = self.generate_ollama_embedding(json.dumps(command_data))
+        store_action_in_qdrant(self.qdrant_client, f"connect_{shape1}_{shape2}", "connect_shapes", action_embedding)  # Pass the embedding
+        return result
 
     def modify_properties(self, command_data):
         shape = command_data.get('shape')
         property_name = command_data.get('property')
         value = command_data.get('value')
-        return modify_shape_properties(shape, property_name, value)
+        result = modify_shape_properties(shape, property_name, value)
 
+        action_embedding = self.generate_ollama_embedding(json.dumps(command_data))
+        store_action_in_qdrant(self.qdrant_client, f"modify_{shape}_{property_name}", "modify_properties", action_embedding)  # Pass the embedding
+        return result
+
+    def search_similar_actions(self, query_text, limit=5):
+        embedding = self.generate_ollama_embedding(query_text)
+        return search_similar_actions(self.qdrant_client, embedding, limit)
 
 # Function to handle prompt requests to the AI API
 async def handle_prompt_from_agent(prompt: str, model: str = "llama3.2"):
@@ -81,11 +115,9 @@ Only respond with the JSON object/array, without any additional text.
         response = requests.post("http://localhost:11434/api/generate", json={"model": model, "prompt": full_prompt}, stream=True)
         response.raise_for_status()
 
-        # Gather all chunks from the streaming response
         full_response = ""
         for line in response.iter_lines():
             if line:
-                # Convert each chunk to a dict and append its "response" field
                 chunk = json.loads(line.decode('utf-8'))
                 full_response += chunk.get("response", "")
                 if chunk.get("done", False):
@@ -93,7 +125,10 @@ Only respond with the JSON object/array, without any additional text.
 
         logging.info(f"Full AI Response: {full_response}")
 
-        # Try to parse the full response as JSON
+        # Store the AI response in Qdrant with embeddings
+        embedding = VisioAgent().generate_ollama_embedding(full_response)
+        store_action_in_qdrant(initialize_qdrant_client(), f"ai_response_{prompt[:20]}", "ai_response", embedding)  # Ensure to pass the embedding
+
         try:
             command_data = json.loads(full_response)
             return command_data
@@ -104,7 +139,6 @@ Only respond with the JSON object/array, without any additional text.
     except requests.RequestException as e:
         logging.error(f"Error communicating with AI: {str(e)}")
         return {"error": f"Error communicating with AI: {str(e)}"}
-
 
 # New function for model listing
 def list_models():
@@ -120,12 +154,10 @@ def list_models():
         logging.error(f"Error fetching models: {str(e)}")
         raise Exception(f"Error fetching models: {str(e)}")
 
-
 def process_visio_agent_command(command):
     try:
         command_data = json.loads(command)
         
-        # Handle the case where multiple commands are returned as a list
         if isinstance(command_data, list):
             results = []
             visio_agent = VisioAgent()
@@ -138,7 +170,6 @@ def process_visio_agent_command(command):
                     results.append({"error": f"Unsupported command '{action}'"})
             return results
         else:
-            # Single command case
             action = command_data.get('action')
             if action:
                 return VisioAgent().execute_command(action, command_data)
@@ -147,3 +178,8 @@ def process_visio_agent_command(command):
     except Exception as e:
         logging.error(f"Error processing Visio command: {str(e)}")
         return {"error": f"Error processing command: {str(e)}"}
+
+# New function to search for similar actions
+def search_similar_actions(query_text, limit=5):
+    visio_agent = VisioAgent()
+    return visio_agent.search_similar_actions(query_text, limit)

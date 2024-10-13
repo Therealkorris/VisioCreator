@@ -1,3 +1,7 @@
+docker run -p 6333:6333 qdrant/qdrant:latest
+uvicorn main:app --reload
+
+
 **Visio AI-Assisted Plugin - Programming Project Plan**
 
 ### **1. Project Overview**
