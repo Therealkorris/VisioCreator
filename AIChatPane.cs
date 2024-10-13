@@ -209,9 +209,10 @@ namespace VisioPlugin
                             float? width = command.width != null ? (float?)command.width : null;
                             float? height = command.height != null ? (float?)command.height : null;
                             float? radius = command.radius != null ? (float?)command.radius : null;
+                            string color = command.color != null ? (string)command.color : null;
 
                             // Execute the Visio command
-                            await ExecuteVisioCommand(shape, x, y, width, height, radius);
+                            await ExecuteVisioCommand(shape, x, y, width, height, radius, color);
                         }
                         else if (action == "set_color")
                         {
@@ -259,11 +260,11 @@ namespace VisioPlugin
         }
 
         // Execute Visio command via BackendCommunication
-        private Task ExecuteVisioCommand(string shape, float x, float y, float? width = null, float? height = null, float? radius = null)
+        private Task ExecuteVisioCommand(string shape, float x, float y, float? width = null, float? height = null, float? radius = null, string color = null)
         {
             try
             {
-                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%");
+                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%, Color={color}");
 
                 string category = FindCategoryForShape(shape);
                 if (string.IsNullOrEmpty(category))
@@ -273,20 +274,18 @@ namespace VisioPlugin
                     return Task.CompletedTask;
                 }
 
-                // Convert percentage to Visio units
                 var activePage = Globals.ThisAddIn.Application.ActivePage;
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                // Calculate position of the shape (top-left corner)
                 double visioX = (x / 100.0) * pageWidth;
-                double visioY = ((100 - y) / 100.0) * pageHeight; // Invert Y-axis
+                double visioY = ((100 - y) / 100.0) * pageHeight;
 
                 if (radius.HasValue)
                 {
-                    double visioRadius = (radius.Value / 100.0) * Math.Min(pageWidth, pageHeight); // Use smaller of width/height for radius
+                    double visioRadius = (radius.Value / 100.0) * Math.Min(pageWidth, pageHeight);
                     Debug.WriteLine($"Adding circle with radius {visioRadius} at ({visioX}, {visioY})");
-                    libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioRadius * 2, visioRadius * 2); // width and height = 2 * radius
+                    libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioRadius * 2, visioRadius * 2);
                 }
                 else if (width.HasValue && height.HasValue)
                 {
@@ -303,7 +302,28 @@ namespace VisioPlugin
                     return Task.CompletedTask;
                 }
 
-                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%)");
+                // Get the last added shape
+                Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
+
+                // Set the color if provided
+                if (addedShape != null && !string.IsNullOrEmpty(color))
+                {
+                    // Convert color string to RGB values
+                    System.Drawing.Color drawingColor = System.Drawing.ColorTranslator.FromHtml(color);
+                    
+                    // Set fill color
+                    addedShape.CellsU["FillForegnd"].FormulaU = $"RGB({drawingColor.R},{drawingColor.G},{drawingColor.B})";
+                    
+                    // Set line color
+                    addedShape.CellsU["LineColor"].FormulaU = $"RGB({drawingColor.R},{drawingColor.G},{drawingColor.B})";
+                    
+                    // Ensure the shape has a fill
+                    addedShape.CellsU["FillPattern"].FormulaU = "1";
+
+                    Debug.WriteLine($"Set color for shape: {color}");
+                }
+
+                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%) with color {color}");
             }
             catch (Exception ex)
             {

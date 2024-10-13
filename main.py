@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Form, WebSocket, WebSocketDisconnect
 import logging
 from agent import handle_prompt_from_agent, process_visio_agent_command, list_models
+from qdrant_db import initialize_qdrant_client, create_all_collections
 
 logging.basicConfig(level=logging.DEBUG)  # DEBUG level for detailed logs
 app = FastAPI()
@@ -44,3 +45,5 @@ async def websocket_visio_command(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+    client = initialize_qdrant_client()
+    create_all_collections(client)
