@@ -5,11 +5,9 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Office = Microsoft.Office.Core;
 using Visio = Microsoft.Office.Interop.Visio;
-using Microsoft.Office.Tools.Ribbon;
 using System.Windows.Forms;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
@@ -30,6 +28,7 @@ namespace VisioPlugin
         private HttpClient httpClient = new HttpClient();
         private string selectedModel = "llama3.1:8b";
         private AIChatPane aiChatPane;
+        private VisioHttpListenerServer httpServer;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -42,10 +41,20 @@ namespace VisioPlugin
             libraryManager = new LibraryManager(visioApplication);
             uiControl = new System.Windows.Forms.Control();
             uiControl.CreateControl();
+
+            // Start the Visio HTTP Server
+            httpServer = new VisioHttpListenerServer(visioApplication, libraryManager);
+            httpServer.Start();
         }
 
+        // In the Shutdown method, stop the server
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
+            // Stop the Visio HTTP Server
+            if (httpServer != null)
+            {
+                httpServer.Stop();
+            }
         }
 
         public string[] GetCategories()
@@ -291,4 +300,3 @@ namespace VisioPlugin
         #endregion
     }
 }
-

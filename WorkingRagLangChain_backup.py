@@ -1,6 +1,5 @@
 import logging
 import json
-from fastapi import FastAPI, HTTPException, Form, WebSocket, WebSocketDisconnect
 from langchain_ollama import ChatOllama
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
@@ -8,11 +7,8 @@ from langchain_community.vectorstores import SKLearnVectorStore
 from langchain_nomic.embeddings import NomicEmbeddings
 from langchain.schema import Document
 from typing import List
-import requests
 
 logging.basicConfig(level=logging.INFO)
-
-app = FastAPI()
 
 # Initialize LLM
 local_llm = "llama3.2:3b-instruct-fp16"
@@ -301,84 +297,14 @@ def test_action_agent():
             print("Format: Incorrect - not valid JSON")
         print()
 
-# Function to list models using Ollama
-def list_models():
-    try:
-        response = llm.client.list_models()
-        model_names = [model['name'] for model in response]
-        return model_names
-    except Exception as e:
-        logging.error(f"Error fetching models: {str(e)}")
-        raise Exception(f"Error fetching models: {str(e)}")
-
-# Function to list models using the existing Ollama setup
-def list_models():
-    try:
-        response = llm.client.list_models()
-        model_names = [model['name'] for model in response]
-        return model_names
-    except Exception as e:
-        logging.error(f"Error fetching models: {str(e)}")
-        raise Exception(f"Error fetching models: {str(e)}")
-
-# API endpoint to get models
-@app.get("/models")
-async def get_models():
-    try:
-        models = list_models()
-        return {"models": models}
-    except Exception as e:
-        logging.error(f"Error fetching models: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching models: {str(e)}")
-
-# Function to handle prompts from the agent
-async def handle_prompt_from_agent(prompt: str, model: str):
-    try:
-        response = llm_json_mode.invoke([
-            {"role": "system", "content": manager_agent_instructions},
-            {"role": "user", "content": prompt}
-        ])
-        return json.loads(response.content)
-    except Exception as e:
-        logging.error(f"Error processing prompt: {str(e)}")
-        return {"error": f"Error processing prompt: {str(e)}"}
-
-# API endpoint to handle agent prompts
-@app.post("/agent-prompt")
-async def handle_agent_prompt(prompt: str = Form(...), model: str = Form("llama3.2")):
-    try:
-        ai_response = await handle_prompt_from_agent(prompt, model)
-        return {"response": ai_response}
-    except Exception as e:
-        logging.error(f"Error processing AI prompt: {str(e)}")
-        return {"error": f"Error processing AI prompt: {str(e)}"}
-
-# Function to process Visio commands
-def process_visio_agent_command(command):
-    try:
-        response = llm_json_mode.invoke([
-            {"role": "system", "content": action_agent_instructions},
-            {"role": "user", "content": command}
-        ])
-        return json.loads(response.content)
-    except Exception as e:
-        logging.error(f"Error processing Visio command: {str(e)}")
-        return {"error": f"Error processing command: {str(e)}"}
-
-# WebSocket endpoint for Visio commands
-@app.websocket("/ws/visio-command")
-async def websocket_visio_command(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        try:
-            data = await websocket.receive_text()
-            logging.info(f"Received Visio command: {data}")
-            processed_data = process_visio_agent_command(data)
-            await websocket.send_text(json.dumps(processed_data))
-        except WebSocketDisconnect:
-            logging.info("WebSocket disconnected")
-            break
-
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("Testing Router:")
+    test_router()
+    print("\nTesting Retrieval Grader:")
+    test_retrieval_grader()
+    print("\nTesting Generation:")
+    test_generation()
+    print("\nTesting Manager Agent:")
+    test_manager_agent()
+    print("\nTesting Action Agent:")
+    test_action_agent()

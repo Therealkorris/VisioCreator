@@ -2,50 +2,46 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Threading.Tasks;
-using System.IO;
-using System.Net.Http;
-using Newtonsoft.Json;
 using System.Diagnostics;
-using System.Collections.Generic;
-using System.Text;
-using System.Linq;
-using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
 {
     public partial class AIChatPane : Form
     {
         private TextBox chatInput;
-        private Button sendButton, uploadImageButton;
+        private Button sendButton;
+        private Button uploadImageButton;
         private RichTextBox chatHistory;
         private ComboBox modelDropdown;
         private Label modelLabel;
-        private readonly HttpClient httpClient = new HttpClient();
-        private string selectedModel;
-        private string pythonApiEndpoint;
-        private string[] availableModels;
-        private LibraryManager libraryManager;
 
-        // Constructor now accepts available models from ThisAddIn
+        private readonly LibraryManager libraryManager;
+        private readonly string apiEndpoint;
+        private string selectedModel;
+
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
-            selectedModel = model;
-            pythonApiEndpoint = apiEndpoint;
-            availableModels = models; // Use the models passed from ThisAddIn
             this.libraryManager = libraryManager;
-            InitializeComponent();
-            PopulateModelDropdown();  // Populate dropdown with models
+            this.apiEndpoint = apiEndpoint;
+            this.selectedModel = model;
+
+            InitializeCustomComponents();
+
+            // Populate models into the dropdown
+            PopulateModelDropdown(models);
+            modelDropdown.SelectedItem = model;
         }
 
-        private void InitializeComponent()
+        private void InitializeCustomComponents()
         {
+            // Initialize controls
             chatHistory = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
+                BackColor = Color.WhiteSmoke,
+                Font = new Font("Segoe UI", 10),
                 AllowDrop = true,
-                BackColor = Color.LightYellow,
-                Font = new Font("Arial", 10),
             };
             chatHistory.DragDrop += ChatHistory_DragDrop;
             chatHistory.DragEnter += ChatHistory_DragEnter;
@@ -55,7 +51,7 @@ namespace VisioPlugin
                 Dock = DockStyle.Bottom,
                 Height = 50,
                 Multiline = true,
-                Font = new Font("Arial", 10),
+                Font = new Font("Segoe UI", 10),
             };
             chatInput.KeyDown += ChatInput_KeyDown;
 
@@ -75,22 +71,21 @@ namespace VisioPlugin
             };
             uploadImageButton.Click += UploadImageButton_Click;
 
-            // Model selection dropdown and label
             modelLabel = new Label
             {
                 Text = "Select AI Model:",
                 Dock = DockStyle.Top,
                 Height = 20,
-                Font = new Font("Arial", 10, FontStyle.Bold),
-                ForeColor = Color.SteelBlue
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.SteelBlue,
             };
 
             modelDropdown = new ComboBox
             {
                 Dock = DockStyle.Top,
                 Height = 30,
-                Font = new Font("Arial", 10),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                Font = new Font("Segoe UI", 10),
+                DropDownStyle = ComboBoxStyle.DropDownList,
             };
             modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged;
 
@@ -101,18 +96,20 @@ namespace VisioPlugin
             Controls.Add(sendButton);
             Controls.Add(modelDropdown);
             Controls.Add(modelLabel);
+
+            // Set form properties
+            Text = "AI Chat Pane";
+            Width = 400;
+            Height = 600;
         }
 
-        // Populate the model dropdown with the available models from the ThisAddIn's list
-        private void PopulateModelDropdown()
+        private void PopulateModelDropdown(string[] models)
         {
             modelDropdown.Items.Clear();
 
-            if (availableModels != null && availableModels.Length > 0)
+            if (models != null && models.Length > 0)
             {
-                modelDropdown.Items.AddRange(availableModels);
-                modelDropdown.SelectedItem = selectedModel;
-                Debug.WriteLine($"Models loaded into dropdown: {string.Join(", ", availableModels)}");
+                modelDropdown.Items.AddRange(models);
             }
             else
             {
@@ -131,7 +128,24 @@ namespace VisioPlugin
 
         private async void SendButton_Click(object sender, EventArgs e)
         {
-            await SendMessage();
+            string userMessage = chatInput.Text.Trim();
+            if (string.IsNullOrEmpty(userMessage)) return;
+
+            chatInput.Clear();
+            AppendToChatHistory($"You: {userMessage}");
+
+            try
+            {
+                var response = await BackendCommunication.SendMessage(apiEndpoint, userMessage, selectedModel);
+                AppendToChatHistory($"AI: {response}");
+
+                // Process AI commands if any
+                ProcessAIResponse(response);
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory($"Error: {ex.Message}");
+            }
         }
 
         private async void UploadImageButton_Click(object sender, EventArgs e)
@@ -141,7 +155,21 @@ namespace VisioPlugin
                 openFileDialog.Filter = "Image Files|*.jpg;*.jpeg;*.png";
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    await SendMessageWithImage(openFileDialog.FileName);
+                    string imagePath = openFileDialog.FileName;
+                    AppendToChatHistory("You sent an image.");
+
+                    try
+                    {
+                        var response = await BackendCommunication.SendImage(apiEndpoint, imagePath, selectedModel);
+                        AppendToChatHistory($"AI: {response}");
+
+                        // Process AI commands if any
+                        ProcessAIResponse(response);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendToChatHistory($"Error: {ex.Message}");
+                    }
                 }
             }
         }
@@ -154,9 +182,9 @@ namespace VisioPlugin
                 if (files.Length > 0)
                 {
                     string filePath = files[0];
-                    if (filePath.EndsWith(".jpg") || filePath.EndsWith(".png"))
+                    if (filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
                     {
-                        Task.Run(() => SendMessageWithImage(filePath));
+                        UploadImage(filePath);
                     }
                 }
             }
@@ -168,188 +196,22 @@ namespace VisioPlugin
                 e.Effect = DragDropEffects.Copy;
         }
 
-        // Send a message to the AI and accumulate the response
-        private async Task SendMessage()
+        private async void UploadImage(string imagePath)
         {
-            try
-            {
-                string userMessage = chatInput.Text.Trim();
-                if (string.IsNullOrEmpty(userMessage)) return;
-
-                AppendToChatHistory("User: " + userMessage);
-                chatInput.Clear();
-
-                var content = new MultipartFormDataContent();
-                content.Add(new StringContent(userMessage), "prompt");
-                content.Add(new StringContent(selectedModel), "model");
-
-                // Log before sending message
-                Debug.WriteLine($"Sending message to backend: {userMessage}");
-
-                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/agent-prompt", content);
-                var responseString = await response.Content.ReadAsStringAsync();
-
-                // Log after receiving response
-                Debug.WriteLine($"Received response from backend: {responseString}");
-
-                AppendToChatHistory("AI: " + responseString.Trim());
-
-                // Parse the response and execute the Visio command(s)
-                var commandResponse = JsonConvert.DeserializeObject<dynamic>(responseString);
-                if (commandResponse?.response != null)
-                {
-                    foreach (var command in commandResponse.response)
-                    {
-                        string action = command.action;
-                        if (action == "create_shape")
-                        {
-                            string shape = command.shape;
-                            float x = (float)command.x;
-                            float y = (float)command.y;
-                            float? width = command.width != null ? (float?)command.width : null;
-                            float? height = command.height != null ? (float?)command.height : null;
-                            float? radius = command.radius != null ? (float?)command.radius : null;
-                            string color = command.color != null ? (string)command.color : null;
-
-                            // Execute the Visio command
-                            await ExecuteVisioCommand(shape, x, y, width, height, radius, color);
-                        }
-                        else if (action == "set_color")
-                        {
-                            // Handle color setting (if applicable to the shapes)
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppendToChatHistory("Error: " + ex.Message);
-                Debug.WriteLine("Error sending message: " + ex.Message);
-            }
-        }
-
-        private async Task SendMessageWithImage(string imagePath)
-        {
-            AppendToChatHistory("User sent an image: " + Path.GetFileName(imagePath));
+            AppendToChatHistory("You sent an image.");
 
             try
             {
-                var content = new MultipartFormDataContent();
+                var response = await BackendCommunication.SendImage(apiEndpoint, imagePath, selectedModel);
+                AppendToChatHistory($"AI: {response}");
 
-                // Add the image file
-                var imageContent = new ByteArrayContent(File.ReadAllBytes(imagePath));
-                imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-                content.Add(imageContent, "file", Path.GetFileName(imagePath));
-
-                // Add the prompt and model as form data
-                content.Add(new StringContent("Image analysis prompt"), "prompt");
-                content.Add(new StringContent(selectedModel), "model");
-
-                // Send the request to FastAPI server
-                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/image-prompt", content);
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                AppendToChatHistory("AI: " + responseContent);
-                Debug.WriteLine($"AI Response: {responseContent}");
+                // Process AI commands if any
+                ProcessAIResponse(response);
             }
             catch (Exception ex)
             {
-                AppendToChatHistory("Error: " + ex.Message);
-                Debug.WriteLine("Error sending image: " + ex.Message);
+                AppendToChatHistory($"Error: {ex.Message}");
             }
-        }
-
-        // Execute Visio command via BackendCommunication
-        private Task ExecuteVisioCommand(string shape, float x, float y, float? width = null, float? height = null, float? radius = null, string color = null)
-        {
-            try
-            {
-                Debug.WriteLine($"Executing Visio command: Shape={shape}, X={x}%, Y={y}%, Color={color}");
-
-                string category = FindCategoryForShape(shape);
-                if (string.IsNullOrEmpty(category))
-                {
-                    AppendToChatHistory($"Error: Shape '{shape}' not found in any category.");
-                    Debug.WriteLine($"Error: Shape '{shape}' not found in any category.");
-                    return Task.CompletedTask;
-                }
-
-                var activePage = Globals.ThisAddIn.Application.ActivePage;
-                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-                double visioX = (x / 100.0) * pageWidth;
-                double visioY = ((100 - y) / 100.0) * pageHeight;
-
-                if (radius.HasValue)
-                {
-                    double visioRadius = (radius.Value / 100.0) * Math.Min(pageWidth, pageHeight);
-                    Debug.WriteLine($"Adding circle with radius {visioRadius} at ({visioX}, {visioY})");
-                    libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioRadius * 2, visioRadius * 2);
-                }
-                else if (width.HasValue && height.HasValue)
-                {
-                    double visioWidth = (width.Value / 100.0) * pageWidth;
-                    double visioHeight = (height.Value / 100.0) * pageHeight;
-
-                    Debug.WriteLine($"Adding shape {shape} at ({visioX}, {visioY}) with dimensions {visioWidth}x{visioHeight}");
-                    libraryManager.AddShapeToDocument(category, shape, visioX, visioY, visioWidth, visioHeight);
-                }
-                else
-                {
-                    AppendToChatHistory($"Error: Invalid shape dimensions provided for {shape}.");
-                    Debug.WriteLine($"Error: Invalid shape dimensions provided for {shape}.");
-                    return Task.CompletedTask;
-                }
-
-                // Get the last added shape
-                Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
-
-                // Set the color if provided
-                if (addedShape != null && !string.IsNullOrEmpty(color))
-                {
-                    // Convert color string to RGB values
-                    System.Drawing.Color drawingColor = System.Drawing.ColorTranslator.FromHtml(color);
-                    
-                    // Set fill color
-                    addedShape.CellsU["FillForegnd"].FormulaU = $"RGB({drawingColor.R},{drawingColor.G},{drawingColor.B})";
-                    
-                    // Set line color
-                    addedShape.CellsU["LineColor"].FormulaU = $"RGB({drawingColor.R},{drawingColor.G},{drawingColor.B})";
-                    
-                    // Ensure the shape has a fill
-                    addedShape.CellsU["FillPattern"].FormulaU = "1";
-
-                    Debug.WriteLine($"Set color for shape: {color}");
-                }
-
-                AppendToChatHistory($"Visio Command Executed: {shape} created successfully at ({x}%, {y}%) with color {color}");
-            }
-            catch (Exception ex)
-            {
-                AppendToChatHistory("Error executing Visio command: " + ex.Message);
-                Debug.WriteLine($"Error executing Visio command: {ex.Message}");
-                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-            }
-
-            return Task.CompletedTask;
-        }
-
-        private string FindCategoryForShape(string shapeName)
-        {
-            Debug.WriteLine($"Searching for category of shape: {shapeName}");
-            foreach (var category in libraryManager.GetCategories())
-            {
-                Debug.WriteLine($"Checking category: {category}");
-                var shapes = libraryManager.GetShapesInCategory(category);
-                if (shapes.Any(s => string.Equals(s, shapeName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    Debug.WriteLine($"Shape '{shapeName}' found in category: {category}");
-                    return category;
-                }
-            }
-            Debug.WriteLine($"Shape '{shapeName}' not found in any category");
-            return null;
         }
 
         private void AppendToChatHistory(string message)
@@ -368,12 +230,30 @@ namespace VisioPlugin
         private void ModelDropdown_SelectedIndexChanged(object sender, EventArgs e)
         {
             selectedModel = modelDropdown.SelectedItem?.ToString();
-            Debug.WriteLine($"Selected model updated to: {selectedModel}");
+            AppendToChatHistory($"Model changed to: {selectedModel}");
         }
 
-        public class ModelResponse
+        private void ProcessAIResponse(string response)
         {
-            public List<string> Models { get; set; }
+            // If the AI response includes commands for Visio, process them here
+            // For example, parse the response and use LibraryManager to add shapes
+            // This is a placeholder for actual implementation
+
+            // Example:
+            /*
+            var aiCommand = JsonConvert.DeserializeObject<AICommand>(response);
+            if (aiCommand != null)
+            {
+                libraryManager.AddShapeToDocument(
+                    aiCommand.Category,
+                    aiCommand.ShapeName,
+                    aiCommand.Position.X,
+                    aiCommand.Position.Y,
+                    aiCommand.Size.Width,
+                    aiCommand.Size.Height
+                );
+            }
+            */
         }
     }
 }

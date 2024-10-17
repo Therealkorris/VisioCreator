@@ -1,12 +1,10 @@
 ﻿using System;
-using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Net.Http.Headers;
-using System.Text;
-using Newtonsoft.Json;
-using Visio = Microsoft.Office.Interop.Visio;
 using System.Diagnostics;
+using Newtonsoft.Json;
+using System.Linq;
+using System.Text;
 
 namespace VisioPlugin
 {
@@ -14,107 +12,131 @@ namespace VisioPlugin
     {
         private static readonly HttpClient httpClient = new HttpClient();
 
-        // Function to send text message to AI API
-        public static async Task<string> SendTextMessage(string message, string model, string apiEndpoint)
+        /// <summary>
+        /// Gets the list of available models from the backend API.
+        /// </summary>
+        /// <param name="apiEndpoint">The base URL of the API endpoint.</param>
+        /// <returns>An array of model names.</returns>
+        public static async Task<string[]> GetModels(string apiEndpoint)
         {
-            var content = new MultipartFormDataContent();
-            content.Add(new StringContent(message), "prompt");
-            content.Add(new StringContent(model), "model");
-
-            var response = await httpClient.PostAsync($"{apiEndpoint}/text-prompt", content);
-            return await response.Content.ReadAsStringAsync();
-        }
-
-        // Function to send image message to AI API
-        public static async Task<string> SendImageMessage(string imagePath, string model, string apiEndpoint)
-        {
-            var content = new MultipartFormDataContent();
-            content.Add(new StringContent(model), "model");
-
-            var imageContent = new ByteArrayContent(File.ReadAllBytes(imagePath));
-            imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
-            content.Add(imageContent, "file", Path.GetFileName(imagePath));
-
-            var response = await httpClient.PostAsync($"{apiEndpoint}/image-prompt", content);
-            return await response.Content.ReadAsStringAsync();
-        }
-
-        // Function to send Visio command to Python API
-        public static async Task<string> SendVisioCommand(string action, string shape, float x, float y, float width, float height, string apiEndpoint)
-        {
-            var command = new
+            try
             {
-                action = action,
-                shape = shape,
-                x = x,
-                y = y,
-                width = width,
-                height = height
-            };
+                var response = await httpClient.GetAsync($"{apiEndpoint}/models");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
 
-            // Serialize the command into JSON format
-            string jsonCommand = JsonConvert.SerializeObject(command);
-            var content = new StringContent(jsonCommand, Encoding.UTF8, "application/json");
+                var jsonResponse = JsonConvert.DeserializeObject<ModelResponse>(content);
+                if (jsonResponse?.Models == null || !jsonResponse.Models.Any())
+                    throw new Exception("No models found in the API response");
 
-            // Send the request to the AI Python API
-            var response = await httpClient.PostAsync($"{apiEndpoint}/agent-prompt", content);
-
-            // Log the response for debugging
-            var responseString = await response.Content.ReadAsStringAsync();
-            System.Diagnostics.Debug.WriteLine("Visio Command Response: " + responseString);
-
-            // Process AI response for further action in Visio
-            ProcessAICommand(responseString);
-
-            // Return the API response
-            return responseString;
-        }
-
-        // Function to process the AI response and apply commands to Visio
-        public static void ProcessAICommand(string aiResponse)
-{
-    try
-    {
-        var commandData = JsonConvert.DeserializeObject<dynamic>(aiResponse);
-
-        // Check if we have a valid action and shape
-        if (commandData != null && commandData.action != null)
-        {
-            string action = commandData.action;
-            string shape = commandData.shape;
-            float x = (float)commandData.x;
-            float y = (float)commandData.y;
-            float width = (float)commandData.width;
-            float height = (float)commandData.height;
-            string color = commandData.color;
-
-            Debug.WriteLine($"Executing action: {action} for shape: {shape}");
-
-            // Depending on the action, call the relevant method in Visio
-            if (action == "create_shape")
-            {
-                // Create an instance of LibraryManager
-                var visioApp = Globals.ThisAddIn.Application; // Assuming you're in an add-in
-                LibraryManager libraryManager = new LibraryManager(visioApp);
-                
-                // Use the instance to add the shape to Visio
-                libraryManager.AddShapeToDocument("BASIC_M.vssx", shape, x, y, width, height);
+                return jsonResponse.Models.Select(m => m.Name).ToArray();
             }
-            else if (action == "modify_properties")
+            catch (HttpRequestException e)
             {
-                // Handle property modifications here (to be implemented)
+                Debug.WriteLine($"HTTP Request Error: {e.Message}");
+                throw;
             }
-            // Additional action handling (e.g., connect_shapes) can be added here
+            catch (Exception e)
+            {
+                Debug.WriteLine($"Unexpected error: {e.Message}");
+                throw;
+            }
         }
-        else
+
+        /// <summary>
+        /// Sends a chat message to the backend AI system and receives the response.
+        /// </summary>
+        /// <param name="apiEndpoint">The base URL of the API endpoint.</param>
+        /// <param name="message">The user's message to send.</param>
+        /// <param name="model">The AI model to use.</param>
+        /// <returns>The AI's response message.</returns>
+        public static async Task<string> SendMessage(string apiEndpoint, string message, string model)
         {
-            Debug.WriteLine("AI response does not contain a valid action or shape.");
+            try
+            {
+                var payload = new
+                {
+                    model = model,
+                    message = message
+                };
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync($"{apiEndpoint}/agent-prompt", jsonContent);
+                response.EnsureSuccessStatusCode();
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                var chatResponse = JsonConvert.DeserializeObject<ChatResponse>(responseContent);
+                if (chatResponse == null || string.IsNullOrEmpty(chatResponse.Response))
+                    throw new Exception("Invalid response from AI system");
+
+                return chatResponse.Response;
+            }
+            catch (HttpRequestException e)
+            {
+                Debug.WriteLine($"HTTP Request Error: {e.Message}");
+                throw;
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"Unexpected error: {e.Message}");
+                throw;
+            }
         }
-    }
-    catch (Exception ex)
-    {
-        Debug.WriteLine($"Error processing AI command: {ex.Message}");
-    }
+
+        /// <summary>
+        /// Sends an image along with a message to the backend AI system.
+        /// </summary>
+        /// <param name="apiEndpoint">The base URL of the API endpoint.</param>
+        /// <param name="imagePath">The path to the image file.</param>
+        /// <param name="model">The AI model to use.</param>
+        /// <returns>The AI's response message.</returns>
+        public static async Task<string> SendImage(string apiEndpoint, string imagePath, string model)
+        {
+            try
+            {
+                var content = new MultipartFormDataContent();
+
+                var imageContent = new ByteArrayContent(System.IO.File.ReadAllBytes(imagePath));
+                imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+                content.Add(imageContent, "image", System.IO.Path.GetFileName(imagePath));
+
+                content.Add(new StringContent(model), "model");
+
+                var response = await httpClient.PostAsync($"{apiEndpoint}/image", content);
+                response.EnsureSuccessStatusCode();
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                var imageResponse = JsonConvert.DeserializeObject<ChatResponse>(responseContent);
+                if (imageResponse == null || string.IsNullOrEmpty(imageResponse.Response))
+                    throw new Exception("Invalid response from AI system");
+
+                return imageResponse.Response;
+            }
+            catch (HttpRequestException e)
+            {
+                Debug.WriteLine($"HTTP Request Error: {e.Message}");
+                throw;
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"Unexpected error: {e.Message}");
+                throw;
+            }
+        }
+
+        // Models to deserialize API responses
+        public class ModelResponse
+        {
+            public System.Collections.Generic.List<ModelInfo> Models { get; set; }
+        }
+
+        public class ModelInfo
+        {
+            public string Name { get; set; }
+        }
+
+        public class ChatResponse
+        {
+            public string Response { get; set; }
         }
     }
 }
