@@ -1,0 +1,190 @@
+{
+  "name": "VisioCommandProcessorWorkflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "process-visio-command",
+        "options": {}
+      },
+      "id": "a33327f1-2b7e-4eb5-a837-9ec832e12d6b",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const command = $json[\"command\"];\nconst parameters = $json[\"parameters\"];\nreturn { command, parameters };"
+      },
+      "id": "c7b242b9-88df-4468-9928-6962d78d1f78",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "dfabc211-4bb6-4d45-a2a8-a8737762c834",
+      "name": "Switch CreateShape",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5678/execute-shape-command",
+        "jsonParameters": true,
+        "options": {}
+      },
+      "id": "26a8635d-a320-4853-9f1d-f19cf13ac663",
+      "name": "HTTP Request CreateShape",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a5769124-7077-4e74-94ff-e22d8bf46344",
+      "name": "Switch DeleteShape",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5678/execute-shape-command",
+        "jsonParameters": true,
+        "options": {}
+      },
+      "id": "ed5bcec3-2a40-4eb0-b4bf-83035c9d0482",
+      "name": "HTTP Request DeleteShape",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        660
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "1f1ca086-bf26-4bd8-81bc-6521eced36d1",
+      "name": "Switch ConnectShapes",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5678/execute-shape-command",
+        "jsonParameters": true,
+        "options": {}
+      },
+      "id": "c3754609-e272-4ffb-8cd4-bc86d89d8423",
+      "name": "HTTP Request ConnectShapes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        860
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Switch CreateShape",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Switch DeleteShape",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Switch ConnectShapes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch CreateShape": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request CreateShape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch DeleteShape": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request DeleteShape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch ConnectShapes": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request ConnectShapes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2163b94e-df18-4bb2-9a6f-db8de724443f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8617a31e3f06210fe687111ab485791c35eb905eedc1db78b92cdc917ac4621b"
+  },
+  "id": "3H8C5TveWrbSWByb",
+  "tags": []
+}

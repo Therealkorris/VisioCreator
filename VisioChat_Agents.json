@@ -1,0 +1,374 @@
+{
+  "name": "VisioChat_Agents",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "id": "c0b83e30-123a-43e9-bc3c-3d83289f4472",
+      "name": "Ollama Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        1260
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the JSON from the Manager response\nconst output = JSON.parse($json.text);\n\n// Return both the route and the reply for further processing\nreturn {\n  route: output.route,   // Keep route for the Switch node\n  reply: output.reply    // Send reply to the Respond webhook\n};"
+      },
+      "id": "e495bc03-8e0d-42f6-b2eb-68290d2167ba",
+      "name": "Code1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -740,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"message\": \"{{ $json.reply }}\"\n}",
+        "options": {}
+      },
+      "id": "3c3c0287-28ec-4d1b-9d25-c5ddaf4971b9",
+      "name": "Respond chat_from_manager1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -260,
+        840
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.output }}\n",
+        "options": {}
+      },
+      "id": "bd56535e-ce65-47df-8cc8-91a3a6b1e974",
+      "name": "Action_response1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        380,
+        1040
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "id": "d66eab87-c5bb-4033-81f0-0b6b744bedc3",
+      "name": "Ollama Model",
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        -1160,
+        1100
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "cbaefb12-355d-4902-84d2-c17e1b4b8d29",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1440,
+        1080
+      ],
+      "webhookId": "fbf6ebb8-5f01-46e5-90f3-52d841026b4c"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### System:\nYou are the Manager Agent responsible for understanding user input and deciding how to respond.\n\n1. If the user's message is a general chat or question, respond directly with a conversation reply and set the route as `\"manager\"`. \n   Example: \n   - User: \"Hello!\"\n   - Response: { \"route\": \"manager\", \"reply\": \"Hi there! How can I assist you today?\" }\n\n2. If the user's message involves actions like creating, modifying, or deleting, respond with a message indicating that their request has been forwarded and set the route as `\"action_agent\"`.\n   Example: \n   - User: \"Create a red circle.\"\n   - Response: { \"route\": \"action_agent\", \"reply\": \"Your request has been forwarded to the Action Agent.\" }\n\nRespond only with a valid JSON response based on the user's input. \n\n### User:\n{{ $json.chatInput || $json.body.message }}\n\n### Assistant:",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "{{ $json.chatInput || $json.body.message }}"
+            }
+          ]
+        }
+      },
+      "id": "65a0bab4-fff4-41c9-b687-6451f9e22c30",
+      "name": "Chat LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        -1100,
+        860
+      ],
+      "typeVersion": 1.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a63a93f6-0542-47f2-86d3-0c8becb0e969",
+      "name": "Chat_visio1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1440,
+        860
+      ],
+      "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    },
+    {
+      "parameters": {
+        "name": "VisioCommandProcessor",
+        "description": "This tool will process commands related to creating shapes, deleting shapes, and connecting shapes in the Visio-like environment.\n",
+        "workflowId": {
+          "__rl": true,
+          "value": "3H8C5TveWrbSWByb",
+          "mode": "list",
+          "cachedResultName": "VisioCommandProcessorWorkflow"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "command",
+              "type": "objectValue",
+              "objectValue": "={{$json[\"command\"]}}"
+            },
+            {
+              "name": "parameters",
+              "type": "objectValue",
+              "objectValue": "={{$json[\"parameters\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "747795d5-d760-47df-83d9-7119790dc42a",
+      "name": "Visio_Command_Processor",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        1260
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8d8a0903-2a4c-4bf9-9385-b25e8d4c9840",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "action_agent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6868b122-c8d4-47fc-ab2c-927611aed835",
+      "name": "Switch1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -600,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "### System:\nYou are an Action Agent that interprets user requests and generates commands for shapes in a Visio-like system.\n\n### Instructions:\n- Your job is to return a clean, valid JSON structure without additional explanation or text.\n- If the user's request is to create a shape, return the appropriate JSON command.\n- The JSON should contain only the required data without any additional information or explanation.\n\n### User Message:\n{{ $json.chatInput || $json.body.message }}\n\n### Respond with:\n{\n  \"command\": \"<command_name>\",\n  \"parameters\": {\n    \"shapeType\": \"<shape_type>\",\n    \"position\": { \"x\": <percent_x>, \"y\": <percent_y> },\n    \"size\": { \"width\": <percent_width>, \"height\": <percent_height> },\n    \"color\": \"<color>\"\n  }\n}",
+        "options": {}
+      },
+      "id": "ff5a872f-3380-4fcc-9d87-25d50e382b31",
+      "name": "action_agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -40,
+        1040
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "action_agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat_visio1": {
+      "main": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visio_Command_Processor": {
+      "ai_tool": [
+        [
+          {
+            "node": "action_agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Respond chat_from_manager1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "action_agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "action_agent1": {
+      "main": [
+        [
+          {
+            "node": "Action_response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f51f6e0d-f8a8-4edc-a0c7-e500ae0b14e8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8617a31e3f06210fe687111ab485791c35eb905eedc1db78b92cdc917ac4621b"
+  },
+  "id": "0YrOWq9lbMxFYMXA",
+  "tags": []
+}

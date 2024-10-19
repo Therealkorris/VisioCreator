@@ -275,6 +275,7 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <None Include="AI_Visio_connection_and_Model.json" />
     <None Include="app.config" />
     <None Include="Instructions.md" />
     <None Include="packages.config" />
@@ -297,8 +298,9 @@
       <DependentUpon>ThisAddIn.Designer.xml</DependentUpon>
     </Compile>
     <AppDesigner Include="Properties\" />
+    <None Include="VisioChat_Agents.json" />
+    <None Include="VisioCommandProcessorWorkflow.json" />
     <None Include="VisioPlugin_TemporaryKey.pfx" />
-    <None Include="Visio_Controller.json" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="agent.py" />

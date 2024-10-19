@@ -1,0 +1,132 @@
+{
+  "name": "AI_Visio_connection_and_Model",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:11434/v1/models",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "d8f03d4d-613c-4bc7-8b78-3f434a05f8e1",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the models from the HTTP request response (assuming they are inside \"data\")\nconst models = $input.first().json.data.map(model => model.id);\n\n// Return the models in a structured response\nreturn [\n  {\n    json: {\n      status: 'Success',\n      availableModels: models\n    }\n  }\n];\n"
+      },
+      "id": "50f8ed10-881e-4ae7-bbb4-778a22d33301",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.availableModels }}",
+        "options": {}
+      },
+      "id": "d10767a1-d4ac-4cc2-8691-0a546957e810",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Connection and Ollama\n** Connects via Webhook, and connects to API\n** List models back to AIChatPane",
+        "height": 300,
+        "width": 956
+      },
+      "id": "073c6bc2-14b9-43e6-8f21-7f9e5f13f389",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        60,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/connection_model_list",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "83bf1ad8-796b-4822-9c21-dda85301098a",
+      "name": "API_Connection_model_visio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        140,
+        380
+      ],
+      "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API_Connection_model_visio": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "775f9adc-7afe-410b-a8b6-f112e1f9d351",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8617a31e3f06210fe687111ab485791c35eb905eedc1db78b92cdc917ac4621b"
+  },
+  "id": "A0DATPdm2Y4WrcPJ",
+  "tags": []
+}
