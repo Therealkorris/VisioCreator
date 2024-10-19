@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
 using System.Diagnostics;
 using System.Linq;
+using System.Collections.Generic; // <-- Important for Dictionary
 
 namespace VisioPlugin
 {
@@ -12,40 +13,65 @@ namespace VisioPlugin
         private readonly Visio.Application visioApp;
         private readonly LibraryManager libraryManager;
 
+        // Command registry to store command names and their corresponding handlers
+        private Dictionary<string, Action<JToken>> commandRegistry;
+
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
             this.visioApp = visioApp;
             this.libraryManager = libraryManager;
+
+            // Initialize the command registry
+            commandRegistry = new Dictionary<string, Action<JToken>>(StringComparer.OrdinalIgnoreCase);
+
+            // Register commands and their handlers
+            RegisterCommands();
         }
 
+        // Register all available commands dynamically
+        private void RegisterCommands()
+        {
+            // Mapping command names to their respective method handlers
+            commandRegistry.Add("CreateShape", CreateShape);
+            commandRegistry.Add("DeleteShape", DeleteShape);
+            commandRegistry.Add("ConnectShapes", ConnectShapes);
+
+            // Add more commands here as needed
+        }
+
+        // The core command processor method
         public void ProcessCommand(string jsonCommand)
         {
             try
             {
+                Debug.WriteLine($"Received Command: {jsonCommand}"); // Log the received command
+
                 JObject commandObject = JObject.Parse(jsonCommand);
                 string commandName = commandObject["command"]?.ToString();
 
                 if (string.IsNullOrEmpty(commandName))
                     throw new Exception("Command name is missing.");
 
-                // Use reflection to find and invoke the method
-                MethodInfo method = this.GetType().GetMethod(commandName, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                if (method == null)
+                // Check if the command is registered
+                if (commandRegistry.ContainsKey(commandName))
+                {
+                    Debug.WriteLine($"Executing Command: {commandName}"); // Log command execution
+                    commandRegistry[commandName](commandObject["parameters"]);
+                }
+                else
+                {
                     throw new Exception($"Command '{commandName}' is not recognized.");
-
-                // Invoke the method with parameters
-                method.Invoke(this, new object[] { commandObject["parameters"] });
+                }
             }
             catch (Exception ex)
             {
-                // Handle exceptions
                 Debug.WriteLine($"Error processing command: {ex.Message}");
-                throw; // Rethrow to let the caller handle it if needed
+                throw; // Re-throw the exception to be handled upstream
             }
         }
 
-        // Command methods
 
+        // Command methods
         private void CreateShape(JToken parameters)
         {
             string shapeType = parameters["shapeType"]?.ToString();
@@ -80,8 +106,6 @@ namespace VisioPlugin
             Debug.WriteLine($"Shape '{shapeType}' created at ({visioX}, {visioY}) with size ({visioWidth}, {visioHeight}) and color {color}.");
         }
 
-        // You can add more command methods here, e.g., ConnectShapes, DeleteShape, etc.
-
         private void DeleteShape(JToken parameters)
         {
             string shapeName = parameters["shapeName"]?.ToString();
@@ -106,7 +130,6 @@ namespace VisioPlugin
                 Debug.WriteLine($"Shape '{shapeName}' not found on the active page.");
             }
         }
-
 
         private void ConnectShapes(JToken parameters)
         {
@@ -149,7 +172,5 @@ namespace VisioPlugin
 
             Debug.WriteLine($"Shapes '{fromShapeName}' and '{toShapeName}' connected with '{connectorType}'.");
         }
-
-        // Add more commands as needed
     }
 }

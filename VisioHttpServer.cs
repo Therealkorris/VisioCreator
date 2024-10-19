@@ -4,6 +4,7 @@ using System.Text;
 using System.Diagnostics;
 using System.Net.Http;
 using Visio = Microsoft.Office.Interop.Visio;
+using Newtonsoft.Json.Linq;
 
 namespace VisioPlugin
 {
@@ -23,18 +24,40 @@ namespace VisioPlugin
         {
             try
             {
+                // Parse the jsonCommand to determine the appropriate n8n endpoint
+                JObject commandObject = JObject.Parse(jsonCommand);
+                string commandName = commandObject["command"]?.ToString();
+
                 // Debugging: Log that we are entering the method
-                Debug.WriteLine($"[Debug] Entering SendCommandToN8n with data: {jsonCommand}");
+                Debug.WriteLine($"[Debug] Entering SendCommandToN8n with command: {commandName} and data: {jsonCommand}");
 
-                // Append the specific path to the base apiEndpoint
-                string n8nWebhookUrl = $"{apiEndpoint}/connection_model_list";  // Full URL
+                // Map commands to different n8n endpoints (if necessary)
+                string n8nWebhookUrl;
+                switch (commandName)
+                {
+                    case "CreateShape":
+                        n8nWebhookUrl = $"{apiEndpoint}/create_shape";  // Example specific URL for creating shape
+                        break;
 
+                    case "DeleteShape":
+                        n8nWebhookUrl = $"{apiEndpoint}/delete_shape";  // Example specific URL for deleting shape
+                        break;
+
+                    case "ConnectShapes":
+                        n8nWebhookUrl = $"{apiEndpoint}/connect_shapes";  // Example specific URL for connecting shapes
+                        break;
+
+                    default:
+                        n8nWebhookUrl = $"{apiEndpoint}/general_command";  // Default URL for other commands
+                        break;
+                }
+
+                // Debugging: Log that we are about to send the POST request
+                Debug.WriteLine($"[Debug] Sending POST request to {n8nWebhookUrl} with command data.");
 
                 using (var httpClient = new HttpClient())
                 {
                     var content = new StringContent(jsonCommand, Encoding.UTF8, "application/json");
-                    // Debugging: Log that we are about to send the POST request
-                    Debug.WriteLine($"[Debug] Sending POST request to {n8nWebhookUrl}");
 
                     var response = await httpClient.PostAsync(n8nWebhookUrl, content);
 
@@ -55,6 +78,7 @@ namespace VisioPlugin
                 Debug.WriteLine($"[Error] Exception sending data to n8n: {ex.Message}");
             }
         }
+
 
 
         public async Task ProcessAndSendCommand(string jsonCommand)
