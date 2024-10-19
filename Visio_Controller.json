@@ -1,0 +1,132 @@
+{
+  "name": "Visio-Controller",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:11434/v1/models",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "72e08845-083d-43c5-bca9-dbbfffa23d3c",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the models from the HTTP request response (assuming they are inside \"data\")\nconst models = $input.first().json.data.map(model => model.id);\n\n// Return the models in a structured response\nreturn [\n  {\n    json: {\n      status: 'Success',\n      availableModels: models\n    }\n  }\n];\n"
+      },
+      "id": "bebb737d-e62d-41bd-9d08-7a2ae7586b7f",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/receive-visio",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "96f78e44-e68b-4d8f-ada5-9076fac02271",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        600,
+        340
+      ],
+      "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.availableModels }}",
+        "options": {}
+      },
+      "id": "a6ec9286-dc18-42cb-ae7e-839f141dd408",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Connection and Ollama\n** Connects via Webhook, and connects to API\n** List models back to AIChatPane",
+        "height": 300,
+        "width": 956
+      },
+      "id": "3055a23b-bc47-4c16-9d97-2af5c7cd1ca7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5ffae3fa-90f6-4546-917d-901619e6ec7d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8617a31e3f06210fe687111ab485791c35eb905eedc1db78b92cdc917ac4621b"
+  },
+  "id": "6ZnbuWSt6YXYvUmA",
+  "tags": []
+}

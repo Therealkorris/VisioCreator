@@ -143,10 +143,6 @@ namespace VisioPlugin
             return addIn.GetModelLabel(control, index);
         }
 
-        public void OnModelSelectionChange(Office.IRibbonControl control, string selectedItemId)
-        {
-            addIn.OnModelSelectionChange(control, selectedItemId);
-        }
 
         // Connection status label control update
         public string GetConnectionStatus(Office.IRibbonControl control)

@@ -16,14 +16,15 @@ namespace VisioPlugin
         private Label modelLabel;
 
         private readonly LibraryManager libraryManager;
-        private readonly string apiEndpoint;
-        private string selectedModel;
+        private readonly VisioChatManager chatManager;
+
 
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
             this.libraryManager = libraryManager;
-            this.apiEndpoint = apiEndpoint;
-            this.selectedModel = model;
+
+            // Initialize the chat manager with the selected model, apiEndpoint, and other necessary details
+            this.chatManager = new VisioChatManager(model, apiEndpoint, models, libraryManager, AppendToChatHistory);
 
             InitializeCustomComponents();
 
@@ -87,7 +88,7 @@ namespace VisioPlugin
                 Font = new Font("Segoe UI", 10),
                 DropDownStyle = ComboBoxStyle.DropDownList,
             };
-            modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged;
+// modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged;
 
             // Add controls to the form
             Controls.Add(chatHistory);
@@ -126,7 +127,7 @@ namespace VisioPlugin
             }
         }
 
-        private async void SendButton_Click(object sender, EventArgs e)
+        private void SendButton_Click(object sender, EventArgs e)
         {
             string userMessage = chatInput.Text.Trim();
             if (string.IsNullOrEmpty(userMessage)) return;
@@ -134,21 +135,11 @@ namespace VisioPlugin
             chatInput.Clear();
             AppendToChatHistory($"You: {userMessage}");
 
-            try
-            {
-                var response = await BackendCommunication.SendMessage(apiEndpoint, userMessage, selectedModel);
-                AppendToChatHistory($"AI: {response}");
-
-                // Process AI commands if any
-                ProcessAIResponse(response);
-            }
-            catch (Exception ex)
-            {
-                AppendToChatHistory($"Error: {ex.Message}");
-            }
+            // Send the message using VisioChatManager
+            chatManager.SendMessage(userMessage);
         }
 
-        private async void UploadImageButton_Click(object sender, EventArgs e)
+        private void UploadImageButton_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
@@ -158,18 +149,8 @@ namespace VisioPlugin
                     string imagePath = openFileDialog.FileName;
                     AppendToChatHistory("You sent an image.");
 
-                    try
-                    {
-                        var response = await BackendCommunication.SendImage(apiEndpoint, imagePath, selectedModel);
-                        AppendToChatHistory($"AI: {response}");
-
-                        // Process AI commands if any
-                        ProcessAIResponse(response);
-                    }
-                    catch (Exception ex)
-                    {
-                        AppendToChatHistory($"Error: {ex.Message}");
-                    }
+                    // Send the image using VisioChatManager
+                    chatManager.SendMessageWithImage(imagePath);
                 }
             }
         }
@@ -184,7 +165,7 @@ namespace VisioPlugin
                     string filePath = files[0];
                     if (filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
                     {
-                        UploadImage(filePath);
+                        chatManager.SendMessageWithImage(filePath);
                     }
                 }
             }
@@ -194,24 +175,6 @@ namespace VisioPlugin
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
                 e.Effect = DragDropEffects.Copy;
-        }
-
-        private async void UploadImage(string imagePath)
-        {
-            AppendToChatHistory("You sent an image.");
-
-            try
-            {
-                var response = await BackendCommunication.SendImage(apiEndpoint, imagePath, selectedModel);
-                AppendToChatHistory($"AI: {response}");
-
-                // Process AI commands if any
-                ProcessAIResponse(response);
-            }
-            catch (Exception ex)
-            {
-                AppendToChatHistory($"Error: {ex.Message}");
-            }
         }
 
         private void AppendToChatHistory(string message)
@@ -227,33 +190,11 @@ namespace VisioPlugin
             }
         }
 
-        private void ModelDropdown_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            selectedModel = modelDropdown.SelectedItem?.ToString();
-            AppendToChatHistory($"Model changed to: {selectedModel}");
-        }
-
         private void ProcessAIResponse(string response)
         {
             // If the AI response includes commands for Visio, process them here
             // For example, parse the response and use LibraryManager to add shapes
             // This is a placeholder for actual implementation
-
-            // Example:
-            /*
-            var aiCommand = JsonConvert.DeserializeObject<AICommand>(response);
-            if (aiCommand != null)
-            {
-                libraryManager.AddShapeToDocument(
-                    aiCommand.Category,
-                    aiCommand.ShapeName,
-                    aiCommand.Position.X,
-                    aiCommand.Position.Y,
-                    aiCommand.Size.Width,
-                    aiCommand.Size.Height
-                );
-            }
-            */
         }
     }
 }

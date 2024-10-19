@@ -258,9 +258,6 @@
     <Compile Include="AIChatPane.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="BackendCommunication.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="ChatManager.cs" />
     <Compile Include="VisioCommandProcessor.cs" />
     <Compile Include="LibraryManager.cs" />
@@ -301,6 +298,7 @@
     </Compile>
     <AppDesigner Include="Properties\" />
     <None Include="VisioPlugin_TemporaryKey.pfx" />
+    <None Include="Visio_Controller.json" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="agent.py" />

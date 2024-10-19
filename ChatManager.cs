@@ -33,18 +33,24 @@ namespace VisioPlugin
 
             try
             {
+                // Prepare the request content as a multipart form, including the message and the selected model
                 var content = new MultipartFormDataContent
-                {
-                    { new StringContent(userMessage), "prompt" },
-                    { new StringContent(selectedModel), "model" }
-                };
+        {
+            { new StringContent(userMessage), "message" },  // Changed "prompt" to "message"
+            { new StringContent(selectedModel), "model" }   // Keeping the selected model
+        };
 
-                var response = await httpClient.PostAsync($"{apiEndpoint}/agent-prompt", content);
+                // Send the message to the n8n webhook for processing
+                var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", content);
+                response.EnsureSuccessStatusCode();  // Ensure the request was successful
+
+                // Read the AI's response
                 var responseString = await response.Content.ReadAsStringAsync();
 
+                // Append AI response to chat history
                 appendToChatHistory("AI: " + responseString.Trim());
 
-                // Send command to the Visio application
+                // Process the AI's response (e.g., if it's a command for Visio)
                 await SendCommandToVisio(responseString);
             }
             catch (Exception ex)
@@ -53,6 +59,7 @@ namespace VisioPlugin
                 Debug.WriteLine("Error sending message: " + ex.Message);
             }
         }
+
 
 
         public async void SendMessageWithImage(string imagePath)
@@ -91,15 +98,25 @@ namespace VisioPlugin
         {
             try
             {
-                // Assuming the AI response is a JSON command
+                // Debugging: Log the received AI response
+                Debug.WriteLine($"[Debug] Received AI Response: {aiResponse}");
+
+                // Process the command
                 var commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);
+
+                // Debugging: Log before processing the command
+                Debug.WriteLine($"[Debug] Processing the command in Visio: {aiResponse}");
+
                 await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
+
+                // Debugging: Log after processing the command successfully
+                Debug.WriteLine($"[Debug] Command processed successfully in Visio.");
             }
             catch (Exception ex)
             {
-                appendToChatHistory("Error executing Visio command: " + ex.Message);
-                Debug.WriteLine($"Error executing Visio command: {ex.Message}");
+                Debug.WriteLine($"[Error] Error executing Visio command: {ex.Message}");
             }
         }
+
     }
 }

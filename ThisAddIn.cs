@@ -21,14 +21,13 @@ namespace VisioPlugin
         private LibraryManager libraryManager;
         private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
-        private string apiEndpoint = "http://localhost:11434";
-        private string pythonApiEndpoint = "http://localhost:8000";
+        public string apiEndpoint = "http://localhost:5678/webhook-test";
         public bool isConnected = false;
         private string[] availableModels = new string[0];
         private HttpClient httpClient = new HttpClient();
-        private string selectedModel = "llama3.1:8b";
+        private string selectedModel = "llama3.2";
         private AIChatPane aiChatPane;
-        private VisioHttpListenerServer httpServer;
+        private VisioCommandSender httpServer;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -43,8 +42,7 @@ namespace VisioPlugin
             uiControl.CreateControl();
 
             // Start the Visio HTTP Server
-            httpServer = new VisioHttpListenerServer(visioApplication, libraryManager);
-            httpServer.Start();
+            httpServer = new VisioCommandSender(visioApplication, libraryManager);
         }
 
         // In the Shutdown method, stop the server
@@ -53,7 +51,6 @@ namespace VisioPlugin
             // Stop the Visio HTTP Server
             if (httpServer != null)
             {
-                httpServer.Stop();
             }
         }
 
@@ -163,35 +160,42 @@ namespace VisioPlugin
         {
             try
             {
-                var uri = new Uri(apiEndpoint);
-                var response = await httpClient.GetAsync($"{pythonApiEndpoint}/models");
+                // Define the request body (if needed, modify this based on your API requirements)
+                var requestBody = new
+                {
+                    command = "get_models"
+                };
+
+                // Convert the request body to JSON
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
+
+                // POST request to API
+                var response = await httpClient.PostAsync($"{apiEndpoint}/connection_model_list", jsonContent);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
                 // Log the raw response
                 Debug.WriteLine("Raw API Response: " + responseContent);
 
-                // Deserialize using Newtonsoft.Json
-                var modelResponse = JsonConvert.DeserializeObject<ModelResponse>(responseContent);
+                // Deserialize into List<string> since the response is an array of models
+                var modelList = JsonConvert.DeserializeObject<List<string>>(responseContent);
 
-                // Log the deserialized object
-                Debug.WriteLine("Deserialized ModelResponse: " + (modelResponse?.Models?.Count ?? 0) + " models found.");
+                Debug.WriteLine("Deserialized ModelResponse: " + (modelList?.Count ?? 0) + " models found.");
 
-                if (modelResponse == null || modelResponse.Models == null || !modelResponse.Models.Any())
+                if (modelList == null || !modelList.Any())
                 {
                     Debug.WriteLine("Error: No models found.");
                     MessageBox.Show("No AI models available. Please check your Ollama installation.");
                     return;
                 }
 
+                // Update UI and other controls
                 uiControl.Invoke((MethodInvoker)(() =>
                 {
                     isConnected = true;
-                    availableModels = modelResponse.Models.ToArray(); // Store available models
-                    Debug.WriteLine("Models loaded successfully.");
+                    availableModels = modelList.ToArray();
                     Ribbon?.InvalidateControl("ConnectionStatus");
                     Ribbon?.InvalidateControl("ModelSelectionDropDown");
-
-                    ShowAIChatPane(); // Load the AI chat window
+                    ShowAIChatPane();
                 }));
             }
             catch (HttpRequestException httpEx)
@@ -204,11 +208,6 @@ namespace VisioPlugin
                 Debug.WriteLine($"Unexpected error: {ex.Message}");
                 MessageBox.Show($"Unexpected error: {ex.Message}");
             }
-        }
-
-        public class ModelResponse
-        {
-            public List<string> Models { get; set; }
         }
 
         public string GetModelLabel(Office.IRibbonControl control, int index)
@@ -225,42 +224,12 @@ namespace VisioPlugin
             return availableModels?.Length ?? 0;
         }
 
-        public async void OnModelSelectionChange(Office.IRibbonControl control, string selectedItemId)
-        {
-            Debug.WriteLine($"Model selected: {selectedItemId}");
-            selectedModel = selectedItemId;
-
-            await SendModelSelectionToPython(selectedModel);
-        }
-
-        private async Task SendModelSelectionToPython(string model)
-        {
-            try
-            {
-                var modelSelectionPayload = new { model = model };
-                var jsonContent = new StringContent(JsonConvert.SerializeObject(modelSelectionPayload), Encoding.UTF8, "application/json");
-
-                var response = await httpClient.PostAsync($"{pythonApiEndpoint}/set-model", jsonContent);
-                if (response.IsSuccessStatusCode)
-                {
-                    Debug.WriteLine("Model successfully updated on Python backend.");
-                }
-                else
-                {
-                    Debug.WriteLine($"Error updating model on Python backend: {response.StatusCode}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error communicating with Python backend: {ex.Message}");
-            }
-        }
 
         private void ShowAIChatPane()
         {
             if (aiChatPane == null || aiChatPane.IsDisposed)
             {
-                aiChatPane = new AIChatPane(selectedModel, pythonApiEndpoint, availableModels, libraryManager);
+                aiChatPane = new AIChatPane(selectedModel, apiEndpoint, availableModels, libraryManager);
                 aiChatPane.FormClosed += (sender, e) => aiChatPane = null;
 
                 IntPtr visioHandle = new IntPtr(visioApplication.WindowHandle32);
