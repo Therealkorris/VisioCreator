@@ -36,23 +36,6 @@
     },
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "/receive-visio",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "96f78e44-e68b-4d8f-ada5-9076fac02271",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        600,
-        340
-      ],
-      "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
-    },
-    {
-      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json.availableModels }}",
         "options": {}
@@ -80,6 +63,113 @@
         520,
         220
       ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/connection_model_list",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "96f78e44-e68b-4d8f-ada5-9076fac02271",
+      "name": "API_Connection_model_visio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        600,
+        340
+      ],
+      "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "id": "9168a5ef-e106-4349-b8d3-3926e6c70905",
+      "name": "Ollama Model",
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        880,
+        920
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b1b9a92b-5915-433c-9dae-5c2d59721f2e",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        900
+      ],
+      "webhookId": "fbf6ebb8-5f01-46e5-90f3-52d841026b4c"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3e257041-367b-40b7-96ea-08619a5e70f0",
+      "name": "Chat_visio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        600,
+        680
+      ],
+      "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### System:\nYou are an assistant helping with tasks and answering questions.\n\n### User:\n{{ $json.chatInput || $json.body.message }}\n\n### Assistant:\n",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "{{ $json.body.message || $json.chatInput || $json.body }}"
+            }
+          ]
+        }
+      },
+      "id": "d329045a-1cbd-4fef-abe6-c2f2eff33451",
+      "name": "Chat LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        900,
+        680
+      ],
+      "typeVersion": 1.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"message\": \"{{ $json.text }}\"\n}\n",
+        "options": {}
+      },
+      "id": "506dea1c-405f-4246-ae60-60c3e47714ee",
+      "name": "Respond to chat",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1360,
+        680
+      ],
+      "alwaysOutputData": false
     }
   ],
   "pinData": {},
@@ -106,7 +196,7 @@
         ]
       ]
     },
-    "Webhook": {
+    "API_Connection_model_visio": {
       "main": [
         [
           {
@@ -116,13 +206,57 @@
           }
         ]
       ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat_visio": {
+      "main": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Respond to chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "5ffae3fa-90f6-4546-917d-901619e6ec7d",
+  "versionId": "72693a28-2745-40d9-bfe8-37019b405ef8",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8617a31e3f06210fe687111ab485791c35eb905eedc1db78b92cdc917ac4621b"

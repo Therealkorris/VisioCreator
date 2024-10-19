@@ -36,7 +36,7 @@ namespace VisioPlugin
             try
             {
                 // Replace this path with the actual location of your BASIC_M.vssx file
-                stencilPath = @"C:\Users\<YourUserName>\Documents\My Shapes\BASIC_M.vssx";
+                stencilPath = @"C:\Users\%username%\Documents\My Shapes\BASIC_M.vssx";
 
                 if (File.Exists(stencilPath))
                 {

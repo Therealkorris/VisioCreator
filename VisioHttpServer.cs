@@ -10,10 +10,13 @@ namespace VisioPlugin
     public class VisioCommandSender
     {
         private readonly VisioCommandProcessor commandProcessor;
+        private readonly string apiEndpoint;
 
-        public VisioCommandSender(Visio.Application visioApp, LibraryManager libraryManager)
+        // Constructor receives apiEndpoint from ThisAddIn
+        public VisioCommandSender(Visio.Application visioApp, LibraryManager libraryManager, string apiEndpoint)
         {
             commandProcessor = new VisioCommandProcessor(visioApp, libraryManager);
+            this.apiEndpoint = apiEndpoint;  // Save the base URL
         }
 
         public async Task SendCommandToN8n(string jsonCommand)
@@ -23,7 +26,9 @@ namespace VisioPlugin
                 // Debugging: Log that we are entering the method
                 Debug.WriteLine($"[Debug] Entering SendCommandToN8n with data: {jsonCommand}");
 
-                string n8nWebhookUrl = "http://localhost:5678/webhook-test/connection_model_list";  // n8n webhook URL
+                // Append the specific path to the base apiEndpoint
+                string n8nWebhookUrl = $"{apiEndpoint}/connection_model_list";  // Full URL
+
 
                 using (var httpClient = new HttpClient())
                 {

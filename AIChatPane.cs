@@ -18,24 +18,21 @@ namespace VisioPlugin
         private readonly LibraryManager libraryManager;
         private readonly VisioChatManager chatManager;
 
-
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
             this.libraryManager = libraryManager;
 
-            // Initialize the chat manager with the selected model, apiEndpoint, and other necessary details
+            // Initialize the chat manager
             this.chatManager = new VisioChatManager(model, apiEndpoint, models, libraryManager, AppendToChatHistory);
 
             InitializeCustomComponents();
-
-            // Populate models into the dropdown
             PopulateModelDropdown(models);
             modelDropdown.SelectedItem = model;
         }
 
         private void InitializeCustomComponents()
         {
-            // Initialize controls
+            // Chat history RichTextBox
             chatHistory = new RichTextBox
             {
                 Dock = DockStyle.Fill,
@@ -47,6 +44,7 @@ namespace VisioPlugin
             chatHistory.DragDrop += ChatHistory_DragDrop;
             chatHistory.DragEnter += ChatHistory_DragEnter;
 
+            // Chat input TextBox
             chatInput = new TextBox
             {
                 Dock = DockStyle.Bottom,
@@ -56,6 +54,7 @@ namespace VisioPlugin
             };
             chatInput.KeyDown += ChatInput_KeyDown;
 
+            // Send button
             sendButton = new Button
             {
                 Text = "Send",
@@ -64,6 +63,7 @@ namespace VisioPlugin
             };
             sendButton.Click += SendButton_Click;
 
+            // Upload image button
             uploadImageButton = new Button
             {
                 Text = "Upload Image",
@@ -72,6 +72,7 @@ namespace VisioPlugin
             };
             uploadImageButton.Click += UploadImageButton_Click;
 
+            // Model label and dropdown
             modelLabel = new Label
             {
                 Text = "Select AI Model:",
@@ -88,7 +89,6 @@ namespace VisioPlugin
                 Font = new Font("Segoe UI", 10),
                 DropDownStyle = ComboBoxStyle.DropDownList,
             };
-// modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged;
 
             // Add controls to the form
             Controls.Add(chatHistory);
@@ -107,7 +107,6 @@ namespace VisioPlugin
         private void PopulateModelDropdown(string[] models)
         {
             modelDropdown.Items.Clear();
-
             if (models != null && models.Length > 0)
             {
                 modelDropdown.Items.AddRange(models);
@@ -118,6 +117,7 @@ namespace VisioPlugin
             }
         }
 
+        // Handles the Enter key in the chat input to send messages
         private void ChatInput_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter && !e.Shift)
@@ -127,18 +127,20 @@ namespace VisioPlugin
             }
         }
 
+        // Handles sending messages
         private void SendButton_Click(object sender, EventArgs e)
         {
             string userMessage = chatInput.Text.Trim();
             if (string.IsNullOrEmpty(userMessage)) return;
 
             chatInput.Clear();
-            AppendToChatHistory($"You: {userMessage}");
+            //AppendToChatHistory($"You: {userMessage}");
 
-            // Send the message using VisioChatManager
+            // Send message via VisioChatManager
             chatManager.SendMessage(userMessage);
         }
 
+        // Handles uploading and sending images
         private void UploadImageButton_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
@@ -147,14 +149,15 @@ namespace VisioPlugin
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     string imagePath = openFileDialog.FileName;
-                    AppendToChatHistory("You sent an image.");
+                    //AppendToChatHistory("You sent an image.");
 
-                    // Send the image using VisioChatManager
+                    // Send image via VisioChatManager
                     chatManager.SendMessageWithImage(imagePath);
                 }
             }
         }
 
+        // Handles drag-and-drop image uploads
         private void ChatHistory_DragDrop(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -177,6 +180,7 @@ namespace VisioPlugin
                 e.Effect = DragDropEffects.Copy;
         }
 
+        // Append text to chat history
         private void AppendToChatHistory(string message)
         {
             if (InvokeRequired)
@@ -190,11 +194,10 @@ namespace VisioPlugin
             }
         }
 
+        // Placeholder for processing AI responses (e.g., adding shapes in Visio)
         private void ProcessAIResponse(string response)
         {
-            // If the AI response includes commands for Visio, process them here
-            // For example, parse the response and use LibraryManager to add shapes
-            // This is a placeholder for actual implementation
+            // Example: Parse and execute commands from the AI response.
         }
     }
 }

@@ -21,7 +21,11 @@ namespace VisioPlugin
         private LibraryManager libraryManager;
         private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
-        public string apiEndpoint = "http://localhost:5678/webhook-test";
+        
+        // Centralized API base URL
+        //public string apiEndpoint = "http://localhost:5678/webhook-test";
+        public string apiEndpoint = "http://localhost:5678/webhook";
+
         public bool isConnected = false;
         private string[] availableModels = new string[0];
         private HttpClient httpClient = new HttpClient();
@@ -42,7 +46,7 @@ namespace VisioPlugin
             uiControl.CreateControl();
 
             // Start the Visio HTTP Server
-            httpServer = new VisioCommandSender(visioApplication, libraryManager);
+            httpServer = new VisioCommandSender(visioApplication, libraryManager, apiEndpoint);
         }
 
         // In the Shutdown method, stop the server
