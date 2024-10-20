@@ -26,12 +26,12 @@ namespace VisioPlugin
             this.commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);
         }
 
-        // Send a message to the API and process the response
+        // Send a message to the AI and process the response (chat or command)
         public async void SendMessage(string userMessage)
         {
             if (string.IsNullOrEmpty(userMessage)) return;
 
-            appendToChatHistory("User: " + userMessage); // Append the user's message
+            appendToChatHistory("User: " + userMessage); // Append the user's message to chat
 
             try
             {
@@ -44,15 +44,15 @@ namespace VisioPlugin
                 // Convert the payload to JSON
                 var jsonContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
-                // Send the message to the external API (e.g., n8n or another service)
+                // Send the message to the external API
                 var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
                 response.EnsureSuccessStatusCode();  // Ensure the API call succeeded
 
-                // Read the response string
+                // Read the response from AI
                 var responseString = await response.Content.ReadAsStringAsync();
 
-                // Process the AI response (e.g., if it's a command for Visio)
-                await ProcessCommandResponse(responseString);
+                // Process AI response - either chat or a command
+                await ProcessCommand(responseString);
             }
             catch (HttpRequestException ex)
             {
@@ -66,8 +66,8 @@ namespace VisioPlugin
             }
         }
 
-        // Process the received AI response and send it to Visio
-        private async Task ProcessCommandResponse(string aiResponse)
+        // Process the AI's response and decide if it's a chat message or a command
+        private async Task ProcessCommand(string aiResponse)
         {
             try
             {
@@ -79,15 +79,19 @@ namespace VisioPlugin
                     JObject responseObject = JObject.Parse(aiResponse);
                     Debug.WriteLine($"[Debug] Parsed JSON Response: {responseObject}");
 
-                    // If the response contains a command, process it
+                    // If the response contains a command, execute it in Visio
                     if (responseObject["command"] != null)
                     {
                         Debug.WriteLine($"[Debug] Command found: {responseObject["command"]}");
-                        await SendCommandToVisio(aiResponse); // Sends the command to Visio
+
+                        // Send the parsed command to VisioCommandProcessor to execute the action in Visio
+                        await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
+
+                        Debug.WriteLine($"[Debug] Command executed in Visio.");
                     }
                     else if (responseObject["message"] != null)
                     {
-                        // If the response is a regular message, append it to the chat history
+                        // If the response is a regular chat message, append it to the chat history
                         string chatMessage = responseObject["message"].ToString();
                         appendToChatHistory($"AI: {chatMessage}");
                     }
@@ -98,6 +102,7 @@ namespace VisioPlugin
                 }
                 else
                 {
+                    // If the response is not a valid JSON, treat it as plain text chat message
                     Debug.WriteLine("[Error] AI Response is not valid JSON. Treating it as plain text.");
                     appendToChatHistory($"AI: {aiResponse}");
                 }
@@ -105,42 +110,6 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Error] Error processing AI response: {ex.Message}");
-            }
-        }
-
-        // Method to send command to Visio
-        public async Task SendCommandToVisio(string jsonCommand)
-        {
-            try
-            {
-                Debug.WriteLine($"[Debug] Sending command to Visio: {jsonCommand}");
-
-                // Prepare the command in JSON format
-                var jsonContent = new StringContent(jsonCommand, Encoding.UTF8, "application/json");
-
-                // Send the request to the Visio command API
-                var response = await httpClient.PostAsync($"{apiEndpoint}/visio-command", jsonContent);
-
-                Debug.WriteLine($"[Debug] Visio API Response Status: {response.StatusCode}");
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    Debug.WriteLine($"[Error] Visio API returned error: {response.StatusCode}");
-                    appendToChatHistory($"Error: Visio API returned status {response.StatusCode}");
-                    return;
-                }
-
-                // Read and log the response content
-                var responseString = await response.Content.ReadAsStringAsync();
-                Debug.WriteLine($"[Debug] Visio API Response Content: {responseString}");
-            }
-            catch (HttpRequestException ex)
-            {
-                Debug.WriteLine($"[Error] HTTP Request failed: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Error] General error: {ex.Message}");
             }
         }
 
