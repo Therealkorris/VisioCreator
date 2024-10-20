@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Text;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using System.Net;
 
 namespace VisioPlugin
 {
@@ -21,17 +22,19 @@ namespace VisioPlugin
         private LibraryManager libraryManager;
         private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
-        
-        // Centralized API base URL
-        //public string apiEndpoint = "http://localhost:5678/webhook-test";
-        public string apiEndpoint = "http://localhost:5678/webhook";
 
+        public string apiEndpoint = "http://localhost:5678/webhook";
         public bool isConnected = false;
         private string[] availableModels = new string[0];
         private HttpClient httpClient = new HttpClient();
         private string selectedModel = "llama3.2";
         private AIChatPane aiChatPane;
-        //private VisioCommandSender httpServer;
+
+        // Class-level declaration of HttpListener
+        private HttpListener listener;
+
+        // Initialize VisioChatManager for webhook listening
+        private VisioChatManager visioChatManager;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -44,12 +47,79 @@ namespace VisioPlugin
             libraryManager = new LibraryManager(visioApplication);
             uiControl = new System.Windows.Forms.Control();
             uiControl.CreateControl();
+
+            // Initialize VisioChatManager and start the webhook listener
+            visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, appendToChatHistory);
+
+            // Start the webhook listener on port 5680
+            StartWebhookListener(5680);
+
+            Debug.WriteLine("VisioChatManager webhook listener started on port 5680.");
+        }
+
+        private void appendToChatHistory(string obj)
+        {
+            // Implementation for chat history, if required.
+            Debug.WriteLine("Append to chat history: " + obj);
+        }
+
+        // Start a webhook listener for receiving commands
+        public void StartWebhookListener(int port)
+        {
+            listener = new HttpListener();
+            listener.Prefixes.Add($"http://localhost:{port}/visio-command/");
+            try
+            {
+                listener.Start();
+                Debug.WriteLine($"Webhook Listening for Visio commands on port {port}");
+
+                Task.Run(async () =>
+                {
+                    while (listener.IsListening)
+                    {
+                        HttpListenerContext context = await listener.GetContextAsync();
+                        string jsonCommand = new System.IO.StreamReader(context.Request.InputStream).ReadToEnd();
+
+                        // Process the webhook command
+                        await ProcessWebhookCommand(jsonCommand);
+
+                        // Respond to the webhook
+                        HttpListenerResponse response = context.Response;
+                        byte[] buffer = Encoding.UTF8.GetBytes("Command received and processed.");
+                        response.ContentLength64 = buffer.Length;
+                        response.OutputStream.Write(buffer, 0, buffer.Length);
+                        response.OutputStream.Close();
+                    }
+                });
+            }
+            catch (HttpListenerException ex)
+            {
+                Debug.WriteLine($"[Error] Failed to start listener on port {port}: {ex.Message}");
+            }
+        }
+
+        // Stop the webhook listener
+        public void StopWebhookListener()
+        {
+            if (listener != null)
+            {
+                listener.Stop();
+                listener.Close();
+                Debug.WriteLine("Webhook listener stopped.");
+            }
         }
 
         // In the Shutdown method, stop the server
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
- 
+            // Stop the webhook listener before shutdown
+            StopWebhookListener();
+        }
+
+        private async Task ProcessWebhookCommand(string jsonCommand)
+        {
+            // You can add processing logic for the webhook command here
+            Debug.WriteLine($"Received command: {jsonCommand}");
         }
 
         public string[] GetCategories()
@@ -158,23 +228,18 @@ namespace VisioPlugin
         {
             try
             {
-                // Define the request body (if needed, modify this based on your API requirements)
                 var requestBody = new
                 {
                     command = "get_models"
                 };
 
-                // Convert the request body to JSON
                 var jsonContent = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
-                // POST request to API
                 var response = await httpClient.PostAsync($"{apiEndpoint}/connection_model_list", jsonContent);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                // Log the raw response
                 Debug.WriteLine("Raw API Response: " + responseContent);
 
-                // Deserialize into List<string> since the response is an array of models
                 var modelList = JsonConvert.DeserializeObject<List<string>>(responseContent);
 
                 Debug.WriteLine("Deserialized ModelResponse: " + (modelList?.Count ?? 0) + " models found.");
@@ -186,7 +251,6 @@ namespace VisioPlugin
                     return;
                 }
 
-                // Update UI and other controls
                 uiControl.Invoke((MethodInvoker)(() =>
                 {
                     isConnected = true;
@@ -221,7 +285,6 @@ namespace VisioPlugin
         {
             return availableModels?.Length ?? 0;
         }
-
 
         private void ShowAIChatPane()
         {

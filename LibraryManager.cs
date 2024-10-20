@@ -15,13 +15,13 @@ namespace VisioPlugin
         {
             visioApplication = visioApp;
             categories = new Dictionary<string, ShapeCategory>();
-            LoadLibraries(); // Load all libraries when initialized
+            LoadLibraries();
         }
 
         public void LoadLibraries()
         {
             categories.Clear();
-            BuildShapesCatalog(); // No need to load a specific stencil manually
+            BuildShapesCatalog();
         }
 
         private void BuildShapesCatalog()
@@ -76,11 +76,9 @@ namespace VisioPlugin
 
                 var activePage = visioApplication.ActivePage;
 
-                // Get the page size (width and height in internal units)
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                // Ensure the master shape exists in the selected category
                 var master = GetShape(categoryName, shapeName);
                 if (master == null)
                 {
@@ -88,34 +86,24 @@ namespace VisioPlugin
                     return;
                 }
 
-                // Calculate random position inside the canvas based on the page width and height percentages
                 double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = (1 - (yPercent / 100.0)) * pageHeight; // Flip y-coordinates for Visio coordinate system (origin is bottom-left)
+                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
 
-                // Constrain x and y coordinates to ensure they are within the page bounds
                 visioX = Math.Max(0, Math.Min(visioX, pageWidth));
                 visioY = Math.Max(0, Math.Min(visioY, pageHeight));
 
-                // Drop the shape on the active Visio page
                 var shape = activePage.Drop(master, visioX, visioY);
                 Debug.WriteLine($"[Debug] Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
 
-                // Adjust the shape size if provided
                 if (widthPercent > 0 && heightPercent > 0)
                 {
-                    // Convert percentage sizes to actual Visio units
                     double shapeWidth = (widthPercent / 100.0) * pageWidth;
                     double shapeHeight = (heightPercent / 100.0) * pageHeight;
 
-                    // Adjust the shape size while keeping it within the canvas
                     shape.Cells["Width"].ResultIU = Math.Abs(shapeWidth);
                     shape.Cells["Height"].ResultIU = Math.Abs(shapeHeight);
 
                     Debug.WriteLine($"[Debug] Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
-                }
-                else
-                {
-                    Debug.WriteLine($"[Error] Invalid shape size: Width = {widthPercent}%, Height = {heightPercent}%. Skipping size adjustment.");
                 }
             }
             catch (Exception ex)
@@ -124,8 +112,6 @@ namespace VisioPlugin
                 Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
         }
-
-
 
         public void SetShapeColor(Visio.Shape shape, string colorHex)
         {
@@ -141,7 +127,7 @@ namespace VisioPlugin
 
                 shape.CellsU["FillForegnd"].FormulaU = $"RGB({rgbValue})";
                 shape.CellsU["LineColor"].FormulaU = $"RGB({rgbValue})";
-                shape.CellsU["FillPattern"].FormulaU = "1"; // Ensure the shape has a fill
+                shape.CellsU["FillPattern"].FormulaU = "1";
 
                 Debug.WriteLine($"Set color for shape '{shape.Name}' to {colorHex}");
             }

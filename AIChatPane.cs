@@ -152,7 +152,7 @@ namespace VisioPlugin
                     //AppendToChatHistory("You sent an image.");
 
                     // Send image via VisioChatManager
-                    chatManager.SendMessageWithImage(imagePath);
+                    //chatManager.SendMessageWithImage(imagePath);
                 }
             }
         }
@@ -168,7 +168,7 @@ namespace VisioPlugin
                     string filePath = files[0];
                     if (filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
                     {
-                        chatManager.SendMessageWithImage(filePath);
+                        //chatManager.SendMessageWithImage(filePath);
                     }
                 }
             }

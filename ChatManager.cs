@@ -26,105 +26,74 @@ namespace VisioPlugin
             this.commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);
         }
 
+        // Send a message to the API and process the response
         public async void SendMessage(string userMessage)
         {
             if (string.IsNullOrEmpty(userMessage)) return;
 
-            appendToChatHistory("User: " + userMessage); // Append the user's message only
+            appendToChatHistory("User: " + userMessage); // Append the user's message
 
             try
             {
-                // Prepare the JSON payload
                 var payload = new
                 {
-                    message = userMessage,  // The user's message
-                    model = selectedModel   // The selected AI model
+                    message = userMessage,
+                    model = selectedModel  // Model specified for AI processing
                 };
 
                 // Convert the payload to JSON
                 var jsonContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
-                // Send the message to the n8n webhook for processing
+                // Send the message to the external API (e.g., n8n or another service)
                 var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
-                response.EnsureSuccessStatusCode();  // Ensure the request was successful
+                response.EnsureSuccessStatusCode();  // Ensure the API call succeeded
 
-                // Read the AI's response
+                // Read the response string
                 var responseString = await response.Content.ReadAsStringAsync();
 
-                // Process the AI's response (e.g., if it's a command for Visio)
-                await SendCommandToVisio(responseString);
+                // Process the AI response (e.g., if it's a command for Visio)
+                await ProcessCommandResponse(responseString);
+            }
+            catch (HttpRequestException ex)
+            {
+                appendToChatHistory("Error sending message (HttpRequestException): " + ex.Message);
+                Debug.WriteLine($"[Error] Sending message failed: {ex.Message}");
             }
             catch (Exception ex)
             {
                 appendToChatHistory("Error: " + ex.Message);
-                Debug.WriteLine("Error sending message: " + ex.Message);
+                Debug.WriteLine($"[Error] Sending message: {ex.Message}");
             }
         }
 
-
-
-
-
-        public async void SendMessageWithImage(string imagePath)
-        {
-            appendToChatHistory("User sent an image: " + System.IO.Path.GetFileName(imagePath));
-
-            try
-            {
-                var content = new MultipartFormDataContent
-                {
-                    { new StringContent("Image analysis prompt"), "prompt" },
-                    { new StringContent(selectedModel), "model" }
-                };
-
-                var imageContent = new ByteArrayContent(System.IO.File.ReadAllBytes(imagePath));
-                imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-                content.Add(imageContent, "file", System.IO.Path.GetFileName(imagePath));
-
-                var response = await httpClient.PostAsync($"{apiEndpoint}/image-prompt", content);
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                appendToChatHistory("AI: " + responseContent);
-                Debug.WriteLine($"AI Response: {responseContent}");
-
-                // Process the AI response as a command
-                await SendCommandToVisio(responseContent);
-            }
-            catch (Exception ex)
-            {
-                appendToChatHistory("Error: " + ex.Message);
-                Debug.WriteLine("Error sending image: " + ex.Message);
-            }
-        }
-
-        private async Task SendCommandToVisio(string aiResponse)
+        // Process the received AI response and send it to Visio
+        private async Task ProcessCommandResponse(string aiResponse)
         {
             try
             {
                 Debug.WriteLine($"[Debug] Received AI Response: {aiResponse}");
 
-                // Check if the response is valid JSON
+                // Validate that the AI response is in JSON format
                 if (IsValidJson(aiResponse))
                 {
                     JObject responseObject = JObject.Parse(aiResponse);
-
                     Debug.WriteLine($"[Debug] Parsed JSON Response: {responseObject}");
 
-                    // Check if it's a command or a regular chat message
+                    // If the response contains a command, process it
                     if (responseObject["command"] != null)
                     {
                         Debug.WriteLine($"[Debug] Command found: {responseObject["command"]}");
-                        await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
-                        Debug.WriteLine($"[Debug] Command processed successfully in Visio.");
+                        await SendCommandToVisio(aiResponse); // Sends the command to Visio
                     }
                     else if (responseObject["message"] != null)
                     {
+                        // If the response is a regular message, append it to the chat history
                         string chatMessage = responseObject["message"].ToString();
                         appendToChatHistory($"AI: {chatMessage}");
                     }
                     else
                     {
-                        Debug.WriteLine("Unrecognized response format.");
+                        Debug.WriteLine("[Error] Unrecognized response format.");
                     }
                 }
                 else
@@ -139,26 +108,60 @@ namespace VisioPlugin
             }
         }
 
+        // Method to send command to Visio
+        public async Task SendCommandToVisio(string jsonCommand)
+        {
+            try
+            {
+                Debug.WriteLine($"[Debug] Sending command to Visio: {jsonCommand}");
+
+                // Prepare the command in JSON format
+                var jsonContent = new StringContent(jsonCommand, Encoding.UTF8, "application/json");
+
+                // Send the request to the Visio command API
+                var response = await httpClient.PostAsync($"{apiEndpoint}/visio-command", jsonContent);
+
+                Debug.WriteLine($"[Debug] Visio API Response Status: {response.StatusCode}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine($"[Error] Visio API returned error: {response.StatusCode}");
+                    appendToChatHistory($"Error: Visio API returned status {response.StatusCode}");
+                    return;
+                }
+
+                // Read and log the response content
+                var responseString = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"[Debug] Visio API Response Content: {responseString}");
+            }
+            catch (HttpRequestException ex)
+            {
+                Debug.WriteLine($"[Error] HTTP Request failed: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Error] General error: {ex.Message}");
+            }
+        }
+
+        // Validate if the input string is a valid JSON object
         private bool IsValidJson(string strInput)
         {
             strInput = strInput.Trim();
-            if ((strInput.StartsWith("{") && strInput.EndsWith("}")) || // For object
-                (strInput.StartsWith("[") && strInput.EndsWith("]")))   // For array
+            if ((strInput.StartsWith("{") && strInput.EndsWith("}")) ||  // Object check
+                (strInput.StartsWith("[") && strInput.EndsWith("]")))   // Array check
             {
                 try
                 {
-                    var obj = JToken.Parse(strInput);
+                    var obj = JToken.Parse(strInput);  // Try parsing the string into a JSON object
                     return true;
                 }
                 catch (Exception)
                 {
-                    return false;
+                    return false;  // If parsing fails, return false
                 }
             }
-
             return false;
         }
-
-
     }
 }
