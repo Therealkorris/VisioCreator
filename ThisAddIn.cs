@@ -31,7 +31,7 @@ namespace VisioPlugin
         private HttpClient httpClient = new HttpClient();
         private string selectedModel = "llama3.2";
         private AIChatPane aiChatPane;
-        private VisioCommandSender httpServer;
+        //private VisioCommandSender httpServer;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -44,18 +44,12 @@ namespace VisioPlugin
             libraryManager = new LibraryManager(visioApplication);
             uiControl = new System.Windows.Forms.Control();
             uiControl.CreateControl();
-
-            // Start the Visio HTTP Server
-            httpServer = new VisioCommandSender(visioApplication, libraryManager, apiEndpoint);
         }
 
         // In the Shutdown method, stop the server
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
-            // Stop the Visio HTTP Server
-            if (httpServer != null)
-            {
-            }
+ 
         }
 
         public string[] GetCategories()

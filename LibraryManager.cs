@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.IO;
 using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
@@ -11,50 +10,18 @@ namespace VisioPlugin
     {
         private readonly Visio.Application visioApplication;
         private readonly Dictionary<string, ShapeCategory> categories;
-        private string stencilPath;
 
         public LibraryManager(Visio.Application visioApp)
         {
             visioApplication = visioApp;
             categories = new Dictionary<string, ShapeCategory>();
-            LoadLibraries();
+            LoadLibraries(); // Load all libraries when initialized
         }
 
         public void LoadLibraries()
         {
             categories.Clear();
-
-            // Load the specific stencil: BASIC_M.vssx
-            LoadSpecificStencil();
-
-            // Build the shapes catalog
-            BuildShapesCatalog();
-        }
-
-        private void LoadSpecificStencil()
-        {
-            try
-            {
-                // Replace this path with the actual location of your BASIC_M.vssx file
-                stencilPath = @"C:\Users\%username%\Documents\My Shapes\BASIC_M.vssx";
-
-                if (File.Exists(stencilPath))
-                {
-                    visioApplication.Documents.OpenEx(stencilPath,
-                        (short)Visio.VisOpenSaveArgs.visOpenHidden |
-                        (short)Visio.VisOpenSaveArgs.visOpenRO);
-
-                    Debug.WriteLine($"Loaded stencil: {stencilPath}");
-                }
-                else
-                {
-                    Debug.WriteLine($"Stencil not found at path: {stencilPath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error loading specific stencil: {ex.Message}");
-            }
+            BuildShapesCatalog(); // No need to load a specific stencil manually
         }
 
         private void BuildShapesCatalog()
@@ -92,55 +59,73 @@ namespace VisioPlugin
             return Enumerable.Empty<string>();
         }
 
-        public string FindCategoryForShape(string shapeName)
+        public Visio.Master GetShape(string categoryName, string shapeName)
         {
-            foreach (var category in categories.Values)
+            if (categories.TryGetValue(categoryName, out ShapeCategory category))
             {
-                if (category.ContainsShape(shapeName))
-                {
-                    return category.Name;
-                }
+                return category.GetShape(shapeName);
             }
             return null;
         }
 
-        public void AddShapeToDocument(string categoryName, string shapeName, double x, double y, double width, double height)
+        public void AddShapeToDocument(string categoryName, string shapeName, double xPercent, double yPercent, double widthPercent, double heightPercent)
         {
             try
             {
-                Debug.WriteLine($"Adding shape: {shapeName} from category: {categoryName} at ({x}, {y}) with size ({width}, {height})");
+                Debug.WriteLine($"[Debug] Adding shape: {shapeName} from category: {categoryName} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
 
                 var activePage = visioApplication.ActivePage;
 
-                // Open the stencil to get the master (shape template)
-                var stencil = visioApplication.Documents.OpenEx(stencilPath, (short)Visio.VisOpenSaveArgs.visOpenHidden | (short)Visio.VisOpenSaveArgs.visOpenRO);
-                var master = stencil.Masters.get_ItemU(shapeName);
+                // Get the page size (width and height in internal units)
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
+                // Ensure the master shape exists in the selected category
+                var master = GetShape(categoryName, shapeName);
                 if (master == null)
                 {
-                    Debug.WriteLine($"Shape '{shapeName}' not found in stencil '{stencil.Name}'.");
+                    Debug.WriteLine($"[Error] Shape '{shapeName}' not found in category '{categoryName}'.");
                     return;
                 }
 
+                // Calculate random position inside the canvas based on the page width and height percentages
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = (1 - (yPercent / 100.0)) * pageHeight; // Flip y-coordinates for Visio coordinate system (origin is bottom-left)
+
+                // Constrain x and y coordinates to ensure they are within the page bounds
+                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
+                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+
                 // Drop the shape on the active Visio page
-                var shape = activePage.Drop(master, x, y);
+                var shape = activePage.Drop(master, visioX, visioY);
+                Debug.WriteLine($"[Debug] Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
 
-                Debug.WriteLine($"Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
-
-                // Adjust size if provided
-                if (width > 0 && height > 0)
+                // Adjust the shape size if provided
+                if (widthPercent > 0 && heightPercent > 0)
                 {
-                    shape.Cells["Width"].ResultIU = width;
-                    shape.Cells["Height"].ResultIU = height;
-                }
+                    // Convert percentage sizes to actual Visio units
+                    double shapeWidth = (widthPercent / 100.0) * pageWidth;
+                    double shapeHeight = (heightPercent / 100.0) * pageHeight;
 
-                Debug.WriteLine($"Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
+                    // Adjust the shape size while keeping it within the canvas
+                    shape.Cells["Width"].ResultIU = Math.Abs(shapeWidth);
+                    shape.Cells["Height"].ResultIU = Math.Abs(shapeHeight);
+
+                    Debug.WriteLine($"[Debug] Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
+                }
+                else
+                {
+                    Debug.WriteLine($"[Error] Invalid shape size: Width = {widthPercent}%, Height = {heightPercent}%. Skipping size adjustment.");
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error adding shape '{shapeName}' from stencil '{stencilPath}': {ex.Message}");
+                Debug.WriteLine($"[Error] Error adding shape '{shapeName}' from category '{categoryName}': {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
         }
+
+
 
         public void SetShapeColor(Visio.Shape shape, string colorHex)
         {
@@ -165,8 +150,6 @@ namespace VisioPlugin
                 Debug.WriteLine($"Error setting color for shape '{shape.Name}': {ex.Message}");
             }
         }
-
-        // ... (Rest of your code)
     }
 
     public class ShapeCategory
@@ -194,11 +177,6 @@ namespace VisioPlugin
         {
             shapes.TryGetValue(name, out Visio.Master master);
             return master;
-        }
-
-        public bool ContainsShape(string name)
-        {
-            return shapes.ContainsKey(name);
         }
     }
 }

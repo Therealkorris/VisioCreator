@@ -101,34 +101,62 @@ namespace VisioPlugin
         {
             try
             {
-                // Debugging: Log the received AI response
                 Debug.WriteLine($"[Debug] Received AI Response: {aiResponse}");
 
-                JObject responseObject = JObject.Parse(aiResponse);
+                // Check if the response is valid JSON
+                if (IsValidJson(aiResponse))
+                {
+                    JObject responseObject = JObject.Parse(aiResponse);
 
-                // Check if it's a command or a regular chat message
-                if (responseObject["command"] != null)
-                {
-                    // If a command exists, process it
-                    Debug.WriteLine($"[Debug] Processing the command in Visio: {aiResponse}");
-                    await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
-                    Debug.WriteLine($"[Debug] Command processed successfully in Visio.");
-                }
-                else if (responseObject["message"] != null)
-                {
-                    // If it's a regular chat message, append it to the chat history
-                    string chatMessage = responseObject["message"].ToString();
-                    appendToChatHistory($"AI: {chatMessage}");
+                    Debug.WriteLine($"[Debug] Parsed JSON Response: {responseObject}");
+
+                    // Check if it's a command or a regular chat message
+                    if (responseObject["command"] != null)
+                    {
+                        Debug.WriteLine($"[Debug] Command found: {responseObject["command"]}");
+                        await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
+                        Debug.WriteLine($"[Debug] Command processed successfully in Visio.");
+                    }
+                    else if (responseObject["message"] != null)
+                    {
+                        string chatMessage = responseObject["message"].ToString();
+                        appendToChatHistory($"AI: {chatMessage}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine("Unrecognized response format.");
+                    }
                 }
                 else
                 {
-                    Debug.WriteLine("Unrecognized response format.");
+                    Debug.WriteLine("[Error] AI Response is not valid JSON. Treating it as plain text.");
+                    appendToChatHistory($"AI: {aiResponse}");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Error] Error processing AI response: {ex.Message}");
             }
+        }
+
+        private bool IsValidJson(string strInput)
+        {
+            strInput = strInput.Trim();
+            if ((strInput.StartsWith("{") && strInput.EndsWith("}")) || // For object
+                (strInput.StartsWith("[") && strInput.EndsWith("]")))   // For array
+            {
+                try
+                {
+                    var obj = JToken.Parse(strInput);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+            }
+
+            return false;
         }
 
 

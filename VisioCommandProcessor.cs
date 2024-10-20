@@ -46,6 +46,7 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"Received Command: {jsonCommand}"); // Log the received command
 
+                // Parse the JSON command
                 JObject commandObject = JObject.Parse(jsonCommand);
                 string commandName = commandObject["command"]?.ToString();
 
@@ -70,7 +71,6 @@ namespace VisioPlugin
             }
         }
 
-
         // Command methods
         private void CreateShape(JToken parameters)
         {
@@ -80,6 +80,20 @@ namespace VisioPlugin
             float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;
             float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
             string color = parameters["color"]?.ToString();
+
+            // Get the current stencil (category) from your dropdown, or use a provided category if available
+            string categoryName = parameters["category"]?.ToString(); // Optional: Get category from AI response
+            if (string.IsNullOrEmpty(categoryName))
+            {
+                // If no category is provided by the AI response, use the currently selected category in your app
+                categoryName = Globals.ThisAddIn.CurrentCategory; // Assuming you store the current category in Globals or similar.
+            }
+
+            if (string.IsNullOrEmpty(categoryName))
+            {
+                Debug.WriteLine("[Error] No category specified, and no category selected. Cannot add shape.");
+                return;
+            }
 
             // Convert percentage to Visio coordinates
             var activePage = visioApp.ActivePage;
@@ -91,8 +105,8 @@ namespace VisioPlugin
             double visioWidth = (widthPercent / 100.0) * pageWidth;
             double visioHeight = (heightPercent / 100.0) * pageHeight;
 
-            // No need to specify category; LibraryManager will find the shape
-            libraryManager.AddShapeToDocument(null, shapeType, visioX, visioY, visioWidth, visioHeight);
+            // Add the shape using the category (stencil) and shape type
+            libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
 
             // Get the last added shape to set properties
             Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
