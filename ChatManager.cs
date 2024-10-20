@@ -45,11 +45,19 @@ namespace VisioPlugin
                 var jsonContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
                 // Send the message to the external API
+                Debug.WriteLine($"[Debug] Sending request to API endpoint: {apiEndpoint}/chat-agent");
+
                 var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
+
+                Debug.WriteLine($"[Debug] API response status: {response.StatusCode}");
+
                 response.EnsureSuccessStatusCode();  // Ensure the API call succeeded
 
                 // Read the response from AI
                 var responseString = await response.Content.ReadAsStringAsync();
+
+                // Log the full raw response for debugging purposes
+                Debug.WriteLine($"[Debug] Full AI Response (raw): {responseString}");
 
                 // Process AI response - either chat or a command
                 await ProcessCommand(responseString);
@@ -71,7 +79,16 @@ namespace VisioPlugin
         {
             try
             {
-                Debug.WriteLine($"[Debug] Received AI Response: {aiResponse}");
+                // Log the raw response again before processing
+                Debug.WriteLine($"[Debug] Received AI Response (raw): {aiResponse}");
+
+                // Check if the response is empty or invalid
+                if (string.IsNullOrEmpty(aiResponse))
+                {
+                    Debug.WriteLine("[Error] Received empty AI response.");
+                    appendToChatHistory("[Error] Received empty response from AI.");
+                    return;
+                }
 
                 // Validate that the AI response is in JSON format
                 if (IsValidJson(aiResponse))

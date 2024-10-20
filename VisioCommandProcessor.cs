@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Reflection;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
 using System.Diagnostics;
-using System.Linq;
-using System.Collections.Generic; // <-- Important for Dictionary
+using System.Collections.Generic;
 
 namespace VisioPlugin
 {
@@ -31,12 +30,8 @@ namespace VisioPlugin
         // Register all available commands dynamically
         private void RegisterCommands()
         {
-            // Mapping command names to their respective method handlers
             commandRegistry.Add("CreateShape", CreateShape);
-            commandRegistry.Add("DeleteShape", DeleteShape);
-            commandRegistry.Add("ConnectShapes", ConnectShapes);
-
-            // Add more commands here as needed
+            // Add more commands if needed in the future
         }
 
         // The core command processor method
@@ -81,17 +76,12 @@ namespace VisioPlugin
             float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
             string color = parameters["color"]?.ToString();
 
-            // Get the current stencil (category) from your dropdown, or use a provided category if available
-            string categoryName = parameters["category"]?.ToString(); // Optional: Get category from AI response
-            if (string.IsNullOrEmpty(categoryName))
-            {
-                // If no category is provided by the AI response, use the currently selected category in your app
-                categoryName = Globals.ThisAddIn.CurrentCategory; // Assuming you store the current category in Globals or similar.
-            }
+            // Get the current category from your AI command or the current selection in the app
+            string categoryName = Globals.ThisAddIn.CurrentCategory;
 
             if (string.IsNullOrEmpty(categoryName))
             {
-                Debug.WriteLine("[Error] No category specified, and no category selected. Cannot add shape.");
+                Debug.WriteLine("[Error] No category specified. Cannot add shape.");
                 return;
             }
 
@@ -108,7 +98,7 @@ namespace VisioPlugin
             // Add the shape using the category (stencil) and shape type
             libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
 
-            // Get the last added shape to set properties
+            // Get the last added shape to set properties (like color)
             Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
 
             // Set color if provided
@@ -118,73 +108,6 @@ namespace VisioPlugin
             }
 
             Debug.WriteLine($"Shape '{shapeType}' created at ({visioX}, {visioY}) with size ({visioWidth}, {visioHeight}) and color {color}.");
-        }
-
-        private void DeleteShape(JToken parameters)
-        {
-            string shapeName = parameters["shapeName"]?.ToString();
-
-            if (string.IsNullOrEmpty(shapeName))
-            {
-                Debug.WriteLine("Shape name is missing for DeleteShape command.");
-                return;
-            }
-
-            var activePage = visioApp.ActivePage;
-            var shape = activePage.Shapes.Cast<Visio.Shape>()
-                .FirstOrDefault(s => string.Equals(s.Name, shapeName, StringComparison.OrdinalIgnoreCase));
-
-            if (shape != null)
-            {
-                shape.Delete();
-                Debug.WriteLine($"Shape '{shapeName}' deleted.");
-            }
-            else
-            {
-                Debug.WriteLine($"Shape '{shapeName}' not found on the active page.");
-            }
-        }
-
-        private void ConnectShapes(JToken parameters)
-        {
-            string fromShapeName = parameters["fromShape"]?.ToString();
-            string toShapeName = parameters["toShape"]?.ToString();
-            string connectorType = parameters["connectorType"]?.ToString() ?? "Dynamic Connector";
-
-            if (string.IsNullOrEmpty(fromShapeName) || string.IsNullOrEmpty(toShapeName))
-            {
-                Debug.WriteLine("FromShape or ToShape is missing for ConnectShapes command.");
-                return;
-            }
-
-            var activePage = visioApp.ActivePage;
-            var fromShape = activePage.Shapes.Cast<Visio.Shape>()
-                .FirstOrDefault(s => string.Equals(s.Name, fromShapeName, StringComparison.OrdinalIgnoreCase));
-            var toShape = activePage.Shapes.Cast<Visio.Shape>()
-                .FirstOrDefault(s => string.Equals(s.Name, toShapeName, StringComparison.OrdinalIgnoreCase));
-
-            if (fromShape == null || toShape == null)
-            {
-                Debug.WriteLine($"One or both shapes '{fromShapeName}', '{toShapeName}' not found.");
-                return;
-            }
-
-            // Get the connector master
-            Visio.Master connectorMaster = visioApp.ConnectorToolDataObject as Visio.Master;
-            if (connectorMaster == null)
-            {
-                Debug.WriteLine("Connector master not found.");
-                return;
-            }
-
-            // Drop the connector
-            Visio.Shape connector = activePage.Drop(connectorMaster, 0, 0);
-
-            // Connect the shapes
-            connector.CellsU["BeginX"].GlueTo(fromShape.CellsU["PinX"]);
-            connector.CellsU["EndX"].GlueTo(toShape.CellsU["PinX"]);
-
-            Debug.WriteLine($"Shapes '{fromShapeName}' and '{toShapeName}' connected with '{connectorType}'.");
         }
     }
 }
