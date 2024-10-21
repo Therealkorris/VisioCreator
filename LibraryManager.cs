@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -64,6 +64,19 @@ namespace VisioPlugin
             if (categories.TryGetValue(categoryName, out ShapeCategory category))
             {
                 return category.GetShape(shapeName);
+            }
+            return null;
+        }
+
+        public Visio.Master GetShapeByName(string shapeName)
+        {
+            foreach (var category in categories.Values)
+            {
+                var shape = category.GetShape(shapeName);
+                if (shape != null)
+                {
+                    return shape;
+                }
             }
             return null;
         }

@@ -14,9 +14,11 @@ namespace VisioPlugin
         private RichTextBox chatHistory;
         private ComboBox modelDropdown;
         private Label modelLabel;
+        private ListView commandStatusListView;
 
         private readonly LibraryManager libraryManager;
         private readonly VisioChatManager chatManager;
+        private readonly VisioCommandProcessor commandProcessor;
 
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
@@ -24,6 +26,7 @@ namespace VisioPlugin
 
             // Initialize the chat manager
             this.chatManager = new VisioChatManager(model, apiEndpoint, models, libraryManager, AppendToChatHistory);
+            this.commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);
 
             InitializeCustomComponents();
             PopulateModelDropdown(models);
@@ -90,6 +93,18 @@ namespace VisioPlugin
                 DropDownStyle = ComboBoxStyle.DropDownList,
             };
 
+            // Command status ListView
+            commandStatusListView = new ListView
+            {
+                Dock = DockStyle.Bottom,
+                Height = 100,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+            };
+            commandStatusListView.Columns.Add("Command", 200);
+            commandStatusListView.Columns.Add("Status", 100);
+
             // Add controls to the form
             Controls.Add(chatHistory);
             Controls.Add(chatInput);
@@ -97,6 +112,7 @@ namespace VisioPlugin
             Controls.Add(sendButton);
             Controls.Add(modelDropdown);
             Controls.Add(modelLabel);
+            Controls.Add(commandStatusListView);
 
             // Set form properties
             Text = "AI Chat Pane";
@@ -138,6 +154,12 @@ namespace VisioPlugin
 
             // Send message via VisioChatManager
             chatManager.SendMessage(userMessage);
+
+            // Process the message as a JSON command
+            commandProcessor.ProcessJsonCommand(userMessage);
+
+            // Update command status
+            UpdateCommandStatus(userMessage, "Sent");
         }
 
         // Handles uploading and sending images
@@ -191,6 +213,21 @@ namespace VisioPlugin
             {
                 chatHistory.AppendText(message + Environment.NewLine);
                 chatHistory.ScrollToCaret();
+            }
+        }
+
+        // Update command status
+        private void UpdateCommandStatus(string command, string status)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string, string>(UpdateCommandStatus), command, status);
+            }
+            else
+            {
+                var item = new ListViewItem(new[] { command, status });
+                item.ForeColor = status == "Success" ? Color.Green : Color.Red;
+                commandStatusListView.Items.Add(item);
             }
         }
 

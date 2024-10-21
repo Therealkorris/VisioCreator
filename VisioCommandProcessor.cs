@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
@@ -62,6 +62,38 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error processing command: {ex.Message}");
+                throw; // Re-throw the exception to be handled upstream
+            }
+        }
+
+        // New method to process JSON commands
+        public void ProcessJsonCommand(string jsonCommand)
+        {
+            try
+            {
+                Debug.WriteLine($"Received JSON Command: {jsonCommand}"); // Log the received command
+
+                // Parse the JSON command
+                JObject commandObject = JObject.Parse(jsonCommand);
+                string commandName = commandObject["command"]?.ToString();
+
+                if (string.IsNullOrEmpty(commandName))
+                    throw new Exception("Command name is missing.");
+
+                // Check if the command is registered
+                if (commandRegistry.ContainsKey(commandName))
+                {
+                    Debug.WriteLine($"Executing JSON Command: {commandName}"); // Log command execution
+                    commandRegistry[commandName](commandObject["parameters"]);
+                }
+                else
+                {
+                    throw new Exception($"Command '{commandName}' is not recognized.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error processing JSON command: {ex.Message}");
                 throw; // Re-throw the exception to be handled upstream
             }
         }
