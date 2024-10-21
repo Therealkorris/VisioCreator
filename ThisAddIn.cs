@@ -29,12 +29,15 @@ namespace VisioPlugin
         private HttpClient httpClient = new HttpClient();
         private string selectedModel = "llama3.2";
         private AIChatPane aiChatPane;
+        private readonly AIChatPane chatPane;  // Reference to AIChatPane
+        private VisioCommandProcessor commandProcessor;
 
         // Class-level declaration of HttpListener
         private HttpListener listener;
 
         // Initialize VisioChatManager for webhook listening
         private VisioChatManager visioChatManager;
+
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -43,18 +46,36 @@ namespace VisioPlugin
 
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
-            visioApplication = (Visio.Application)Application;
-            libraryManager = new LibraryManager(visioApplication);
-            uiControl = new System.Windows.Forms.Control();
-            uiControl.CreateControl();
+            try
+            {
+                Debug.WriteLine("Initializing Visio application...");
+                visioApplication = (Visio.Application)Application;
 
-            // Initialize VisioChatManager and start the webhook listener
-            visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, appendToChatHistory);
+                Debug.WriteLine("Initializing LibraryManager...");
+                libraryManager = new LibraryManager(visioApplication);
 
-            // Start the webhook listener on port 5680
-            StartWebhookListener(5680);
+                Debug.WriteLine("Initializing UIControl...");
+                uiControl = new System.Windows.Forms.Control();
+                uiControl.CreateControl();
 
-            Debug.WriteLine("VisioChatManager webhook listener started on port 5680.");
+                // Initialize VisioCommandProcessor
+                Debug.WriteLine("Initializing VisioCommandProcessor...");
+                commandProcessor = new VisioCommandProcessor(visioApplication, libraryManager); // Initialize the commandProcessor here
+
+                Debug.WriteLine("Initializing VisioChatManager...");
+                visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, appendToChatHistory, chatPane);
+
+                // Start the webhook listener on port 5680
+                Debug.WriteLine("Starting webhook listener...");
+                StartWebhookListener(5680);
+
+                Debug.WriteLine("VisioChatManager webhook listener started on port 5680.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in ThisAddIn_Startup: {ex.Message}");
+                MessageBox.Show($"Error during startup: {ex.Message}");
+            }
         }
 
         private void appendToChatHistory(string obj)
@@ -72,7 +93,6 @@ namespace VisioPlugin
             {
                 listener.Start();
                 Debug.WriteLine($"Webhook Listening for Visio commands on port {port}");
-
                 Task.Run(async () =>
                 {
                     while (listener.IsListening)
@@ -118,9 +138,28 @@ namespace VisioPlugin
 
         private async Task ProcessWebhookCommand(string jsonCommand)
         {
-            // You can add processing logic for the webhook command here
-            Debug.WriteLine($"Received command: {jsonCommand}");
+            try
+            {
+                // Log the received command
+                Debug.WriteLine($"[ProcessWebhookCommand] Received command: {jsonCommand}");
+
+                // Pass the command to the VisioCommandProcessor to handle
+                if (commandProcessor != null)
+                {
+                    commandProcessor.ProcessCommand(jsonCommand); // Process the command
+                    Debug.WriteLine("[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.");
+                }
+                else
+                {
+                    Debug.WriteLine("[ProcessWebhookCommand] [Error] CommandProcessor is not initialized.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ProcessWebhookCommand] [Error] Failed to process webhook command: {ex.Message}");
+            }
         }
+
 
         public string[] GetCategories()
         {
@@ -166,8 +205,11 @@ namespace VisioPlugin
                 return;
             }
 
+            // Set the current category in Globals
             CurrentCategory = selectedId;
+            Debug.WriteLine($"[OnCategorySelectionChange] Current category set to: {CurrentCategory}");
         }
+
 
         public void OnAddTestShapeClick(Office.IRibbonControl control)
         {
@@ -228,6 +270,12 @@ namespace VisioPlugin
         {
             try
             {
+                Debug.WriteLine("Checking httpClient initialization...");
+                if (httpClient == null) throw new NullReferenceException("httpClient is not initialized!");
+
+                Debug.WriteLine("Checking apiEndpoint initialization...");
+                if (string.IsNullOrEmpty(apiEndpoint)) throw new NullReferenceException("apiEndpoint is not initialized or is empty!");
+
                 var requestBody = new
                 {
                     command = "get_models"
@@ -253,10 +301,20 @@ namespace VisioPlugin
 
                 uiControl.Invoke((MethodInvoker)(() =>
                 {
-                    isConnected = true;
+                    Debug.WriteLine("Checking availableModels assignment...");
                     availableModels = modelList.ToArray();
-                    Ribbon?.InvalidateControl("ConnectionStatus");
-                    Ribbon?.InvalidateControl("ModelSelectionDropDown");
+
+                    Debug.WriteLine("Checking Ribbon initialization...");
+                    if (Ribbon != null)
+                    {
+                        Ribbon.InvalidateControl("ConnectionStatus");
+                        Ribbon.InvalidateControl("ModelSelectionDropDown");
+                    }
+                    else
+                    {
+                        Debug.WriteLine("Ribbon is null, skipping Ribbon invalidation.");
+                    }
+
                     ShowAIChatPane();
                 }));
             }

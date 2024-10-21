@@ -3,6 +3,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace VisioPlugin
 {
@@ -15,6 +17,8 @@ namespace VisioPlugin
         private ComboBox modelDropdown;
         private Label modelLabel;
         private ListView commandStatusListView;
+        private Button toggleStatusButton;
+        private Panel statusPanel;
 
         private readonly LibraryManager libraryManager;
         private readonly VisioChatManager chatManager;
@@ -24,8 +28,8 @@ namespace VisioPlugin
         {
             this.libraryManager = libraryManager;
 
-            // Initialize the chat manager
-            this.chatManager = new VisioChatManager(model, apiEndpoint, models, libraryManager, AppendToChatHistory);
+            // Initialize the chat manager, passing "this" to allow access to UpdateCommandStatus
+            this.chatManager = new VisioChatManager(model, apiEndpoint, models, libraryManager, AppendToChatHistory, this);
             this.commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);
 
             InitializeCustomComponents();
@@ -96,14 +100,31 @@ namespace VisioPlugin
             // Command status ListView
             commandStatusListView = new ListView
             {
-                Dock = DockStyle.Bottom,
-                Height = 100,
+                Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
             };
             commandStatusListView.Columns.Add("Command", 200);
             commandStatusListView.Columns.Add("Status", 100);
+
+            // Toggle status button
+            toggleStatusButton = new Button
+            {
+                Text = "Show/Hide Status",
+                Dock = DockStyle.Bottom,
+                Height = 40,
+            };
+            toggleStatusButton.Click += ToggleStatusButton_Click;
+
+            // Status panel
+            statusPanel = new Panel
+            {
+                Dock = DockStyle.Right,
+                Width = 300,
+                Visible = false,
+            };
+            statusPanel.Controls.Add(commandStatusListView);
 
             // Add controls to the form
             Controls.Add(chatHistory);
@@ -112,11 +133,12 @@ namespace VisioPlugin
             Controls.Add(sendButton);
             Controls.Add(modelDropdown);
             Controls.Add(modelLabel);
-            Controls.Add(commandStatusListView);
+            Controls.Add(toggleStatusButton);
+            Controls.Add(statusPanel);
 
             // Set form properties
             Text = "AI Chat Pane";
-            Width = 400;
+            Width = 700;
             Height = 600;
         }
 
@@ -150,17 +172,45 @@ namespace VisioPlugin
             if (string.IsNullOrEmpty(userMessage)) return;
 
             chatInput.Clear();
-            //AppendToChatHistory($"You: {userMessage}");
 
             // Send message via VisioChatManager
             chatManager.SendMessage(userMessage);
 
-            // Process the message as a JSON command
-            commandProcessor.ProcessJsonCommand(userMessage);
+            // Try processing the message as a JSON command
+            if (IsValidJson(userMessage))
+            {
+                // Process the message as a JSON command
+                commandProcessor.ProcessCommand(userMessage);
+            }
+            else
+            {
+                // If it's not valid JSON, still append it as plain text
+                AppendToChatHistory($"You: {userMessage}");
+            }
 
             // Update command status
             UpdateCommandStatus(userMessage, "Sent");
         }
+
+        // Continue with the same JSON validation method
+        private bool IsValidJson(string input)
+        {
+            input = input.Trim();
+            if ((input.StartsWith("{") && input.EndsWith("}")) || (input.StartsWith("[") && input.EndsWith("]")))
+            {
+                try
+                {
+                    JToken.Parse(input);
+                    return true;
+                }
+                catch (JsonReaderException)
+                {
+                    return false;
+                }
+            }
+            return false;
+        }
+
 
         // Handles uploading and sending images
         private void UploadImageButton_Click(object sender, EventArgs e)
@@ -217,7 +267,7 @@ namespace VisioPlugin
         }
 
         // Update command status
-        private void UpdateCommandStatus(string command, string status)
+        public void UpdateCommandStatus(string command, string status)
         {
             if (InvokeRequired)
             {
@@ -229,6 +279,13 @@ namespace VisioPlugin
                 item.ForeColor = status == "Success" ? Color.Green : Color.Red;
                 commandStatusListView.Items.Add(item);
             }
+        }
+
+
+        // Toggle the visibility of the status panel
+        private void ToggleStatusButton_Click(object sender, EventArgs e)
+        {
+            statusPanel.Visible = !statusPanel.Visible;
         }
 
         // Placeholder for processing AI responses (e.g., adding shapes in Visio)

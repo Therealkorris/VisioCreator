@@ -300,11 +300,6 @@
     <None Include="VisioCommandProcessorWorkflow.json" />
     <None Include="VisioPlugin_TemporaryKey.pfx" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="agent.py" />
-    <Content Include="main.py" />
-    <Content Include="tools.py" />
-  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>

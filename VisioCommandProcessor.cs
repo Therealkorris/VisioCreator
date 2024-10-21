@@ -31,7 +31,6 @@ namespace VisioPlugin
         private void RegisterCommands()
         {
             commandRegistry.Add("CreateShape", CreateShape);
-            // Add more commands if needed in the future
         }
 
         // The core command processor method
@@ -39,107 +38,108 @@ namespace VisioPlugin
         {
             try
             {
-                Debug.WriteLine($"Received Command: {jsonCommand}"); // Log the received command
+                Debug.WriteLine($"[ProcessCommand] Received Command: {jsonCommand}");
 
                 // Parse the JSON command
                 JObject commandObject = JObject.Parse(jsonCommand);
                 string commandName = commandObject["command"]?.ToString();
 
                 if (string.IsNullOrEmpty(commandName))
-                    throw new Exception("Command name is missing.");
+                    throw new Exception("[ProcessCommand] Command name is missing.");
 
                 // Check if the command is registered
                 if (commandRegistry.ContainsKey(commandName))
                 {
-                    Debug.WriteLine($"Executing Command: {commandName}"); // Log command execution
+                    Debug.WriteLine($"[ProcessCommand] Executing Command: {commandName}");
                     commandRegistry[commandName](commandObject["parameters"]);
                 }
                 else
                 {
-                    throw new Exception($"Command '{commandName}' is not recognized.");
+                    throw new Exception($"[ProcessCommand] Command '{commandName}' is not recognized.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error processing command: {ex.Message}");
-                throw; // Re-throw the exception to be handled upstream
+                Debug.WriteLine($"[ProcessCommand] Error processing command: {ex.Message}");
+                throw;
             }
         }
 
-        // New method to process JSON commands
-        public void ProcessJsonCommand(string jsonCommand)
+        // Process the CreateShape command from AI
+        private void CreateShape(JToken parameters)
         {
             try
             {
-                Debug.WriteLine($"Received JSON Command: {jsonCommand}"); // Log the received command
+                Debug.WriteLine($"[CreateShape] Received Parameters: {parameters.ToString()}");
 
-                // Parse the JSON command
-                JObject commandObject = JObject.Parse(jsonCommand);
-                string commandName = commandObject["command"]?.ToString();
+                // Extract parameters from the AI response
+                string shapeType = parameters["shapeType"]?.ToString();
+                float x = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Absolute x-coordinate
+                float y = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Absolute y-coordinate
+                float width = parameters["size"]?["width"]?.Value<float>() ?? 10;  // Absolute width
+                float height = parameters["size"]?["height"]?.Value<float>() ?? 10;  // Absolute height
+                string color = parameters["color"]?.ToString();
 
-                if (string.IsNullOrEmpty(commandName))
-                    throw new Exception("Command name is missing.");
+                Debug.WriteLine($"[CreateShape] ShapeType: {shapeType}, X: {x}, Y: {y}, Width: {width}, Height: {height}, Color: {color}");
 
-                // Check if the command is registered
-                if (commandRegistry.ContainsKey(commandName))
+                // Get the current category (stencil) to be used to create the shape
+                string categoryName = Globals.ThisAddIn.CurrentCategory; // Use CurrentCategory
+
+                if (string.IsNullOrEmpty(categoryName))
                 {
-                    Debug.WriteLine($"Executing JSON Command: {commandName}"); // Log command execution
-                    commandRegistry[commandName](commandObject["parameters"]);
+                    Debug.WriteLine("[CreateShape] [Error] No category specified. Cannot add shape.");
+                    return;
+                }
+
+                Debug.WriteLine($"[CreateShape] Using Category: {categoryName}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[CreateShape] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Use provided coordinates directly as Visio coordinates
+                double visioX = x;
+                double visioY = y;
+
+                // Use the provided width and height directly
+                double visioWidth = width;
+                double visioHeight = height;
+
+                Debug.WriteLine($"[CreateShape] Calculated Coordinates - X: {visioX}, Y: {visioY}, Width: {visioWidth}, Height: {visioHeight}");
+
+                // Add the shape using the category (stencil) and shape type
+                Debug.WriteLine($"[CreateShape] Attempting to add shape '{shapeType}' from category '{categoryName}'");
+                libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
+
+                // Get the last added shape to set additional properties (like color)
+                Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
+
+                if (addedShape != null)
+                {
+                    Debug.WriteLine($"[CreateShape] Shape '{addedShape.Name}' added successfully.");
+
+                    // Apply color if it's specified in the AI command
+                    if (!string.IsNullOrEmpty(color))
+                    {
+                        libraryManager.SetShapeColor(addedShape, color);
+                        Debug.WriteLine($"[CreateShape] Applied color '{color}' to shape '{addedShape.Name}'.");
+                    }
                 }
                 else
                 {
-                    throw new Exception($"Command '{commandName}' is not recognized.");
+                    Debug.WriteLine("[CreateShape] [Error] Shape was not added successfully.");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error processing JSON command: {ex.Message}");
-                throw; // Re-throw the exception to be handled upstream
+                Debug.WriteLine($"[CreateShape] [Error] Error creating shape: {ex.Message}");
+                throw;
             }
         }
 
-        // Command methods
-        private void CreateShape(JToken parameters)
-        {
-            string shapeType = parameters["shapeType"]?.ToString();
-            float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;
-            float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;
-            float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;
-            float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
-            string color = parameters["color"]?.ToString();
-
-            // Get the current category from your AI command or the current selection in the app
-            string categoryName = Globals.ThisAddIn.CurrentCategory;
-
-            if (string.IsNullOrEmpty(categoryName))
-            {
-                Debug.WriteLine("[Error] No category specified. Cannot add shape.");
-                return;
-            }
-
-            // Convert percentage to Visio coordinates
-            var activePage = visioApp.ActivePage;
-            double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-            double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-            double visioX = (xPercent / 100.0) * pageWidth;
-            double visioY = ((100 - yPercent) / 100.0) * pageHeight;
-            double visioWidth = (widthPercent / 100.0) * pageWidth;
-            double visioHeight = (heightPercent / 100.0) * pageHeight;
-
-            // Add the shape using the category (stencil) and shape type
-            libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
-
-            // Get the last added shape to set properties (like color)
-            Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
-
-            // Set color if provided
-            if (addedShape != null && !string.IsNullOrEmpty(color))
-            {
-                libraryManager.SetShapeColor(addedShape, color);
-            }
-
-            Debug.WriteLine($"Shape '{shapeType}' created at ({visioX}, {visioY}) with size ({visioWidth}, {visioHeight}) and color {color}.");
-        }
     }
 }
