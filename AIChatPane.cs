@@ -15,6 +15,8 @@ namespace VisioPlugin
         private ComboBox modelDropdown;
         private Label modelLabel;
         private ListView commandStatusListView;
+        private Button toggleStatusButton;
+        private Panel statusPanel;
 
         private readonly LibraryManager libraryManager;
         private readonly VisioChatManager chatManager;
@@ -96,14 +98,31 @@ namespace VisioPlugin
             // Command status ListView
             commandStatusListView = new ListView
             {
-                Dock = DockStyle.Bottom,
-                Height = 100,
+                Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
             };
             commandStatusListView.Columns.Add("Command", 200);
             commandStatusListView.Columns.Add("Status", 100);
+
+            // Toggle status button
+            toggleStatusButton = new Button
+            {
+                Text = "Show/Hide Status",
+                Dock = DockStyle.Bottom,
+                Height = 40,
+            };
+            toggleStatusButton.Click += ToggleStatusButton_Click;
+
+            // Status panel
+            statusPanel = new Panel
+            {
+                Dock = DockStyle.Right,
+                Width = 300,
+                Visible = false,
+            };
+            statusPanel.Controls.Add(commandStatusListView);
 
             // Add controls to the form
             Controls.Add(chatHistory);
@@ -112,11 +131,12 @@ namespace VisioPlugin
             Controls.Add(sendButton);
             Controls.Add(modelDropdown);
             Controls.Add(modelLabel);
-            Controls.Add(commandStatusListView);
+            Controls.Add(toggleStatusButton);
+            Controls.Add(statusPanel);
 
             // Set form properties
             Text = "AI Chat Pane";
-            Width = 400;
+            Width = 700;
             Height = 600;
         }
 
@@ -229,6 +249,12 @@ namespace VisioPlugin
                 item.ForeColor = status == "Success" ? Color.Green : Color.Red;
                 commandStatusListView.Items.Add(item);
             }
+        }
+
+        // Toggle the visibility of the status panel
+        private void ToggleStatusButton_Click(object sender, EventArgs e)
+        {
+            statusPanel.Visible = !statusPanel.Visible;
         }
 
         // Placeholder for processing AI responses (e.g., adding shapes in Visio)

@@ -101,45 +101,53 @@ namespace VisioPlugin
         // Command methods
         private void CreateShape(JToken parameters)
         {
-            string shapeType = parameters["shapeType"]?.ToString();
-            float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;
-            float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;
-            float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;
-            float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
-            string color = parameters["color"]?.ToString();
-
-            // Get the current category from your AI command or the current selection in the app
-            string categoryName = Globals.ThisAddIn.CurrentCategory;
-
-            if (string.IsNullOrEmpty(categoryName))
+            try
             {
-                Debug.WriteLine("[Error] No category specified. Cannot add shape.");
-                return;
+                string shapeType = parameters["shapeType"]?.ToString();
+                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;
+                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;
+                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;
+                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
+                string color = parameters["color"]?.ToString();
+
+                // Get the current category from your AI command or the current selection in the app
+                string categoryName = Globals.ThisAddIn.CurrentCategory;
+
+                if (string.IsNullOrEmpty(categoryName))
+                {
+                    Debug.WriteLine("[Error] No category specified. Cannot add shape.");
+                    return;
+                }
+
+                // Convert percentage to Visio coordinates
+                var activePage = visioApp.ActivePage;
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = ((100 - yPercent) / 100.0) * pageHeight;
+                double visioWidth = (widthPercent / 100.0) * pageWidth;
+                double visioHeight = (heightPercent / 100.0) * pageHeight;
+
+                // Add the shape using the category (stencil) and shape type
+                libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
+
+                // Get the last added shape to set properties (like color)
+                Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
+
+                // Set color if provided
+                if (addedShape != null && !string.IsNullOrEmpty(color))
+                {
+                    libraryManager.SetShapeColor(addedShape, color);
+                }
+
+                Debug.WriteLine($"Shape '{shapeType}' created at ({visioX}, {visioY}) with size ({visioWidth}, {visioHeight}) and color {color}.");
             }
-
-            // Convert percentage to Visio coordinates
-            var activePage = visioApp.ActivePage;
-            double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-            double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-            double visioX = (xPercent / 100.0) * pageWidth;
-            double visioY = ((100 - yPercent) / 100.0) * pageHeight;
-            double visioWidth = (widthPercent / 100.0) * pageWidth;
-            double visioHeight = (heightPercent / 100.0) * pageHeight;
-
-            // Add the shape using the category (stencil) and shape type
-            libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
-
-            // Get the last added shape to set properties (like color)
-            Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
-
-            // Set color if provided
-            if (addedShape != null && !string.IsNullOrEmpty(color))
+            catch (Exception ex)
             {
-                libraryManager.SetShapeColor(addedShape, color);
+                Debug.WriteLine($"Error creating shape: {ex.Message}");
+                throw; // Re-throw the exception to be handled upstream
             }
-
-            Debug.WriteLine($"Shape '{shapeType}' created at ({visioX}, {visioY}) with size ({visioWidth}, {visioHeight}) and color {color}.");
         }
     }
 }
