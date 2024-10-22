@@ -19,6 +19,8 @@ namespace VisioPlugin
         private ListView commandStatusListView;
         private Button toggleStatusButton;
         private Panel statusPanel;
+        private Button darkModeButton;
+        private bool isDarkMode = false;
 
         private readonly LibraryManager libraryManager;
         private readonly VisioChatManager chatManager;
@@ -67,6 +69,8 @@ namespace VisioPlugin
                 Text = "Send",
                 Dock = DockStyle.Bottom,
                 Height = 40,
+                Image = Image.FromFile("send_icon.png"), // Use an icon instead of text
+                TextImageRelation = TextImageRelation.ImageBeforeText,
             };
             sendButton.Click += SendButton_Click;
 
@@ -76,6 +80,8 @@ namespace VisioPlugin
                 Text = "Upload Image",
                 Dock = DockStyle.Bottom,
                 Height = 40,
+                Image = Image.FromFile("upload_icon.png"), // Use an icon instead of text
+                TextImageRelation = TextImageRelation.ImageBeforeText,
             };
             uploadImageButton.Click += UploadImageButton_Click;
 
@@ -114,8 +120,21 @@ namespace VisioPlugin
                 Text = "Show/Hide Status",
                 Dock = DockStyle.Bottom,
                 Height = 40,
+                Image = Image.FromFile("toggle_icon.png"), // Use an icon instead of text
+                TextImageRelation = TextImageRelation.ImageBeforeText,
             };
             toggleStatusButton.Click += ToggleStatusButton_Click;
+
+            // Dark mode button
+            darkModeButton = new Button
+            {
+                Text = "Toggle Dark Mode",
+                Dock = DockStyle.Bottom,
+                Height = 40,
+                Image = Image.FromFile("dark_mode_icon.png"), // Use an icon instead of text
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+            };
+            darkModeButton.Click += DarkModeButton_Click;
 
             // Status panel
             statusPanel = new Panel
@@ -134,6 +153,7 @@ namespace VisioPlugin
             Controls.Add(modelDropdown);
             Controls.Add(modelLabel);
             Controls.Add(toggleStatusButton);
+            Controls.Add(darkModeButton);
             Controls.Add(statusPanel);
 
             // Set form properties
@@ -281,11 +301,63 @@ namespace VisioPlugin
             }
         }
 
-
         // Toggle the visibility of the status panel
         private void ToggleStatusButton_Click(object sender, EventArgs e)
         {
             statusPanel.Visible = !statusPanel.Visible;
+        }
+
+        // Toggle dark mode
+        private void DarkModeButton_Click(object sender, EventArgs e)
+        {
+            isDarkMode = !isDarkMode;
+            ApplyDarkMode(isDarkMode);
+        }
+
+        private void ApplyDarkMode(bool enable)
+        {
+            if (enable)
+            {
+                this.BackColor = Color.FromArgb(45, 45, 48);
+                chatHistory.BackColor = Color.FromArgb(30, 30, 30);
+                chatHistory.ForeColor = Color.White;
+                chatInput.BackColor = Color.FromArgb(30, 30, 30);
+                chatInput.ForeColor = Color.White;
+                modelLabel.ForeColor = Color.White;
+                modelDropdown.BackColor = Color.FromArgb(30, 30, 30);
+                modelDropdown.ForeColor = Color.White;
+                commandStatusListView.BackColor = Color.FromArgb(30, 30, 30);
+                commandStatusListView.ForeColor = Color.White;
+                toggleStatusButton.BackColor = Color.FromArgb(30, 30, 30);
+                toggleStatusButton.ForeColor = Color.White;
+                darkModeButton.BackColor = Color.FromArgb(30, 30, 30);
+                darkModeButton.ForeColor = Color.White;
+                sendButton.BackColor = Color.FromArgb(30, 30, 30);
+                sendButton.ForeColor = Color.White;
+                uploadImageButton.BackColor = Color.FromArgb(30, 30, 30);
+                uploadImageButton.ForeColor = Color.White;
+            }
+            else
+            {
+                this.BackColor = Color.White;
+                chatHistory.BackColor = Color.WhiteSmoke;
+                chatHistory.ForeColor = Color.Black;
+                chatInput.BackColor = Color.White;
+                chatInput.ForeColor = Color.Black;
+                modelLabel.ForeColor = Color.SteelBlue;
+                modelDropdown.BackColor = Color.White;
+                modelDropdown.ForeColor = Color.Black;
+                commandStatusListView.BackColor = Color.White;
+                commandStatusListView.ForeColor = Color.Black;
+                toggleStatusButton.BackColor = Color.White;
+                toggleStatusButton.ForeColor = Color.Black;
+                darkModeButton.BackColor = Color.White;
+                darkModeButton.ForeColor = Color.Black;
+                sendButton.BackColor = Color.White;
+                sendButton.ForeColor = Color.Black;
+                uploadImageButton.BackColor = Color.White;
+                uploadImageButton.ForeColor = Color.Black;
+            }
         }
 
         // Placeholder for processing AI responses (e.g., adding shapes in Visio)
