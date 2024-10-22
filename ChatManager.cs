@@ -79,6 +79,57 @@ namespace VisioPlugin
             }
         }
 
+        // Send an image to the AI and process the response (chat or command)
+        public async void SendMessageWithImage(string imagePath)
+        {
+            if (string.IsNullOrEmpty(imagePath)) return;
+            try
+            {
+                var payload = new
+                {
+                    image = Convert.ToBase64String(System.IO.File.ReadAllBytes(imagePath)),
+                    model = selectedModel  // Model specified for AI processing
+                };
+
+                // Convert the payload to JSON
+                var jsonContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+
+                // Send the image to the external API
+                Debug.WriteLine($"[Debug] Sending image to API endpoint: {apiEndpoint}/chat-agent");
+
+                var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
+
+                Debug.WriteLine($"[Debug] API response status: {response.StatusCode}");
+
+                response.EnsureSuccessStatusCode();  // Ensure the API call succeeded
+
+                // Read the response from AI
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                // Log the full raw response for debugging purposes
+                Debug.WriteLine($"[Debug] Full AI Response (raw): {responseString}");
+
+                // Process AI response - either chat or a command
+                await ProcessCommand(responseString, imagePath);
+            }
+            catch (HttpRequestException ex)
+            {
+                appendToChatHistory("Error sending image (HttpRequestException): " + ex.Message);
+                Debug.WriteLine($"[Error] Sending image failed: {ex.Message}");
+
+                // Update command status to Failed
+                chatPane.UpdateCommandStatus(imagePath, "Failed");
+            }
+            catch (Exception ex)
+            {
+                appendToChatHistory("Error: " + ex.Message);
+                Debug.WriteLine($"[Error] Sending image: {ex.Message}");
+
+                // Update command status to Failed
+                chatPane.UpdateCommandStatus(imagePath, "Failed");
+            }
+        }
+
         // Process the AI's response and decide if it's a chat message or a command
         private async Task ProcessCommand(string aiResponse, string userMessage)
         {
