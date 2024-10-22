@@ -317,11 +317,46 @@ namespace VisioPlugin
 
                     ShowAIChatPane();
                 }));
+
+                // Automatically refresh the library after connecting to the AI
+                libraryManager.LoadLibraries();
+
+                // Send the list of libraries to the AI
+                await SendLibraryListToAI();
             }
             catch (HttpRequestException httpEx)
             {
                 Debug.WriteLine($"Error connecting to API: {httpEx.Message}");
                 MessageBox.Show($"Error connecting to AI: {httpEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Unexpected error: {ex.Message}");
+                MessageBox.Show($"Unexpected error: {ex.Message}");
+            }
+        }
+
+        private async Task SendLibraryListToAI()
+        {
+            try
+            {
+                var libraries = libraryManager.GetCategories().ToArray();
+                var requestBody = new
+                {
+                    libraries = libraries
+                };
+
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{apiEndpoint}/Visio-LibraryList", jsonContent);
+                response.EnsureSuccessStatusCode();
+
+                Debug.WriteLine("Library list sent to AI successfully.");
+            }
+            catch (HttpRequestException httpEx)
+            {
+                Debug.WriteLine($"Error sending library list to AI: {httpEx.Message}");
+                MessageBox.Show($"Error sending library list to AI: {httpEx.Message}");
             }
             catch (Exception ex)
             {

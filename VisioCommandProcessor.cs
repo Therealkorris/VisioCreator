@@ -31,6 +31,7 @@ namespace VisioPlugin
         private void RegisterCommands()
         {
             commandRegistry.Add("CreateShape", CreateShape);
+            commandRegistry.Add("UpdateShapeColor", UpdateShapeColor);
         }
 
         // The core command processor method
@@ -141,5 +142,49 @@ namespace VisioPlugin
             }
         }
 
+        // Process the UpdateShapeColor command from AI
+        private void UpdateShapeColor(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[UpdateShapeColor] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string shapeName = parameters["shapeName"]?.ToString();
+                string color = parameters["color"]?.ToString();
+
+                Debug.WriteLine($"[UpdateShapeColor] ShapeName: {shapeName}, Color: {color}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[UpdateShapeColor] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Find the shape by name
+                Visio.Shape shape = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
+
+                if (shape != null)
+                {
+                    // Apply color if it's specified in the AI command
+                    if (!string.IsNullOrEmpty(color))
+                    {
+                        libraryManager.SetShapeColor(shape, color);
+                        Debug.WriteLine($"[UpdateShapeColor] Applied color '{color}' to shape '{shape.Name}'.");
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine($"[UpdateShapeColor] [Error] Shape '{shapeName}' not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UpdateShapeColor] [Error] Error updating shape color: {ex.Message}");
+                throw;
+            }
+        }
     }
 }
