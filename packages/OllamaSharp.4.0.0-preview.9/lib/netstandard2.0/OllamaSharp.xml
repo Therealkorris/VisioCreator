@@ -1,0 +1,1947 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>OllamaSharp</name>
+    </assembly>
+    <members>
+        <member name="T:OllamaSharp.AsyncEnumerableExtensions.ChatResponseStreamAppender">
+            <summary>
+            Appender to stream IAsyncEnumerable(ChatResponseStream) to build up one single ChatDoneResponseStream object
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.ChatResponseStreamAppender.Append(OllamaSharp.Models.Chat.ChatResponseStream)">
+            <summary>
+            Appends a given ChatResponseStream item to build a single return object
+            </summary>
+            <param name="item">The item to append</param>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.ChatResponseStreamAppender.Complete">
+            <summary>
+            Builds up one single ChatDoneResponseStream object from the previously streamed ChatResponseStream items
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.AsyncEnumerableExtensions.GenerateResponseStreamAppender">
+            <summary>
+            Appender to stream IAsyncEnumerable(GenerateResponseStream) to build up one single GenerateDoneResponseStream object
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.GenerateResponseStreamAppender.Append(OllamaSharp.Models.GenerateResponseStream)">
+            <summary>
+            Appends a given GenerateResponseStream item to build a single return object
+            </summary>
+            <param name="item">The item to append</param>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.GenerateResponseStreamAppender.Complete">
+            <summary>
+            Builds up one single GenerateDoneResponseStream object from the previously streamed GenerateResponseStream items
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.AsyncEnumerableExtensions.IAppender`2">
+            <summary>
+            Interface to append items while streaming an IAsyncEnumerable to the end
+            </summary>
+            <typeparam name="Tin">The type of the items of the IAsyncEnumerable</typeparam>
+            <typeparam name="Tout">The return type after the IAsyncEnumerable was streamed to the end</typeparam>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.IAppender`2.Append(`0)">
+            <summary>
+            Appends an item to build up the return value
+            </summary>
+            <param name="item">The item to append</param>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.IAppender`2.Complete">
+            <summary>
+            Completes and returns the return value built up from the appended items
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.AsyncEnumerableExtensions.StringAppender">
+            <summary>
+            Appender to stream IAsyncEnumerable(string) to build up one single result string
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.StringAppender.Append(System.String)">
+            <summary>
+            Appends a given string value to the return value
+            </summary>
+            <param name="item">The string value to append</param>
+        </member>
+        <member name="M:OllamaSharp.AsyncEnumerableExtensions.StringAppender.Complete">
+            <summary>
+            Returns the whole string value
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.IAsyncEnumerableExtensions">
+            <summary>
+            Extension methods to stream IAsyncEnumerable to its end and return one single result value
+            </summary>
+            <summary>
+            Extension methods to stream IAsyncEnumerable to its end and return one single result value
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.IAsyncEnumerableExtensions.StreamToEndAsync(System.Collections.Generic.IAsyncEnumerable{System.String},System.Action{System.String})">
+            <summary>
+            Streams a given IAsyncEnumerable to its end and appends its items to a single response string
+            </summary>
+            <param name="stream">The IAsyncEnumerable to stream</param>
+            <param name="itemCallback">An optional callback to additionally process every single item from the IAsyncEnumerable</param>
+            <returns>A single response stream appened from every IAsyncEnumerable item</returns>
+        </member>
+        <member name="M:OllamaSharp.IAsyncEnumerableExtensions.StreamToEndAsync(System.Collections.Generic.IAsyncEnumerable{OllamaSharp.Models.GenerateResponseStream},System.Action{OllamaSharp.Models.GenerateResponseStream})">
+            <summary>
+            Streams a given IAsyncEnumerable of response chunks to its end and builds one single GenerateDoneResponseStream out of them.
+            </summary>
+            <param name="stream">The IAsyncEnumerable to stream</param>
+            <param name="itemCallback">An optional callback to additionally process every single item from the IAsyncEnumerable</param>
+            <returns>A single GenerateDoneResponseStream built up from every single IAsyncEnumerable item</returns>
+        </member>
+        <member name="M:OllamaSharp.IAsyncEnumerableExtensions.StreamToEndAsync(System.Collections.Generic.IAsyncEnumerable{OllamaSharp.Models.Chat.ChatResponseStream},System.Action{OllamaSharp.Models.Chat.ChatResponseStream})">
+            <summary>
+            Streams a given IAsyncEnumerable of response chunks to its end and builds one single ChatDoneResponseStream out of them.
+            </summary>
+            <param name="stream">The IAsyncEnumerable to stream</param>
+            <param name="itemCallback">An optional callback to additionally process every single item from the IAsyncEnumerable</param>
+            <returns>A single ChatDoneResponseStream built up from every single IAsyncEnumerable item</returns>
+        </member>
+        <member name="M:OllamaSharp.IAsyncEnumerableExtensions.StreamToEndAsync``2(System.Collections.Generic.IAsyncEnumerable{``0},OllamaSharp.AsyncEnumerableExtensions.IAppender{``0,``1},System.Action{``0})">
+            <summary>
+            Streams a given IAsyncEnumerable of response chunks to its end and builds one single ChatDoneResponseStream out of them.
+            </summary>
+            <param name="stream">The IAsyncEnumerable to stream</param>
+            <param name="appender">The appender instance used to build up one single response value</param>
+            <param name="itemCallback">An optional callback to additionally process every single item from the IAsyncEnumerable</param>
+            <returns>A single ChatDoneResponseStream built up from every single IAsyncEnumerable item</returns>
+        </member>
+        <member name="M:OllamaSharp.IAsyncEnumerableExtensions.StreamToEndAsync(System.Collections.Generic.IAsyncEnumerable{Microsoft.Extensions.AI.StreamingChatCompletionUpdate},System.Action{Microsoft.Extensions.AI.StreamingChatCompletionUpdate})">
+            <summary>
+            Streams a given IAsyncEnumerable of response chunks to its end and builds one single StreamingChatCompletionUpdate out of them.
+            </summary>
+            <param name="stream">The IAsyncEnumerable to stream</param>
+            <param name="itemCallback">An optional callback to additionally process every single item from the IAsyncEnumerable</param>
+            <returns>A single StreamingChatCompletionUpdate built up from every single IAsyncEnumerable item</returns>
+        </member>
+        <member name="T:OllamaSharp.Chat">
+            <summary>
+            A chat helper that handles the chat logic internally and
+            automatically extends the message history.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Chat.Messages">
+            <summary>
+            Gets or sets the messages of the chat history
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Chat.Client">
+            <summary>
+            Gets the Ollama API client
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Chat.Model">
+            <summary>
+            Gets or sets the AI model to chat with
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Chat.Options">
+            <summary>
+            Gets or sets the RequestOptions to chat with
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Chat.#ctor(OllamaSharp.IOllamaApiClient,System.String)">
+            <summary>
+            Creates a new chat instance
+            </summary>
+            <param name="client">The Ollama client to use for the chat</param>
+            <param name="systemPrompt">An optional system prompt to define the behavior of the chat assistant</param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:OllamaSharp.Chat.SendAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a message to the currently selected model and streams its response
+            </summary>
+            <param name="message">The message to send</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.Chat.SendAsync(System.String,System.Collections.Generic.IEnumerable{OllamaSharp.Models.Chat.Tool},System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Sends a message to the currently selected model and streams its response
+            </summary>
+            <param name="message">The message to send</param>
+            <param name="tools">Tools that the model can make use of, see https://ollama.com/blog/tool-support. By using tools, response streaming is automatically turned off</param>
+            <param name="imagesAsBase64">Base64 encoded images to send to the model</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.Chat.SendAsAsync(OllamaSharp.Models.Chat.ChatRole,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a message in a given role to the currently selected model and streams its response
+            </summary>
+            <param name="role">The role in which the message should be sent</param>
+            <param name="message">The message to send</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.Chat.SendAsAsync(OllamaSharp.Models.Chat.ChatRole,System.String,System.Collections.Generic.IEnumerable{OllamaSharp.Models.Chat.Tool},System.Collections.Generic.IEnumerable{System.String},System.Threading.CancellationToken)">
+            <summary>
+            Sends a message in a given role to the currently selected model and streams its response
+            </summary>
+            <param name="role">The role in which the message should be sent</param>
+            <param name="message">The message to send</param>
+            <param name="tools">Tools that the model can make use of, see https://ollama.com/blog/tool-support. By using tools, response streaming is automatically turned off</param>
+            <param name="imagesAsBase64">Base64 encoded images to send to the model</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="T:OllamaSharp.HttpRequestMessageExtensions">
+            <summary>
+            Extension methods for the http request message
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.HttpRequestMessageExtensions.ApplyCustomHeaders(System.Net.Http.HttpRequestMessage,System.Collections.Generic.Dictionary{System.String,System.String},OllamaSharp.Models.OllamaRequest)">
+            <summary>
+            Applies default headers from the OllamaApiClient and optional Ollama requests
+            </summary>
+            <param name="requestMessage">The http request message to set the headers on</param>
+            <param name="headers">The headers to set on the request message</param>
+            <param name="ollamaRequest">The request to the Ollama API to get the custom headers from</param>
+        </member>
+        <member name="T:OllamaSharp.IOllamaApiClient">
+            <summary>
+            Interface for the Ollama API client.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.IOllamaApiClient.Uri">
+            <summary>
+            Gets the endpoint uri used by the api client
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.IOllamaApiClient.SelectedModel">
+            <summary>
+            Gets or sets the name of the model to run requests on.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.ChatAsync(OllamaSharp.Models.Chat.ChatRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/chat endpoint and streams the response of the chat.
+            To implement a fully interactive chat, you should make use of the Chat class with "new Chat(...)"
+            </summary>
+            <param name="request">The request to send to Ollama</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+            <returns>
+            An asynchronous enumerable that yields ChatResponseStream. Each item
+            represents a message in the chat response stream. Returns null when the
+            stream is completed.
+            </returns>
+            <remarks>
+            This is the method to call the Ollama endpoint /api/chat. You might not want to do this manually.
+            To implement a fully interactive chat, you should make use of the Chat class with "new Chat(...)"
+            </remarks>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.CopyModelAsync(OllamaSharp.Models.CopyModelRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/copy endpoint to copy a model
+            </summary>
+            <param name="request">The parameters required to copy a model</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.CreateModelAsync(OllamaSharp.Models.CreateModelRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/create endpoint to create a model
+            </summary>
+            <param name="request">The request object containing the model details</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+            <returns>An asynchronous enumerable of the model creation status</returns>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.DeleteModelAsync(OllamaSharp.Models.DeleteModelRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/delete endpoint to delete a model
+            </summary>
+            <param name="request">The request containing the model to delete</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.EmbedAsync(OllamaSharp.Models.EmbedRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/embed endpoint to generate embeddings
+            </summary>
+            <param name="request">The parameters to generate embeddings for</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.ListLocalModelsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/tags endpoint to get all models that are available locally
+            </summary>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.ListRunningModelsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/ps endpoint to get the running models
+            </summary>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.PullModelAsync(OllamaSharp.Models.PullModelRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/pull endpoint to pull a new model
+            </summary>
+            <param name="request">The request specifying the model name and whether to use insecure connection</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+            <returns>
+            Async enumerable of PullStatus objects representing the status of the
+            model pull operation
+            </returns>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.PushModelAsync(OllamaSharp.Models.PushModelRequest,System.Threading.CancellationToken)">
+            <summary>
+            Pushes a model to the Ollama API endpoint.
+            </summary>
+            <param name="request">The request containing the model information to push.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+            <returns>
+            An asynchronous enumerable of push status updates. Use the enumerator
+            to retrieve the push status updates.
+            </returns>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.ShowModelAsync(OllamaSharp.Models.ShowModelRequest,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/show endpoint to show the information of a model
+            </summary>
+            <param name="request">The request containing the name of the model the get the information for</param>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+            <returns>The model information</returns>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.GenerateAsync(OllamaSharp.Models.GenerateRequest,System.Threading.CancellationToken)">
+            <summary>
+            Streams completion responses from the /api/generate endpoint on the Ollama API based on the provided request.
+            </summary>
+            <param name="request">The request containing the parameters for the completion.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+            <returns>An asynchronous enumerable of completion response streams.</returns>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.IsRunningAsync(System.Threading.CancellationToken)">
+            <summary>
+            Sends a query to check whether the Ollama api is running or not
+            </summary>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="M:OllamaSharp.IOllamaApiClient.GetVersionAsync(System.Threading.CancellationToken)">
+            <summary>
+            Get the version of Ollama
+            </summary>
+            <param name="cancellationToken">The token to cancel the operation with</param>
+        </member>
+        <member name="T:OllamaSharp.MicrosoftAi.AbstractionMapper">
+            <summary>
+            Provides mapping functionality between OllamaSharp and Microsoft.Extensions.AI models.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToChatCompletion(OllamaSharp.Models.Chat.ChatDoneResponseStream,System.String)">
+            <summary>
+            Maps a <see cref="T:OllamaSharp.Models.Chat.ChatRequest"/> and <see cref="T:OllamaSharp.Models.Chat.ChatDoneResponseStream"/> to a <see cref="T:Microsoft.Extensions.AI.ChatCompletion"/>.
+            </summary>
+            <param name="stream">The response stream with completion data.</param>
+            <param name="fallbackModel">The name of the model if the response stream object does not define one.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpChatRequest(OllamaSharp.IOllamaApiClient,System.Collections.Generic.IList{Microsoft.Extensions.AI.ChatMessage},Microsoft.Extensions.AI.ChatOptions,System.Boolean)">
+            <summary>
+            Converts Microsoft.Extensions.AI messages and options to an OllamaSharp chat request.
+            </summary>
+            <param name="apiClient">The API client used for communication.</param>
+            <param name="chatMessages">A list of chat messages.</param>
+            <param name="options">Optional chat options to configure the request.</param>
+            <param name="stream">Indicates if the request should be streamed.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpTools(System.Collections.Generic.IEnumerable{Microsoft.Extensions.AI.AITool})">
+            <summary>
+            Converts a collection of Microsoft.Extensions.AI.<see cref="T:Microsoft.Extensions.AI.AITool"/> to a collection of OllamaSharp tools.
+            </summary>
+            <param name="tools">The tools to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpTool(Microsoft.Extensions.AI.AITool)">
+            <summary>
+            Converts an Microsoft.Extensions.AI.<see cref="T:Microsoft.Extensions.AI.AITool"/> to an OllamaSharp tool.
+            </summary>
+            <param name="tool">The tool to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpTool(Microsoft.Extensions.AI.AIFunctionMetadata)">
+            <summary>
+            Converts <see cref="T:Microsoft.Extensions.AI.AIFunctionMetadata"/> to a <see cref="T:OllamaSharp.Models.Chat.Tool"/>.
+            </summary>
+            <param name="functionMetadata">The function metadata to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.GetPossibleValues(System.Text.Json.Nodes.JsonObject)">
+            <summary>
+            Converts parameter schema object to a function type string.
+            </summary>
+            <param name="schema">The schema object holding schema type information.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToFunctionTypeString(System.Text.Json.Nodes.JsonObject)">
+            <summary>
+            Converts parameter schema object to a function type string.
+            </summary>
+            <param name="schema">The schema object holding schema type information.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpMessages(System.Collections.Generic.IList{Microsoft.Extensions.AI.ChatMessage})">
+            <summary>
+            Converts a list of Microsoft.Extensions.AI.<see cref="T:Microsoft.Extensions.AI.ChatMessage"/> to a list of Ollama <see cref="T:OllamaSharp.Models.Chat.Message"/>.
+            </summary>
+            <param name="chatMessages">The chat messages to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaImage(Microsoft.Extensions.AI.DataContent)">
+            <summary>
+            Converts a Microsoft.Extensions.AI.<see cref="T:Microsoft.Extensions.AI.DataContent"/> to a base64 image string.
+            </summary>
+            <param name="content">The data content to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpToolCall(Microsoft.Extensions.AI.FunctionCallContent)">
+            <summary>
+            Converts a Microsoft.Extensions.AI.<see cref="T:Microsoft.Extensions.AI.FunctionCallContent"/> to a <see cref="T:OllamaSharp.Models.Chat.Message.ToolCall"/>.
+            </summary>
+            <param name="functionCall">The function call content to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToOllamaSharpRole(Microsoft.Extensions.AI.ChatRole)">
+            <summary>
+            Maps a <see cref="T:Microsoft.Extensions.AI.ChatRole"/> to an <see cref="T:OllamaSharp.Models.Chat.ChatRole"/>.
+            </summary>
+            <param name="role">The chat role to map.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToAbstractionRole(System.Nullable{OllamaSharp.Models.Chat.ChatRole})">
+            <summary>
+            Maps an <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> to a <see cref="T:Microsoft.Extensions.AI.ChatRole"/>.
+            </summary>
+            <param name="role">The chat role to map.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToStreamingChatCompletionUpdate(OllamaSharp.Models.Chat.ChatResponseStream)">
+            <summary>
+            Converts a <see cref="T:OllamaSharp.Models.Chat.ChatResponseStream"/> to a <see cref="T:Microsoft.Extensions.AI.StreamingChatCompletionUpdate"/>.
+            </summary>
+            <param name="response">The response stream to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToChatMessage(OllamaSharp.Models.Chat.Message)">
+            <summary>
+            Converts a <see cref="T:OllamaSharp.Models.Chat.Message"/> to a <see cref="T:Microsoft.Extensions.AI.ChatMessage"/>.
+            </summary>
+            <param name="message">The message to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ParseOllamaChatResponseProps(OllamaSharp.Models.Chat.ChatDoneResponseStream)">
+            <summary>
+            Parses additional properties from a <see cref="T:OllamaSharp.Models.Chat.ChatDoneResponseStream"/>.
+            </summary>
+            <param name="response">The response to parse.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ToFinishReason(System.String)">
+            <summary>
+            Maps a string representation of a finish reason to a <see cref="T:Microsoft.Extensions.AI.ChatFinishReason"/>.
+            </summary>
+            <param name="ollamaDoneReason">The finish reason string.</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.AbstractionMapper.ParseOllamaChatResponseUsage(OllamaSharp.Models.Chat.ChatDoneResponseStream)">
+            <summary>
+            Parses usage details from a <see cref="T:OllamaSharp.Models.Chat.ChatDoneResponseStream"/>.
+            </summary>
+            <param name="response">The response to parse.</param>
+            <returns>A <see cref="T:Microsoft.Extensions.AI.UsageDetails"/> object containing the parsed usage details.</returns>
+        </member>
+        <member name="T:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateAppender">
+            <summary>
+            Appender to stream IAsyncEnumerable(StreamingChatCompletionUpdate) to build up one single StreamingChatCompletionUpdate object
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateAppender.Append(Microsoft.Extensions.AI.StreamingChatCompletionUpdate)">
+            <summary>
+            Appends a given StreamingChatCompletionUpdate item to build a single return object
+            </summary>
+            <param name="item">The item to append</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateAppender.Complete">
+            <summary>
+            Builds up one single StreamingChatCompletionUpdate object from the previously streamed items
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateBuilder">
+            <summary>
+            A builder that can append streamed completion updates to one single completion update
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateBuilder.Append(Microsoft.Extensions.AI.StreamingChatCompletionUpdate)">
+            <summary>
+            Appends a completion update to build one single completion update item
+            </summary>
+            <param name="update">The completion update to append to the final completion update</param>
+        </member>
+        <member name="M:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateBuilder.Complete">
+            <summary>
+            Builds the final completion update out of the streamed updates that were appended before
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.MicrosoftAi.StreamingChatCompletionUpdateBuilder.Contents">
+            <summary>
+            Gets or sets the list of all content elements received from completion updates
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.ChatDoneResponseStream">
+            <summary>
+            Represents the final message in a stream of responses from the /api/chat endpoint.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.TotalDuration">
+            <summary>
+            The time spent generating the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.LoadDuration">
+            <summary>
+            The time spent in nanoseconds loading the model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.PromptEvalCount">
+            <summary>
+            The number of tokens in the prompt
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.PromptEvalDuration">
+            <summary>
+            The time spent in nanoseconds evaluating the prompt
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.EvalCount">
+            <summary>
+            The number of tokens in the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.EvalDuration">
+            <summary>
+            The time in nanoseconds spent generating the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatDoneResponseStream.DoneReason">
+            <summary>
+            The reason for the completion of the chat
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.ChatRequest">
+            <summary>
+            Represents a request to generate a chat completion using the specified model and parameters.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Model">
+            <summary>
+            Gets or sets the model name (required).
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Messages">
+            <summary>
+            Gets or sets the messages of the chat, this can be used to keep a chat memory.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Options">
+            <summary>
+            Gets or sets additional model parameters listed in the documentation for the Modelfile such as temperature.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Template">
+            <summary>
+            Gets or sets the full prompt or prompt template (overrides what is defined in the Modelfile).
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.KeepAlive">
+            <summary>
+            Gets or sets the KeepAlive property, which decides how long a given model should stay loaded.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Format">
+            <summary>
+            Gets or sets the format to return a response in. Currently only accepts "json" or null.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Stream">
+            <summary>
+            Gets or sets a value indicating whether the response will be returned as a single response object rather than a stream of objects.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRequest.Tools">
+            <summary>
+            Gets or sets the tools for the model to use if supported. Requires stream to be set to false.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Tool">
+            <summary>
+            Represents a tool that the model can use, if supported.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Tool.Type">
+            <summary>
+            Gets or sets the type of the tool, default is "function".
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Tool.Function">
+            <summary>
+            Gets or sets the function definition associated with this tool.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Function">
+            <summary>
+            Represents a function that can be executed by a tool.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Function.Name">
+            <summary>
+            Gets or sets the name of the function.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Function.Description">
+            <summary>
+            Gets or sets the description of the function.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Function.Parameters">
+            <summary>
+            Gets or sets the parameters required by the function.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Parameters">
+            <summary>
+            Represents the parameters required by a function, including their properties and required fields.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Parameters.Type">
+            <summary>
+            Gets or sets the type of the parameters, default is "object".
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Parameters.Properties">
+            <summary>
+            Gets or sets the properties of the parameters with their respective types and descriptions.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Parameters.Required">
+            <summary>
+            Gets or sets a list of required fields within the parameters.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Properties">
+            <summary>
+            Represents a property within a function's parameters, including its type, description, and possible values.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Properties.Type">
+            <summary>
+            Gets or sets the type of the property.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Properties.Description">
+            <summary>
+            Gets or sets the description of the property.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Properties.Enum">
+            <summary>
+            Gets or sets an enumeration of possible values for the property.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.ChatResponseStream">
+            <summary>
+            Represents a streamed response from a chat model in the Ollama API.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatResponseStream.Model">
+            <summary>
+            Gets or sets the model that generated the response.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatResponseStream.CreatedAtString">
+            <summary>
+            Gets or sets the time the response was generated. 
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatResponseStream.CreatedAt">
+            <summary>
+            Gets or sets the time the response was generated.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatResponseStream.Message">
+            <summary>
+            Gets or sets the message returned by the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatResponseStream.Done">
+            <summary>
+            Gets or sets a value indicating whether the response is complete.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.ChatRole">
+            <summary>
+            Represents a role within a chat completions interaction, describing the intended purpose of a message.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> with the specified role.
+            </summary>
+            <param name="role">The role to initialize with.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when <paramref name="role"/> is null.</exception>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.#ctor(System.Object)">
+            <summary>
+            Initializes a new instance of <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> using a JSON constructor.
+            </summary>
+            <param name="_">The placeholder parameter for JSON constructor.</param>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRole.System">
+            <summary>
+            Gets the role that instructs or sets the behavior of the assistant.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRole.Assistant">
+            <summary>
+            Gets the role that provides responses to system-instructed, user-prompted input.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRole.User">
+            <summary>
+            Gets the role that provides input for chat completions.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.ChatRole.Tool">
+            <summary>
+            Gets the role that is used to input the result from an external tool.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.op_Equality(OllamaSharp.Models.Chat.ChatRole,OllamaSharp.Models.Chat.ChatRole)">
+            <summary>
+            Determines if two <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> instances are equal.
+            </summary>
+            <param name="left">The first <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> to compare.</param>
+            <param name="right">The second <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> to compare.</param>
+            <returns><c>true</c> if both instances are equal; otherwise, <c>false</c>.</returns>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.op_Inequality(OllamaSharp.Models.Chat.ChatRole,OllamaSharp.Models.Chat.ChatRole)">
+            <summary>
+            Determines if two <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> instances are not equal.
+            </summary>
+            <param name="left">The first <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> to compare.</param>
+            <param name="right">The second <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> to compare.</param>
+            <returns><c>true</c> if both instances are not equal; otherwise, <c>false</c>.</returns>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.op_Implicit(System.String)~OllamaSharp.Models.Chat.ChatRole">
+            <summary>
+            Implicitly converts a string to a <see cref="T:OllamaSharp.Models.Chat.ChatRole"/>.
+            </summary>
+            <param name="value">The string value to convert.</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.Equals(System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.Equals(OllamaSharp.Models.Chat.ChatRole)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.GetHashCode">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.ChatRole.ToString">
+            <inheritdoc />
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Converter.ChatRoleConverter">
+            <summary>
+            Converts a <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> to and from JSON.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.Converter.ChatRoleConverter.Read(System.Text.Json.Utf8JsonReader@,System.Type,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Reads and converts the JSON representation of a <see cref="T:OllamaSharp.Models.Chat.ChatRole"/>.
+            </summary>
+            <param name="reader">The reader to read from.</param>
+            <param name="typeToConvert">The type of the object to convert.</param>
+            <param name="options">Options to control the conversion.</param>
+            <returns>The <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> value.</returns>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.Converter.ChatRoleConverter.Write(System.Text.Json.Utf8JsonWriter,OllamaSharp.Models.Chat.ChatRole,System.Text.Json.JsonSerializerOptions)">
+            <summary>
+            Writes a <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> as a JSON string.
+            </summary>
+            <param name="writer">The writer to write to.</param>
+            <param name="value">The <see cref="T:OllamaSharp.Models.Chat.ChatRole"/> value to write.</param>
+            <param name="options">Options to control the conversion.</param>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Message">
+            <summary>
+            Represents a message in a chat.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.Message.#ctor(OllamaSharp.Models.Chat.ChatRole,System.String,System.String[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Chat.Message"/> class with the specified role, content, and images.
+            </summary>
+            <param name="role">The role of the message, either system, user, or assistant.</param>
+            <param name="content">The content of the message.</param>
+            <param name="images">An array of base64-encoded images.</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.Message.#ctor(OllamaSharp.Models.Chat.ChatRole,System.String[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Chat.Message"/> class with the specified role and images.
+            </summary>
+            <param name="role">The role of the message, either system, user, or assistant.</param>
+            <param name="images">An array of base64-encoded images.</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.Message.#ctor(System.Nullable{OllamaSharp.Models.Chat.ChatRole},System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Chat.Message"/> class with the specified role and content.
+            </summary>
+            <param name="role">The role of the message, either system, user, or assistant.</param>
+            <param name="content">The content of the message.</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.Message.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Chat.Message"/> class.
+            Required for JSON deserialization.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.Role">
+            <summary>
+            Gets or sets the role of the message, either system, user, or assistant.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.Content">
+            <summary>
+            Gets or sets the content of the message.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.Images">
+            <summary>
+            Gets or sets an array of base64-encoded images (for multimodal models such as llava).
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.ToolCalls">
+            <summary>
+            Gets or sets a list of tools the model wants to use (for models that support function calls, such as llama3.1).
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Message.ToolCall">
+            <summary>
+            Represents a tool call within a message.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.ToolCall.Function">
+            <summary>
+            Gets or sets the function to be called by the tool.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.Message.Function">
+            <summary>
+            Represents a function that can be called by a tool.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.Function.Name">
+            <summary>
+            Gets or sets the name of the function.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.Message.Function.Arguments">
+            <summary>
+            Gets or sets the arguments for the function, represented as a dictionary of argument names and values.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Chat.MessageBuilder">
+            <summary>
+            A message builder that can build messages from streamed chunks
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.MessageBuilder.Append(OllamaSharp.Models.Chat.ChatResponseStream)">
+            <summary>
+            Appends a message chunk to build the final message
+            </summary>
+            <param name="chunk">The message chunk to append to the final message</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Chat.MessageBuilder.ToMessage">
+            <summary>
+            Builds the message out of the streamed chunks that were appended before
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.MessageBuilder.Role">
+            <summary>
+            The role of the message, either system, user or assistant
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.MessageBuilder.Images">
+            <summary>
+            Base64-encoded images (for multimodal models such as llava)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.MessageBuilder.ToolCalls">
+            <summary>
+            A list of tools the model wants to use (for models that support function calls, such as llama3.1)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Chat.MessageBuilder.HasValue">
+            <summary>
+            Gets whether the message builder received message chunks yet
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.CopyModelRequest">
+            <summary>
+            https://github.com/jmorganca/ollama/blob/main/docs/api.md#copy-a-model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CopyModelRequest.Source">
+            <summary>
+            The source model name
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CopyModelRequest.Destination">
+            <summary>
+            The destination model name
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.CreateModelRequest">
+            <summary>
+            https://github.com/jmorganca/ollama/blob/main/docs/api.md#create-a-model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CreateModelRequest.Model">
+            <summary>
+            Name of the model to create
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CreateModelRequest.ModelFileContent">
+            <summary>
+            Contents of the Modelfile
+            See https://github.com/jmorganca/ollama/blob/main/docs/modelfile.md
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CreateModelRequest.Path">
+            <summary>
+            Path to the Modelfile (optional)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CreateModelRequest.Stream">
+            <summary>
+            If false the response will be returned as a single response object, rather than a stream of objects (optional)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CreateModelRequest.Quantize">
+            <summary>
+            Set the quantization level for quantize model when importing (e.g. q4_0, optional)
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.CreateModelResponse">
+            <summary>
+            Represents the response from the /api/create endpoint
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.CreateModelResponse.Status">
+            <summary>
+            Represents the status of a model creation.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.DeleteModelRequest">
+            <summary>
+            https://github.com/jmorganca/ollama/blob/main/docs/api.md#delete-a-model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.DeleteModelRequest.Model">
+            <summary>
+            The name of the model to delete
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.EmbedRequest">
+            <summary>
+            https://github.com/jmorganca/ollama/blob/main/docs/api.md#generate-embeddings
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedRequest.Model">
+            <summary>
+            The name of the model to generate embeddings from
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedRequest.Input">
+            <summary>
+            The text to generate embeddings for
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedRequest.Options">
+            <summary>
+            Additional model parameters listed in the documentation for the Modelfile
+            such as temperature.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedRequest.KeepAlive">
+            <summary>
+            Gets or sets the KeepAlive property, which decides how long a given
+            model should stay loaded.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedRequest.Truncate">
+            <summary>
+            Truncates the end of each input to fit within context length.
+            Returns error if false and context length is exceeded. Defaults to true
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.EmbedResponse">
+            <summary>
+            The response from the /api/embed endpoint
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedResponse.Embeddings">
+            <summary>
+            An array of embeddings for the input text
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedResponse.TotalDuration">
+            <summary>
+            The time spent generating the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedResponse.LoadDuration">
+            <summary>
+            The time spent in nanoseconds loading the model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.EmbedResponse.PromptEvalCount">
+            <summary>
+            The number of tokens in the input text
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException">
+            <summary>
+            Represents an exception thrown when a model does not support the requested tools.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException"/> class.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException"/> class with a specified error message.
+            </summary>
+            <param name="message">The message that describes the error.</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Exceptions.ModelDoesNotSupportToolsException"/> class with a specified error message and a reference to the inner exception that is the cause of this exception.
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.</param>
+            <param name="innerException">The exception that is the cause of the current exception, or a null reference if no inner exception is specified.</param>
+        </member>
+        <member name="T:OllamaSharp.Models.Exceptions.OllamaException">
+            <summary>
+            Represents errors that occur during Ollama API operations.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Exceptions.OllamaException.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Exceptions.OllamaException"/> class.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.Models.Exceptions.OllamaException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Exceptions.OllamaException"/> class with a specified error message.
+            </summary>
+            <param name="message">The message that describes the error.</param>
+        </member>
+        <member name="M:OllamaSharp.Models.Exceptions.OllamaException.#ctor(System.String,System.Exception)">
+            <summary>
+            Initializes a new instance of the <see cref="T:OllamaSharp.Models.Exceptions.OllamaException"/> class with a specified error message and a reference to the inner exception that is the cause of this exception.
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.</param>
+            <param name="innerException">The exception that is the cause of the current exception, or a null reference if no inner exception is specified.</param>
+        </member>
+        <member name="T:OllamaSharp.Models.GenerateRequest">
+            <summary>
+            https://github.com/jmorganca/ollama/blob/main/docs/api.md#generate-a-completion
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Model">
+            <summary>
+            The model name (required)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Prompt">
+            <summary>
+            The prompt to generate a response for
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Options">
+            <summary>
+            Additional model parameters listed in the documentation for the
+            Modelfile such as temperature
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Images">
+            <summary>
+            Base64-encoded images (for multimodal models such as llava)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.System">
+            <summary>
+            System prompt to (overrides what is defined in the Modelfile)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Template">
+            <summary>
+            The full prompt or prompt template (overrides what is defined in the Modelfile)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Context">
+            <summary>
+            The context parameter returned from a previous request to /generate,
+            this can be used to keep a short conversational memory
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.KeepAlive">
+            <summary>
+            Gets or sets the KeepAlive property, which decides how long a given model should stay loaded.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Format">
+            <summary>
+            The format to return a response in. Currently only accepts "json" or null.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Stream">
+            <summary>
+            If false the response will be returned as a single response object,
+            rather than a stream of objects
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateRequest.Raw">
+            <summary>
+            In some cases you may wish to bypass the templating system and provide
+            a full prompt. In this case, you can use the raw parameter to disable formatting.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.GenerateResponseStream">
+            <summary>
+            The response from the /api/generate endpoint when streaming is enabled
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateResponseStream.Model">
+            <summary>
+            The model that generated the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateResponseStream.CreatedAtString">
+            <summary>
+            Gets or sets the time the response was generated. 
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateResponseStream.CreatedAt">
+            <summary>
+            Gets or sets the time the response was generated.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateResponseStream.Response">
+            <summary>
+            The response generated by the model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateResponseStream.Done">
+            <summary>
+            Whether the response is complete
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.GenerateDoneResponseStream">
+            <summary>
+            Represents the final response from the /api/generate endpoint
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.Context">
+            <summary>
+            An encoding of the conversation used in this response, this can be
+            sent in the next request to keep a conversational memory
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.TotalDuration">
+            <summary>
+            The time spent generating the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.LoadDuration">
+            <summary>
+            The time spent in nanoseconds loading the model
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.PromptEvalCount">
+            <summary>
+            The number of tokens in the prompt
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.PromptEvalDuration">
+            <summary>
+            The time spent in nanoseconds evaluating the prompt
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.EvalCount">
+            <summary>
+            The number of tokens in the response
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.GenerateDoneResponseStream.EvalDuration">
+            <summary>
+            The time in nanoseconds spent generating the response
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.ListModelsResponse">
+            <summary>
+            Represents the response from the API call to list local models.
+            <see href="https://github.com/jmorganca/ollama/blob/main/docs/api.md#list-local-models"/>
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ListModelsResponse.Models">
+            <summary>
+            Gets or sets the array of models returned by the API.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Model">
+            <summary>
+            Represents a model with its associated metadata.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Model.Name">
+            <summary>
+            Gets or sets the name of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Model.ModifiedAt">
+            <summary>
+            Gets or sets the time the model was created or last modified.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Model.Size">
+            <summary>
+            Gets or sets the size of the model file in bytes.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Model.Digest">
+            <summary>
+            Gets or sets a cryptographic hash of the model file.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Model.Details">
+            <summary>
+            Gets or sets additional details about the model.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.Details">
+            <summary>
+            Represents additional details about a model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Details.ParentModel">
+            <summary>
+            Gets or sets the name of the parent model on which the model is based.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Details.Format">
+            <summary>
+            Gets or sets the format of the model file.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Details.Family">
+            <summary>
+            Gets or sets the family of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Details.Families">
+            <summary>
+            Gets or sets the families of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Details.ParameterSize">
+            <summary>
+            Gets or sets the number of parameters in the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.Details.QuantizationLevel">
+            <summary>
+            Gets or sets the quantization level of the model.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.ListRunningModelsResponse">
+            <summary>
+            A response from the /api/ps endpoint.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ListRunningModelsResponse.RunningModels">
+            <summary>
+            An array of running models.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.RunningModel">
+            <summary>
+            Represents a running model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RunningModel.SizeVRAM">
+            <summary>
+            The amount of vram (in bytes) used by the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RunningModel.ExpiresAt">
+            <summary>
+            The time the model will be unloaded from memory.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.OllamaRequest">
+            <summary>
+            Represents the base class for requests to the Ollama API.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.OllamaRequest.CustomHeaders">
+            <summary>
+            Gets the custom headers to include with the request.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.PullModelRequest">
+            <summary>
+            Represents a request to pull a model from the API.
+            <see href="https://github.com/jmorganca/ollama/blob/main/docs/api.md#pull-a-model"/>
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PullModelRequest.Model">
+            <summary>
+            Gets or sets the name of the model to pull.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.PullModelResponse">
+            <summary>
+            Represents the streamed response from the /api/pull endpoint.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PullModelResponse.Status">
+            <summary>
+            Gets or sets the status of the pull operation.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PullModelResponse.Digest">
+            <summary>
+            Gets or sets the hash of the model file.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PullModelResponse.Total">
+            <summary>
+            Gets or sets the total number of bytes to pull.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PullModelResponse.Completed">
+            <summary>
+            Gets or sets the number of bytes pulled so far.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PullModelResponse.Percent">
+            <summary>
+            Gets the percentage of the pull operation that has been completed.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.PushModelRequest">
+            <summary>
+            Represents a request to push a model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PushModelRequest.Model">
+            <summary>
+            Gets or sets the name of the model to push in the form of namespace/model:tag.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PushModelRequest.Insecure">
+            <summary>
+            Gets or sets a value indicating whether to allow insecure connections to the library.
+            Only use this if you are pulling from your own library during development.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PushModelRequest.Stream">
+            <summary>
+            Gets or sets a value indicating whether to stream the response.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.PushModelResponse">
+            <summary>
+            Represents the response from the /api/push endpoint.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PushModelResponse.Status">
+            <summary>
+            Gets or sets the status of the push operation.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PushModelResponse.Digest">
+            <summary>
+            Gets or sets the hash of the model file.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.PushModelResponse.Total">
+            <summary>
+            Gets or sets the total number of bytes to push.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.RequestOptions">
+            <summary>
+            The configuration information used for a chat completions request.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.MiroStat">
+            <summary>
+            Enable Mirostat sampling for controlling perplexity.
+            (default: 0, 0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.MiroStatEta">
+            <summary>
+            Influences how quickly the algorithm responds to feedback from the
+            generated text. A lower learning rate will result in slower adjustments,
+            while a higher learning rate will make the algorithm more responsive.
+            (Default: 0.1)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.MiroStatTau">
+            <summary>
+            Controls the balance between coherence and diversity of the output.
+            A lower value will result in more focused and coherent text.
+            (Default: 5.0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumCtx">
+            <summary>
+            Sets the size of the context window used to generate the next token.
+            (Default: 2048)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumGqa">
+            <summary>
+            The number of GQA groups in the transformer layer. Required for some
+            models, for example it is 8 for llama2:70b
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumGpu">
+            <summary>
+            The number of layers to send to the GPU(s). On macOS it defaults to
+            1 to enable metal support, 0 to disable.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.MainGpu">
+            <summary>
+            This option controls which GPU is used for small tensors. The overhead of
+            splitting the computation across all GPUs is not worthwhile. The GPU will
+            use slightly more VRAM to store a scratch buffer for temporary results.
+            By default, GPU 0 is used.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumBatch">
+            <summary>
+            Prompt processing maximum batch size.
+            (Default: 512)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumThread">
+            <summary>
+            Sets the number of threads to use during computation. By default,
+            Ollama will detect this for optimal performance.
+            It is recommended to set this value to the number of physical CPU cores
+            your system has (as opposed to the logical number of cores).
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumKeep">
+            <summary>
+            Number of tokens to keep from the initial prompt.
+            (Default: 4, -1 = all)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.RepeatLastN">
+            <summary>
+            Sets how far back for the model to look back to prevent repetition.
+            (Default: 64, 0 = disabled, -1 = num_ctx)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.RepeatPenalty">
+            <summary>
+            Sets how strongly to penalize repetitions.
+            A higher value (e.g., 1.5) will penalize repetitions more strongly,
+            while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.PresencePenalty">
+            <summary>
+            The penalty to apply to tokens based on their presence in the prompt.
+            (Default: 0.0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.FrequencyPenalty">
+            <summary>
+            The penalty to apply to tokens based on their frequency in the prompt.
+            (Default: 0.0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.Temperature">
+            <summary>
+            The temperature of the model. Increasing the temperature will make the
+            model answer more creatively. (Default: 0.8)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.Seed">
+            <summary>
+            Sets the random number seed to use for generation.
+            Setting this to a specific number will make the model generate the same
+            text for the same prompt. (Default: 0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.Stop">
+            <summary>
+            Sets the stop sequences to use. When this pattern is encountered the
+            LLM will stop generating text and return. Multiple stop patterns may
+            be set by specifying multiple separate stop parameters in a modelfile.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.TfsZ">
+            <summary>
+            Tail free sampling is used to reduce the impact of less probable
+            tokens from the output. A higher value (e.g., 2.0) will reduce the
+            impact more, while a value of 1.0 disables this setting. (default: 1)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.NumPredict">
+            <summary>
+            Maximum number of tokens to predict when generating text.
+            (Default: 128, -1 = infinite generation, -2 = fill context)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.TopK">
+            <summary>
+            Reduces the probability of generating nonsense. A higher value
+            (e.g. 100) will give more diverse answers, while a lower value (e.g. 10)
+            will be more conservative. (Default: 40)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.TopP">
+            <summary>
+            Works together with top-k. A higher value (e.g., 0.95) will lead to
+            more diverse text, while a lower value (e.g., 0.5) will generate more
+            focused and conservative text. (Default: 0.9)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.MinP">
+            <summary>
+            Alternative to the top_p, and aims to ensure a balance of quality and variety.min_p represents the minimum
+            probability for a token to be considered, relative to the probability of the most likely token.For
+            example, with min_p=0.05 and the most likely token having a probability of 0.9, logits with a value less
+            than 0.05*0.9=0.045 are filtered out. (Default: 0.0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.TypicalP">
+            <summary>
+            The typical-p value to use for sampling. Locally Typical Sampling implementation described in the paper
+            https://arxiv.org/abs/2202.00666. (Default: 1.0)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.PenalizeNewline">
+            <summary>
+            Penalize newline tokens (Default: True)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.UseMmap">
+            <summary>
+            Models are mapped into memory by default, which allows the system to
+            load only the necessary parts as needed. Disabling mmap makes loading
+            slower but reduces pageouts if you're not using mlock. If the model is
+            bigger than your RAM, turning off mmap stops it from loading.
+            (Default: True)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.UseMlock">
+            <summary>
+            Lock the model in memory to prevent swapping. This can improve
+            performance, but it uses more RAM and may slow down loading.
+            (Default: False)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.LowVram">
+            <summary>
+            Enable low VRAM mode.
+            (Default: False)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.F16kv">
+            <summary>
+            Enable f16 key/value.
+            (Default: False)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.LogitsAll">
+            <summary>
+            Return logits for all the tokens, not just the last one.
+            (Default: False)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.VocabOnly">
+            <summary>
+            Load only the vocabulary, not the weights.
+            (Default: False)
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.RequestOptions.Numa">
+            <summary>
+             Enable NUMA support.
+            (Default: False)
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.ShowModelRequest">
+            <summary>
+            Represents a request to show model information.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelRequest.Model">
+            <summary>
+            Gets or sets the name of the model to show.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.ShowModelResponse">
+            <summary>
+            Represents the response containing detailed model information.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.License">
+            <summary>
+            Gets or sets the license for the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.Modelfile">
+            <summary>
+            Gets or sets the Modelfile for the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.Parameters">
+            <summary>
+            Gets or sets the parameters for the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.Template">
+            <summary>
+            Gets or sets the template for the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.System">
+            <summary>
+            Gets or sets the system prompt for the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.Details">
+            <summary>
+            Gets or sets additional details about the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.Info">
+            <summary>
+            Gets or sets extra information about the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ShowModelResponse.Projector">
+            <summary>
+            Gets or sets extra information about the projector.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.ModelInfo">
+            <summary>
+            Represents additional model information.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ModelInfo.Architecture">
+            <summary>
+            Gets or sets the architecture of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ModelInfo.FileType">
+            <summary>
+            Gets or sets the file type of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ModelInfo.ParameterCount">
+            <summary>
+            Gets or sets the parameter count of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ModelInfo.QuantizationVersion">
+            <summary>
+            Gets or sets the quantization version of the model.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ModelInfo.ExtraInfo">
+            <summary>
+            Gets or sets additional information as a dictionary.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.Models.ProjectorInfo">
+            <summary>
+            Represents projector-specific information.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.Models.ProjectorInfo.ExtraInfo">
+            <summary>
+            Gets or sets additional projector information as a dictionary.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.OllamaApiClient">
+            <summary>
+            The default client to use the Ollama API conveniently.
+            <see href="https://github.com/jmorganca/ollama/blob/main/docs/api.md"/>
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.DefaultRequestHeaders">
+            <summary>
+            Gets the default request headers that are sent to the Ollama API.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.OutgoingJsonSerializerOptions">
+            <summary>
+            Gets the serializer options for outgoing web requests like Post or Delete.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.IncomingJsonSerializerOptions">
+            <summary>
+            Gets the serializer options used for deserializing HTTP responses.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.Config">
+            <summary>
+            Gets the current configuration of the API client.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.Uri">
+            <inheritdoc />
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.SelectedModel">
+            <inheritdoc />
+        </member>
+        <member name="F:OllamaSharp.OllamaApiClient._client">
+            <summary>
+            Gets the HTTP client that is used to communicate with the Ollama API.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.#ctor(System.String,System.String)">
+            <summary>
+            Creates a new instance of the Ollama API client.
+            </summary>
+            <param name="uriString">The URI of the Ollama API endpoint.</param>
+            <param name="defaultModel">The default model that should be used with Ollama.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.#ctor(System.Uri,System.String)">
+            <summary>
+            Creates a new instance of the Ollama API client.
+            </summary>
+            <param name="uri">The URI of the Ollama API endpoint.</param>
+            <param name="defaultModel">The default model that should be used with Ollama.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.#ctor(OllamaSharp.OllamaApiClient.Configuration)">
+            <summary>
+            Creates a new instance of the Ollama API client.
+            </summary>
+            <param name="config">The configuration for the Ollama API client.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.#ctor(System.Net.Http.HttpClient,System.String)">
+            <summary>
+            Creates a new instance of the Ollama API client.
+            </summary>
+            <param name="client">The HTTP client to access the Ollama API with.</param>
+            <param name="defaultModel">The default model that should be used with Ollama.</param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.CreateModelAsync(OllamaSharp.Models.CreateModelRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.DeleteModelAsync(OllamaSharp.Models.DeleteModelRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.ListLocalModelsAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.ListRunningModelsAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.ShowModelAsync(OllamaSharp.Models.ShowModelRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.CopyModelAsync(OllamaSharp.Models.CopyModelRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.PullModelAsync(OllamaSharp.Models.PullModelRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.PushModelAsync(OllamaSharp.Models.PushModelRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.EmbedAsync(OllamaSharp.Models.EmbedRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.GenerateAsync(OllamaSharp.Models.GenerateRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.ChatAsync(OllamaSharp.Models.Chat.ChatRequest,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.IsRunningAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.GetVersionAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.SendToOllamaAsync(System.Net.Http.HttpRequestMessage,OllamaSharp.Models.OllamaRequest,System.Net.Http.HttpCompletionOption,System.Threading.CancellationToken)">
+            <summary>
+            Sends an HTTP request message to the Ollama API.
+            </summary>
+            <param name="requestMessage">The HTTP request message to send.</param>
+            <param name="ollamaRequest">The request containing custom HTTP request headers.</param>
+            <param name="completionOption">When the operation should complete (as soon as a response is available or after reading the whole response content).</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.Dispose">
+            <summary>
+            Releases the resources used by the <see cref="T:OllamaSharp.OllamaApiClient"/> instance.
+            Disposes the internal HTTP client if it was created internally.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.Microsoft#Extensions#AI#IChatClient#Metadata">
+            <inheritdoc/>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.Microsoft#Extensions#AI#IChatClient#CompleteAsync(System.Collections.Generic.IList{Microsoft.Extensions.AI.ChatMessage},Microsoft.Extensions.AI.ChatOptions,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.Microsoft#Extensions#AI#IChatClient#CompleteStreamingAsync(System.Collections.Generic.IList{Microsoft.Extensions.AI.ChatMessage},Microsoft.Extensions.AI.ChatOptions,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.Microsoft#Extensions#AI#IChatClient#GetService``1(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClient.System#IDisposable#Dispose">
+            <inheritdoc/>
+        </member>
+        <member name="T:OllamaSharp.OllamaApiClient.Configuration">
+            <summary>
+            The configuration for the Ollama API client.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.Configuration.Uri">
+            <summary>
+            Gets or sets the URI of the Ollama API endpoint.
+            </summary>
+        </member>
+        <member name="P:OllamaSharp.OllamaApiClient.Configuration.Model">
+            <summary>
+            Gets or sets the model that should be used.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.ConversationContext">
+            <summary>
+            Represents a conversation context containing context data.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.ConversationContext.#ctor(System.Int64[])">
+            <summary>
+            Represents a conversation context containing context data.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.ConversationContextWithResponse">
+            <summary>
+            Represents a conversation context with an additional response.
+            Inherits from <see cref="T:OllamaSharp.ConversationContext"/>.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.ConversationContextWithResponse.#ctor(System.String,System.Int64[])">
+            <summary>
+            Represents a conversation context with an additional response.
+            Inherits from <see cref="T:OllamaSharp.ConversationContext"/>.
+            </summary>
+        </member>
+        <member name="T:OllamaSharp.OllamaApiClientExtensions">
+            <summary>
+            Extension methods to simplify the usage of the <see cref="T:OllamaSharp.IOllamaApiClient"/>.
+            </summary>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.CopyModel(OllamaSharp.IOllamaApiClient,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/copy endpoint to copy a model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="source">The name of the existing model to copy.</param>
+            <param name="destination">The name the copied model should get.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.CreateModel(OllamaSharp.IOllamaApiClient,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/create endpoint to create a model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="name">The name for the new model.</param>
+            <param name="modelFileContent">
+            The file content for the model file the new model should be built with.
+            See <see href="https://github.com/jmorganca/ollama/blob/main/docs/modelfile.md"/>.
+            </param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.CreateModel(OllamaSharp.IOllamaApiClient,System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/create endpoint to create a model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="name">The name for the new model.</param>
+            <param name="modelFileContent">
+            The file content for the model file the new model should be built with.
+            See <see href="https://github.com/jmorganca/ollama/blob/main/docs/modelfile.md"/>.
+            </param>
+            <param name="path">The name path to the model file.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.DeleteModel(OllamaSharp.IOllamaApiClient,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/delete endpoint to delete a model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="model">The name of the model to delete.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.PullModel(OllamaSharp.IOllamaApiClient,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/pull endpoint to pull a new model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="model">The name of the model to pull.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.PushModel(OllamaSharp.IOllamaApiClient,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/push endpoint to push a new model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="name">The name of the model to push.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.Embed(OllamaSharp.IOllamaApiClient,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/embed endpoint to generate embeddings for the currently selected model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="input">The input text to generate embeddings for.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.GenerateAsync(OllamaSharp.IOllamaApiClient,System.String,OllamaSharp.ConversationContext,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/generate endpoint to get a completion and streams the returned chunks to a given streamer
+            that can be used to update the user interface in real-time.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="prompt">The prompt to generate a completion for.</param>
+            <param name="context">
+            The context that keeps the conversation for a chat-like history.
+            Should reuse the result from earlier calls if these calls belong together. Can be null initially.
+            </param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+            <returns>An async enumerable that can be used to iterate over the streamed responses.</returns>
+        </member>
+        <member name="M:OllamaSharp.OllamaApiClientExtensions.ShowModel(OllamaSharp.IOllamaApiClient,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Sends a request to the /api/show endpoint to show the information of a model.
+            </summary>
+            <param name="client">The client used to execute the command.</param>
+            <param name="model">The name of the model to get the information for.</param>
+            <param name="cancellationToken">The token to cancel the operation with.</param>
+            <returns>The model information.</returns>
+        </member>
+        <member name="T:System.Runtime.CompilerServices.IsExternalInit">
+            <summary>
+            Reserved to be used by the compiler for tracking metadata.
+            This class should not be used by developers in source code.
+            </summary>
+        </member>
+    </members>
+</doc>
