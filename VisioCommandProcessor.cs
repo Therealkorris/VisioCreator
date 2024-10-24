@@ -34,6 +34,7 @@ namespace VisioPlugin
             commandRegistry.Add("DeleteShape", DeleteShape);
             commandRegistry.Add("MoveShape", MoveShape);
             commandRegistry.Add("ResizeShape", ResizeShape);
+            commandRegistry.Add("ConnectShapes", ConnectShapes);
         }
 
         // The core command processor method
@@ -295,6 +296,54 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ResizeShape] [Error] Error resizing shape: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Process the ConnectShapes command from AI
+        private void ConnectShapes(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[ConnectShapes] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string shapeName1 = parameters["shapeName1"]?.ToString();
+                string shapeName2 = parameters["shapeName2"]?.ToString();
+
+                Debug.WriteLine($"[ConnectShapes] ShapeName1: {shapeName1}, ShapeName2: {shapeName2}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[ConnectShapes] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Find the shapes by name
+                Visio.Shape shape1 = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName1);
+                Visio.Shape shape2 = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName2);
+
+                if (shape1 != null && shape2 != null)
+                {
+                    // Create a dynamic connector
+                    Visio.Shape connector = activePage.Drop(visioApp.ConnectorToolDataObject, 0, 0);
+
+                    // Connect the shapes
+                    connector.CellsU["BeginX"].GlueTo(shape1.CellsU["PinX"]);
+                    connector.CellsU["EndX"].GlueTo(shape2.CellsU["PinX"]);
+
+                    Debug.WriteLine($"[ConnectShapes] Shapes '{shapeName1}' and '{shapeName2}' connected successfully.");
+                }
+                else
+                {
+                    Debug.WriteLine($"[ConnectShapes] [Error] One or both shapes not found. Shape1: {shapeName1}, Shape2: {shapeName2}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ConnectShapes] [Error] Error connecting shapes: {ex.Message}");
                 throw;
             }
         }
