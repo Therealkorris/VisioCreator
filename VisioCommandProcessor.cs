@@ -35,6 +35,7 @@ namespace VisioPlugin
             commandRegistry.Add("MoveShape", MoveShape);
             commandRegistry.Add("ResizeShape", ResizeShape);
             commandRegistry.Add("ConnectShapes", ConnectShapes);
+            commandRegistry.Add("CreateText", CreateText);
         }
 
         // The core command processor method
@@ -344,6 +345,65 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ConnectShapes] [Error] Error connecting shapes: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Process the CreateText command from AI
+        private void CreateText(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[CreateText] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string textContent = parameters["textContent"]?.ToString();
+                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
+                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
+                float fontSize = parameters["fontSize"]?.Value<float>() ?? 12;  // Font size
+                string color = parameters["color"]?.ToString();
+
+                Debug.WriteLine($"[CreateText] TextContent: {textContent}, X: {xPercent}%, Y: {yPercent}%, FontSize: {fontSize}, Color: {color}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[CreateText] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Retrieve the canvas dimensions
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                // Convert percentage coordinates to absolute coordinates
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
+
+                // Ensure the coordinates fit within the canvas
+                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
+                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+
+                Debug.WriteLine($"[CreateText] Calculated Coordinates - X: {visioX}, Y: {visioY}");
+
+                // Add the text to the Visio page
+                Visio.Shape textShape = activePage.DrawRectangle(visioX, visioY, visioX + 1, visioY + 1);
+                textShape.Text = textContent;
+                textShape.CellsU["Char.Size"].ResultIU = fontSize;
+
+                // Apply color if it's specified in the AI command
+                if (!string.IsNullOrEmpty(color))
+                {
+                    textShape.CellsU["Char.Color"].FormulaU = $"RGB({color})";
+                    Debug.WriteLine($"[CreateText] Applied color '{color}' to text.");
+                }
+
+                Debug.WriteLine($"[CreateText] Text '{textContent}' added successfully.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CreateText] [Error] Error adding text: {ex.Message}");
                 throw;
             }
         }
