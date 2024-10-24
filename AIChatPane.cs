@@ -407,5 +407,21 @@ namespace VisioPlugin
                 commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.3);
             }
         }
+
+        private void AdjustOtherColumnWidth(int changedColumnIndex)
+        {
+            if (commandStatusListView.Columns.Count == 2)
+            {
+                int totalWidth = commandStatusListView.ClientSize.Width;
+                if (changedColumnIndex == 0)
+                {
+                    commandStatusListView.Columns[1].Width = totalWidth - commandStatusListView.Columns[0].Width;
+                }
+                else if (changedColumnIndex == 1)
+                {
+                    commandStatusListView.Columns[0].Width = totalWidth - commandStatusListView.Columns[1].Width;
+                }
+            }
+        }
     }
 }

@@ -263,8 +263,8 @@ namespace VisioPlugin
                     double randomY = random.NextDouble() * pageHeight;
 
                     // Calculate a reasonable size for the shape (e.g., 5-10% of page width)
-                    double minSize = Math.Min(pageWidth, pageHeight) * 0.05;
-                    double maxSize = Math.Min(pageWidth, pageHeight) * 0.1;
+                    double minSize = Math.min(pageWidth, pageHeight) * 0.05;
+                    double maxSize = Math.min(pageWidth, pageHeight) * 0.1;
                     double randomWidth = minSize + (random.NextDouble() * (maxSize - minSize));
                     double randomHeight = minSize + (random.NextDouble() * (maxSize - minSize));
 
