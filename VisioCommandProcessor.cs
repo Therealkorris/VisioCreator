@@ -36,6 +36,7 @@ namespace VisioPlugin
             commandRegistry.Add("ResizeShape", ResizeShape);
             commandRegistry.Add("ConnectShapes", ConnectShapes);
             commandRegistry.Add("CreateText", CreateText);
+            commandRegistry.Add("RetrieveAllShapes", RetrieveAllShapes);
         }
 
         // The core command processor method
@@ -162,9 +163,10 @@ namespace VisioPlugin
                 Debug.WriteLine($"[DeleteShape] Received Parameters: {parameters.ToString()}");
 
                 // Extract parameters from the AI response
-                string shapeName = parameters["shapeName"]?.ToString();
+                string color = parameters["color"]?.ToString();
+                string shapeType = parameters["shapeType"]?.ToString();
 
-                Debug.WriteLine($"[DeleteShape] ShapeName: {shapeName}");
+                Debug.WriteLine($"[DeleteShape] Color: {color}, ShapeType: {shapeType}");
 
                 // Get the current active Visio page
                 var activePage = visioApp.ActivePage;
@@ -174,16 +176,16 @@ namespace VisioPlugin
                     return;
                 }
 
-                // Find the shape by name and delete it
-                Visio.Shape shapeToDelete = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
+                // Find the shape by color and shapeType and delete it
+                Visio.Shape shapeToDelete = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.CellsU["FillForegnd"].FormulaU.Contains(color) && s.Name.Contains(shapeType));
                 if (shapeToDelete != null)
                 {
                     shapeToDelete.Delete();
-                    Debug.WriteLine($"[DeleteShape] Shape '{shapeName}' deleted successfully.");
+                    Debug.WriteLine($"[DeleteShape] Shape with Color '{color}' and ShapeType '{shapeType}' deleted successfully.");
                 }
                 else
                 {
-                    Debug.WriteLine($"[DeleteShape] [Error] Shape '{shapeName}' not found.");
+                    Debug.WriteLine($"[DeleteShape] [Error] Shape with Color '{color}' and ShapeType '{shapeType}' not found.");
                 }
             }
             catch (Exception ex)
@@ -201,11 +203,12 @@ namespace VisioPlugin
                 Debug.WriteLine($"[MoveShape] Received Parameters: {parameters.ToString()}");
 
                 // Extract parameters from the AI response
-                string shapeName = parameters["shapeName"]?.ToString();
+                string color = parameters["color"]?.ToString();
+                string shapeType = parameters["shapeType"]?.ToString();
                 float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
                 float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
 
-                Debug.WriteLine($"[MoveShape] ShapeName: {shapeName}, X: {xPercent}%, Y: {yPercent}%");
+                Debug.WriteLine($"[MoveShape] Color: {color}, ShapeType: {shapeType}, X: {xPercent}%, Y: {yPercent}%");
 
                 // Get the current active Visio page
                 var activePage = visioApp.ActivePage;
@@ -229,17 +232,17 @@ namespace VisioPlugin
 
                 Debug.WriteLine($"[MoveShape] Calculated Coordinates - X: {visioX}, Y: {visioY}");
 
-                // Find the shape by name and move it
-                Visio.Shape shapeToMove = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
+                // Find the shape by color and shapeType and move it
+                Visio.Shape shapeToMove = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.CellsU["FillForegnd"].FormulaU.Contains(color) && s.Name.Contains(shapeType));
                 if (shapeToMove != null)
                 {
                     shapeToMove.CellsU["PinX"].ResultIU = visioX;
                     shapeToMove.CellsU["PinY"].ResultIU = visioY;
-                    Debug.WriteLine($"[MoveShape] Shape '{shapeName}' moved successfully.");
+                    Debug.WriteLine($"[MoveShape] Shape with Color '{color}' and ShapeType '{shapeType}' moved successfully.");
                 }
                 else
                 {
-                    Debug.WriteLine($"[MoveShape] [Error] Shape '{shapeName}' not found.");
+                    Debug.WriteLine($"[MoveShape] [Error] Shape with Color '{color}' and ShapeType '{shapeType}' not found.");
                 }
             }
             catch (Exception ex)
@@ -404,6 +407,51 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[CreateText] [Error] Error adding text: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Retrieve all shapes in the active Visio page
+        private void RetrieveAllShapes(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[RetrieveAllShapes] Received Parameters: {parameters.ToString()}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[RetrieveAllShapes] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Iterate through all shapes in the active page and collect their properties
+                var shapes = activePage.Shapes.Cast<Visio.Shape>().Select(shape => new
+                {
+                    Name = shape.Name,
+                    Type = shape.Master.Name,
+                    Position = new
+                    {
+                        X = shape.CellsU["PinX"].ResultIU,
+                        Y = shape.CellsU["PinY"].ResultIU
+                    },
+                    Color = shape.CellsU["FillForegnd"].FormulaU
+                }).ToList();
+
+                // Log the retrieved shapes
+                Debug.WriteLine($"[RetrieveAllShapes] Retrieved {shapes.Count} shapes.");
+                foreach (var shape in shapes)
+                {
+                    Debug.WriteLine($"[RetrieveAllShapes] Shape - Name: {shape.Name}, Type: {shape.Type}, Position: ({shape.Position.X}, {shape.Position.Y}), Color: {shape.Color}");
+                }
+
+                // Send the shapes data back to the AI
+                // Note: Implement the logic to send the shapes data back to the AI as needed
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[RetrieveAllShapes] [Error] Error retrieving shapes: {ex.Message}");
                 throw;
             }
         }

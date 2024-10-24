@@ -70,6 +70,9 @@ namespace VisioPlugin
                 StartWebhookListener(5680);
 
                 Debug.WriteLine("VisioChatManager webhook listener started on port 5680.");
+
+                // Call SendShapesToAI method after initializing the Visio application
+                SendShapesToAI();
             }
             catch (Exception ex)
             {
@@ -160,6 +163,35 @@ namespace VisioPlugin
             }
         }
 
+        // Method to call the shape retrieval function and send the data back to the AI
+        private void SendShapesToAI()
+        {
+            try
+            {
+                // Retrieve all shapes in the active Visio page
+                var shapes = commandProcessor.RetrieveAllShapes();
+
+                // Convert the shapes data to JSON
+                var jsonShapes = JsonConvert.SerializeObject(shapes);
+
+                // Send the shapes data back to the AI
+                var content = new StringContent(jsonShapes, Encoding.UTF8, "application/json");
+                var response = httpClient.PostAsync($"{apiEndpoint}/shapes", content).Result;
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Debug.WriteLine("Shapes data sent to AI successfully.");
+                }
+                else
+                {
+                    Debug.WriteLine($"Failed to send shapes data to AI. Status code: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in SendShapesToAI: {ex.Message}");
+            }
+        }
 
         public string[] GetCategories()
         {
