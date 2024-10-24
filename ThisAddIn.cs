@@ -168,6 +168,8 @@ namespace VisioPlugin
         {
             try
             {
+                Debug.WriteLine("[SendShapesToAI] Starting to send shapes to AI.");
+
                 // Retrieve all shapes in the active Visio page
                 var shapes = commandProcessor.RetrieveAllShapes();
 
@@ -180,16 +182,16 @@ namespace VisioPlugin
 
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine("Shapes data sent to AI successfully.");
+                    Debug.WriteLine("[SendShapesToAI] Shapes data sent to AI successfully.");
                 }
                 else
                 {
-                    Debug.WriteLine($"Failed to send shapes data to AI. Status code: {response.StatusCode}");
+                    Debug.WriteLine($"[SendShapesToAI] Failed to send shapes data to AI. Status code: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in SendShapesToAI: {ex.Message}");
+                Debug.WriteLine($"[SendShapesToAI] Error in SendShapesToAI: {ex.Message}");
             }
         }
 

@@ -31,6 +31,7 @@ namespace VisioPlugin
         // Send a message to the AI and process the response (chat or command)
         public async void SendMessage(string userMessage)
         {
+            Debug.WriteLine($"[SendMessage] Sending message to AI: {userMessage}");
             if (string.IsNullOrEmpty(userMessage)) return;
             try
             {
@@ -44,11 +45,11 @@ namespace VisioPlugin
                 var jsonContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
                 // Send the message to the external API
-                Debug.WriteLine($"[Debug] Sending request to API endpoint: {apiEndpoint}/chat-agent");
+                Debug.WriteLine($"[SendMessage] Sending request to API endpoint: {apiEndpoint}/chat-agent");
 
                 var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
 
-                Debug.WriteLine($"[Debug] API response status: {response.StatusCode}");
+                Debug.WriteLine($"[SendMessage] API response status: {response.StatusCode}");
 
                 response.EnsureSuccessStatusCode();  // Ensure the API call succeeded
 
@@ -56,7 +57,7 @@ namespace VisioPlugin
                 var responseString = await response.Content.ReadAsStringAsync();
 
                 // Log the full raw response for debugging purposes
-                Debug.WriteLine($"[Debug] Full AI Response (raw): {responseString}");
+                Debug.WriteLine($"[SendMessage] Full AI Response (raw): {responseString}");
 
                 // Process AI response - either chat or a command
                 await ProcessCommand(responseString, userMessage);
@@ -64,7 +65,7 @@ namespace VisioPlugin
             catch (HttpRequestException ex)
             {
                 appendToChatHistory("Error sending message (HttpRequestException): " + ex.Message);
-                Debug.WriteLine($"[Error] Sending message failed: {ex.Message}");
+                Debug.WriteLine($"[SendMessage] [Error] Sending message failed: {ex.Message}");
 
                 // Update command status to Failed
                 chatPane.UpdateCommandStatus(userMessage, "Failed");
@@ -72,7 +73,7 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 appendToChatHistory("Error: " + ex.Message);
-                Debug.WriteLine($"[Error] Sending message: {ex.Message}");
+                Debug.WriteLine($"[SendMessage] [Error] Sending message: {ex.Message}");
 
                 // Update command status to Failed
                 chatPane.UpdateCommandStatus(userMessage, "Failed");
@@ -82,16 +83,17 @@ namespace VisioPlugin
         // Process the AI's response and decide if it's a chat message or a command
         private async Task ProcessCommand(string aiResponse, string userMessage)
         {
+            Debug.WriteLine($"[ProcessCommand] Processing AI response: {aiResponse}");
             try
             {
                 // Log the raw response again before processing
-                Debug.WriteLine($"[Debug] Received AI Response (raw): {aiResponse}");
+                Debug.WriteLine($"[ProcessCommand] Received AI Response (raw): {aiResponse}");
 
                 // Check if the response is empty or invalid
                 if (string.IsNullOrEmpty(aiResponse))
                 {
-                    Debug.WriteLine("[Error] Received empty AI response.");
-                    appendToChatHistory("[Error] Received empty response from AI.");
+                    Debug.WriteLine("[ProcessCommand] [Error] Received empty AI response.");
+                    appendToChatHistory("[ProcessCommand] [Error] Received empty response from AI.");
 
                     // Update command status to Failed
                     chatPane.UpdateCommandStatus(userMessage, "Failed");
@@ -102,17 +104,17 @@ namespace VisioPlugin
                 if (IsValidJson(aiResponse))
                 {
                     JObject responseObject = JObject.Parse(aiResponse);
-                    Debug.WriteLine($"[Debug] Parsed JSON Response: {responseObject}");
+                    Debug.WriteLine($"[ProcessCommand] Parsed JSON Response: {responseObject}");
 
                     // If the response contains a command, execute it in Visio
                     if (responseObject["command"] != null)
                     {
-                        Debug.WriteLine($"[Debug] Command found: {responseObject["command"]}");
+                        Debug.WriteLine($"[ProcessCommand] Command found: {responseObject["command"]}");
 
                         // Send the parsed command to VisioCommandProcessor to execute the action in Visio
                         await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
 
-                        Debug.WriteLine($"[Debug] Command executed in Visio.");
+                        Debug.WriteLine($"[ProcessCommand] Command executed in Visio.");
 
                         // Update command status to Success
                         chatPane.UpdateCommandStatus(userMessage, "Success");
@@ -125,14 +127,14 @@ namespace VisioPlugin
                     }
                     else
                     {
-                        Debug.WriteLine("[Error] Unrecognized response format.");
+                        Debug.WriteLine("[ProcessCommand] [Error] Unrecognized response format.");
                         chatPane.UpdateCommandStatus(userMessage, "Failed");
                     }
                 }
                 else
                 {
                     // If the response is not valid JSON, treat it as plain text chat message
-                    Debug.WriteLine("[Error] AI Response is not valid JSON. Treating it as plain text.");
+                    Debug.WriteLine("[ProcessCommand] [Error] AI Response is not valid JSON. Treating it as plain text.");
                     appendToChatHistory($"AI: {aiResponse}");
 
                     // Update command status to Success (since plain text is not considered a failure)
@@ -141,7 +143,7 @@ namespace VisioPlugin
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Error] Error processing AI response: {ex.Message}");
+                Debug.WriteLine($"[ProcessCommand] [Error] Error processing AI response: {ex.Message}");
 
                 // Update command status to Failed
                 chatPane.UpdateCommandStatus(userMessage, "Failed");
