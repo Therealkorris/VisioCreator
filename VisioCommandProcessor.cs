@@ -31,6 +31,10 @@ namespace VisioPlugin
         private void RegisterCommands()
         {
             commandRegistry.Add("CreateShape", CreateShape);
+            commandRegistry.Add("DeleteShape", DeleteShape);
+            commandRegistry.Add("MoveShape", MoveShape);
+            commandRegistry.Add("ResizeShape", ResizeShape);
+            commandRegistry.Add("ConnectShapes", ConnectShapes);
         }
 
         // The core command processor method
@@ -74,13 +78,13 @@ namespace VisioPlugin
 
                 // Extract parameters from the AI response
                 string shapeType = parameters["shapeType"]?.ToString();
-                float x = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Absolute x-coordinate
-                float y = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Absolute y-coordinate
-                float width = parameters["size"]?["width"]?.Value<float>() ?? 10;  // Absolute width
-                float height = parameters["size"]?["height"]?.Value<float>() ?? 10;  // Absolute height
+                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
+                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
+                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;  // Percentage width
+                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;  // Percentage height
                 string color = parameters["color"]?.ToString();
 
-                Debug.WriteLine($"[CreateShape] ShapeType: {shapeType}, X: {x}, Y: {y}, Width: {width}, Height: {height}, Color: {color}");
+                Debug.WriteLine($"[CreateShape] ShapeType: {shapeType}, X: {xPercent}%, Y: {yPercent}%, Width: {widthPercent}%, Height: {heightPercent}%, Color: {color}");
 
                 // Get the current category (stencil) to be used to create the shape
                 string categoryName = Globals.ThisAddIn.CurrentCategory; // Use CurrentCategory
@@ -101,13 +105,21 @@ namespace VisioPlugin
                     return;
                 }
 
-                // Use provided coordinates directly as Visio coordinates
-                double visioX = x;
-                double visioY = y;
+                // Retrieve the canvas dimensions
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                // Use the provided width and height directly
-                double visioWidth = width;
-                double visioHeight = height;
+                // Convert percentage coordinates to absolute coordinates
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
+
+                // Ensure the coordinates fit within the canvas
+                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
+                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+
+                // Convert percentage size to absolute size
+                double visioWidth = (widthPercent / 100.0) * pageWidth;
+                double visioHeight = (heightPercent / 100.0) * pageHeight;
 
                 Debug.WriteLine($"[CreateShape] Calculated Coordinates - X: {visioX}, Y: {visioY}, Width: {visioWidth}, Height: {visioHeight}");
 
@@ -141,5 +153,199 @@ namespace VisioPlugin
             }
         }
 
+        // Process the DeleteShape command from AI
+        private void DeleteShape(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[DeleteShape] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string shapeName = parameters["shapeName"]?.ToString();
+
+                Debug.WriteLine($"[DeleteShape] ShapeName: {shapeName}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[DeleteShape] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Find the shape by name and delete it
+                Visio.Shape shapeToDelete = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
+                if (shapeToDelete != null)
+                {
+                    shapeToDelete.Delete();
+                    Debug.WriteLine($"[DeleteShape] Shape '{shapeName}' deleted successfully.");
+                }
+                else
+                {
+                    Debug.WriteLine($"[DeleteShape] [Error] Shape '{shapeName}' not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DeleteShape] [Error] Error deleting shape: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Process the MoveShape command from AI
+        private void MoveShape(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[MoveShape] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string shapeName = parameters["shapeName"]?.ToString();
+                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
+                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
+
+                Debug.WriteLine($"[MoveShape] ShapeName: {shapeName}, X: {xPercent}%, Y: {yPercent}%");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[MoveShape] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Retrieve the canvas dimensions
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                // Convert percentage coordinates to absolute coordinates
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
+
+                // Ensure the coordinates fit within the canvas
+                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
+                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+
+                Debug.WriteLine($"[MoveShape] Calculated Coordinates - X: {visioX}, Y: {visioY}");
+
+                // Find the shape by name and move it
+                Visio.Shape shapeToMove = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
+                if (shapeToMove != null)
+                {
+                    shapeToMove.CellsU["PinX"].ResultIU = visioX;
+                    shapeToMove.CellsU["PinY"].ResultIU = visioY;
+                    Debug.WriteLine($"[MoveShape] Shape '{shapeName}' moved successfully.");
+                }
+                else
+                {
+                    Debug.WriteLine($"[MoveShape] [Error] Shape '{shapeName}' not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MoveShape] [Error] Error moving shape: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Process the ResizeShape command from AI
+        private void ResizeShape(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[ResizeShape] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string shapeName = parameters["shapeName"]?.ToString();
+                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;  // Percentage width
+                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;  // Percentage height
+
+                Debug.WriteLine($"[ResizeShape] ShapeName: {shapeName}, Width: {widthPercent}%, Height: {heightPercent}%");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[ResizeShape] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Retrieve the canvas dimensions
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                // Convert percentage size to absolute size
+                double visioWidth = (widthPercent / 100.0) * pageWidth;
+                double visioHeight = (heightPercent / 100.0) * pageHeight;
+
+                Debug.WriteLine($"[ResizeShape] Calculated Size - Width: {visioWidth}, Height: {visioHeight}");
+
+                // Find the shape by name and resize it
+                Visio.Shape shapeToResize = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
+                if (shapeToResize != null)
+                {
+                    shapeToResize.CellsU["Width"].ResultIU = visioWidth;
+                    shapeToResize.CellsU["Height"].ResultIU = visioHeight;
+                    Debug.WriteLine($"[ResizeShape] Shape '{shapeName}' resized successfully.");
+                }
+                else
+                {
+                    Debug.WriteLine($"[ResizeShape] [Error] Shape '{shapeName}' not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ResizeShape] [Error] Error resizing shape: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Process the ConnectShapes command from AI
+        private void ConnectShapes(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[ConnectShapes] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                string shapeName1 = parameters["shapeName1"]?.ToString();
+                string shapeName2 = parameters["shapeName2"]?.ToString();
+
+                Debug.WriteLine($"[ConnectShapes] ShapeName1: {shapeName1}, ShapeName2: {shapeName2}");
+
+                // Get the current active Visio page
+                var activePage = visioApp.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[ConnectShapes] [Error] No active page found in Visio.");
+                    return;
+                }
+
+                // Find the shapes by name
+                Visio.Shape shape1 = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName1);
+                Visio.Shape shape2 = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName2);
+
+                if (shape1 != null && shape2 != null)
+                {
+                    // Create a dynamic connector
+                    Visio.Shape connector = activePage.Drop(visioApp.ConnectorToolDataObject, 0, 0);
+
+                    // Connect the shapes
+                    connector.CellsU["BeginX"].GlueTo(shape1.CellsU["PinX"]);
+                    connector.CellsU["EndX"].GlueTo(shape2.CellsU["PinX"]);
+
+                    Debug.WriteLine($"[ConnectShapes] Shapes '{shapeName1}' and '{shapeName2}' connected successfully.");
+                }
+                else
+                {
+                    Debug.WriteLine($"[ConnectShapes] [Error] One or both shapes not found. Shape1: {shapeName1}, Shape2: {shapeName2}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ConnectShapes] [Error] Error connecting shapes: {ex.Message}");
+                throw;
+            }
+        }
     }
 }
