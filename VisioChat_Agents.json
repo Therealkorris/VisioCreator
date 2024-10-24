@@ -249,6 +249,21 @@
         -40,
         1040
       ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "### System:\nYou are an Action Agent that interprets user requests and generates commands for shapes and text in a Visio-like system.\n\n### Instructions:\n- Your job is to return a clean, valid JSON structure without additional explanation or text.\n- If the user's request is to create a shape or add text, return the appropriate JSON command.\n- The JSON should contain only the required data without any additional information or explanation.\n\n### User Message:\n{{ $json.chatInput || $json.body.message }}\n\n### Respond with:\n{\n  \"command\": \"<command_name>\",\n  \"parameters\": {\n    \"shapeType\": \"<shape_type>\",\n    \"position\": { \"x\": <percent_x>, \"y\": <percent_y> },\n    \"size\": { \"width\": <percent_width>, \"height\": <percent_height> },\n    \"color\": \"<color>\"\n  }\n}\nOR\n{\n  \"command\": \"CreateText\",\n  \"parameters\": {\n    \"textContent\": \"<text_content>\",\n    \"position\": { \"x\": <percent_x>, \"y\": <percent_y> },\n    \"fontSize\": <font_size>,\n    \"color\": \"<color>\"\n  }\n}",
+        "options": {}
+      },
+      "id": "ff5a872f-3380-4fcc-9d87-25d50e382b31",
+      "name": "action_agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -40,
+        1040
+      ]
     }
   ],
   "pinData": {},
