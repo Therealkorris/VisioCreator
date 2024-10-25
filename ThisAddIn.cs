@@ -67,7 +67,7 @@ namespace VisioPlugin
 
                 // Start the webhook listener on port 5680
                 Debug.WriteLine("Starting webhook listener...");
-                StartWebhookListener(5680);
+                _ = StartWebhookListener(5680); // Use _ to discard the task
 
                 Debug.WriteLine("VisioChatManager webhook listener started on port 5680.");
             }
@@ -85,7 +85,7 @@ namespace VisioPlugin
         }
 
         // Start a webhook listener for receiving commands
-        public void StartWebhookListener(int port)
+        public async Task StartWebhookListener(int port)
         {
             listener = new HttpListener();
             listener.Prefixes.Add($"http://localhost:{port}/visio-command/");
@@ -93,24 +93,21 @@ namespace VisioPlugin
             {
                 listener.Start();
                 Debug.WriteLine($"Webhook Listening for Visio commands on port {port}");
-                Task.Run(async () =>
+                while (listener.IsListening)
                 {
-                    while (listener.IsListening)
-                    {
-                        HttpListenerContext context = await listener.GetContextAsync();
-                        string jsonCommand = new System.IO.StreamReader(context.Request.InputStream).ReadToEnd();
+                    HttpListenerContext context = await listener.GetContextAsync();
+                    string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
 
-                        // Process the webhook command
-                        await ProcessWebhookCommand(jsonCommand);
+                    // Process the webhook command
+                    await ProcessWebhookCommand(jsonCommand);
 
-                        // Respond to the webhook
-                        HttpListenerResponse response = context.Response;
-                        byte[] buffer = Encoding.UTF8.GetBytes("Command received and processed.");
-                        response.ContentLength64 = buffer.Length;
-                        response.OutputStream.Write(buffer, 0, buffer.Length);
-                        response.OutputStream.Close();
-                    }
-                });
+                    // Respond to the webhook
+                    HttpListenerResponse response = context.Response;
+                    byte[] buffer = Encoding.UTF8.GetBytes("Command received and processed.");
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                    response.OutputStream.Close();
+                }
             }
             catch (HttpListenerException ex)
             {
@@ -146,7 +143,7 @@ namespace VisioPlugin
                 // Pass the command to the VisioCommandProcessor to handle
                 if (commandProcessor != null)
                 {
-                    commandProcessor.ProcessCommand(jsonCommand); // Process the command
+                    await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand)); // Process the command asynchronously
                     Debug.WriteLine("[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.");
                 }
                 else

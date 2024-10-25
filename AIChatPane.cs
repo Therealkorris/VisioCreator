@@ -405,5 +405,18 @@ namespace VisioPlugin
                 commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.3);
             }
         }
+
+        // Add this method to the AIChatPane class
+        private void AdjustOtherColumnWidth(int changedColumnIndex)
+        {
+            if (commandStatusListView.Columns.Count != 2) return;
+
+            int totalWidth = commandStatusListView.ClientSize.Width;
+            int changedColumnWidth = commandStatusListView.Columns[changedColumnIndex].Width;
+            int otherColumnIndex = 1 - changedColumnIndex; // This works because we only have 2 columns (0 and 1)
+
+            // Set the width of the other column to fill the remaining space
+            commandStatusListView.Columns[otherColumnIndex].Width = totalWidth - changedColumnWidth;
+        }
     }
 }
