@@ -412,7 +412,7 @@ namespace VisioPlugin
         }
 
         // Retrieve all shapes in the active Visio page
-        private void RetrieveAllShapes(JToken parameters)
+        public void RetrieveAllShapes(JToken parameters)
         {
             try
             {

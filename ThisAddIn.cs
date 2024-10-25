@@ -168,6 +168,8 @@ namespace VisioPlugin
         {
             try
             {
+                Debug.WriteLine("[SendShapesToAI] Starting to send shapes to AI.");
+
                 // Retrieve all shapes in the active Visio page
                 var shapes = commandProcessor.RetrieveAllShapes();
 
@@ -180,16 +182,16 @@ namespace VisioPlugin
 
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine("Shapes data sent to AI successfully.");
+                    Debug.WriteLine("[SendShapesToAI] Shapes data sent to AI successfully.");
                 }
                 else
                 {
-                    Debug.WriteLine($"Failed to send shapes data to AI. Status code: {response.StatusCode}");
+                    Debug.WriteLine($"[SendShapesToAI] Failed to send shapes data to AI. Status code: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in SendShapesToAI: {ex.Message}");
+                Debug.WriteLine($"[SendShapesToAI] Error in SendShapesToAI: {ex.Message}");
             }
         }
 
@@ -261,8 +263,8 @@ namespace VisioPlugin
                     double randomY = random.NextDouble() * pageHeight;
 
                     // Calculate a reasonable size for the shape (e.g., 5-10% of page width)
-                    double minSize = Math.Min(pageWidth, pageHeight) * 0.05;
-                    double maxSize = Math.Min(pageWidth, pageHeight) * 0.1;
+                    double minSize = Math.min(pageWidth, pageHeight) * 0.05;
+                    double maxSize = Math.min(pageWidth, pageHeight) * 0.1;
                     double randomWidth = minSize + (random.NextDouble() * (maxSize - minSize));
                     double randomHeight = minSize + (random.NextDouble() * (maxSize - minSize));
 

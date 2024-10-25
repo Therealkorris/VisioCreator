@@ -26,6 +26,7 @@ namespace VisioPlugin
 
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
+            Debug.WriteLine("[AIChatPane] Initializing AIChatPane with model: " + model);
             this.libraryManager = libraryManager;
 
             // Initialize the chat manager, passing "this" to allow access to UpdateCommandStatus
@@ -240,6 +241,7 @@ namespace VisioPlugin
         // Handles sending messages
         private void SendButton_Click(object sender, EventArgs e)
         {
+            Debug.WriteLine("[SendButton_Click] User clicked send button.");
             string userMessage = chatInput.Text.Trim();
             if (string.IsNullOrEmpty(userMessage)) return;
 
@@ -403,6 +405,22 @@ namespace VisioPlugin
                 int totalWidth = commandStatusListView.ClientSize.Width;
                 commandStatusListView.Columns[0].Width = (int)(totalWidth * 0.7);
                 commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.3);
+            }
+        }
+
+        private void AdjustOtherColumnWidth(int changedColumnIndex)
+        {
+            if (commandStatusListView.Columns.Count == 2)
+            {
+                int totalWidth = commandStatusListView.ClientSize.Width;
+                if (changedColumnIndex == 0)
+                {
+                    commandStatusListView.Columns[1].Width = totalWidth - commandStatusListView.Columns[0].Width;
+                }
+                else if (changedColumnIndex == 1)
+                {
+                    commandStatusListView.Columns[0].Width = totalWidth - commandStatusListView.Columns[1].Width;
+                }
             }
         }
     }
