@@ -13,7 +13,7 @@ namespace VisioPlugin
 
         public LibraryManager(Visio.Application visioApp)
         {
-            visioApplication = visioApp;
+            visioApplication = visioApp ?? throw new ArgumentNullException(nameof(visioApp));
             categories = new Dictionary<string, ShapeCategory>();
             LoadLibraries();
         }
@@ -26,6 +26,12 @@ namespace VisioPlugin
 
         private void BuildShapesCatalog()
         {
+            if (visioApplication?.Documents == null)
+            {
+                Debug.WriteLine("[BuildShapesCatalog] Visio application or documents are null.");
+                return;
+            }
+
             foreach (Visio.Document stencilDoc in visioApplication.Documents)
             {
                 if (stencilDoc.Type == Visio.VisDocumentTypes.visTypeStencil)
@@ -87,7 +93,12 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"[Debug] Adding shape: {shapeName} from category: {categoryName} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
 
-                var activePage = visioApplication.ActivePage;
+                var activePage = visioApplication?.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[Error] No active page found in Visio application.");
+                    return;
+                }
 
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
@@ -149,6 +160,46 @@ namespace VisioPlugin
                 Debug.WriteLine($"Error setting color for shape '{shape.Name}': {ex.Message}");
             }
         }
+
+        public List<ShapeInfo> ListAllShapes()
+        {
+            var shapes = new List<ShapeInfo>();
+
+            try
+            {
+                var activePage = visioApplication.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[ListAllShapes] [Error] No active page found in Visio.");
+                    return shapes;
+                }
+
+                foreach (Visio.Shape shape in activePage.Shapes)
+                {
+                    var shapeInfo = new ShapeInfo
+                    {
+                        Name = shape.Name,
+                        Type = shape.Master.Name,
+                        Position = new Position
+                        {
+                            X = shape.CellsU["PinX"].ResultIU,
+                            Y = shape.CellsU["PinY"].ResultIU
+                        },
+                        Color = shape.CellsU["FillForegnd"].FormulaU
+                    };
+
+                    shapes.Add(shapeInfo);
+                }
+
+                Debug.WriteLine($"[ListAllShapes] Retrieved {shapes.Count} shapes.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ListAllShapes] [Error] Error listing shapes: {ex.Message}");
+            }
+
+            return shapes;
+        }
     }
 
     public class ShapeCategory
@@ -177,5 +228,19 @@ namespace VisioPlugin
             shapes.TryGetValue(name, out Visio.Master master);
             return master;
         }
+    }
+
+    public class ShapeInfo
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public Position Position { get; set; }
+        public string Color { get; set; }
+    }
+
+    public class Position
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
     }
 }

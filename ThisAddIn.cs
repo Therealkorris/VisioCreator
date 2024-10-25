@@ -89,6 +89,7 @@ namespace VisioPlugin
         {
             listener = new HttpListener();
             listener.Prefixes.Add($"http://localhost:{port}/visio-command/");
+            listener.Prefixes.Add($"http://localhost:{port}/list-shapes/"); // Add this line
             try
             {
                 listener.Start();
@@ -96,14 +97,20 @@ namespace VisioPlugin
                 while (listener.IsListening)
                 {
                     HttpListenerContext context = await listener.GetContextAsync();
-                    string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
 
-                    // Process the webhook command
-                    await ProcessWebhookCommand(jsonCommand);
+                    if (context.Request.Url.LocalPath == "/list-shapes/")
+                    {
+                        await HandleListShapesRequest(context);
+                    }
+                    else
+                    {
+                        string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                        await ProcessWebhookCommand(jsonCommand);
+                    }
 
                     // Respond to the webhook
                     HttpListenerResponse response = context.Response;
-                    byte[] buffer = Encoding.UTF8.GetBytes("Command received and processed.");
+                    byte[] buffer = Encoding.UTF8.GetBytes("Request processed.");
                     response.ContentLength64 = buffer.Length;
                     await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
                     response.OutputStream.Close();
@@ -113,6 +120,17 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"[Error] Failed to start listener on port {port}: {ex.Message}");
             }
+        }
+
+        private async Task HandleListShapesRequest(HttpListenerContext context)
+        {
+            var shapes = libraryManager.ListAllShapes();
+            string jsonResponse = JsonConvert.SerializeObject(shapes);
+
+            context.Response.ContentType = "application/json";
+            byte[] buffer = Encoding.UTF8.GetBytes(jsonResponse);
+            context.Response.ContentLength64 = buffer.Length;
+            await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
         }
 
         // Stop the webhook listener
@@ -277,6 +295,12 @@ namespace VisioPlugin
                 {
                     command = "get_models"
                 };
+
+                libraryManager.LoadLibraries();
+                if (Ribbon != null)
+                {
+                    Ribbon.InvalidateControl("CategorySelectionDropDown");
+                }
 
                 var jsonContent = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
