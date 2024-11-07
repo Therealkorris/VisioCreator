@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
@@ -338,6 +338,9 @@ namespace VisioPlugin
 
                     ShowAIChatPane();
                 }));
+
+                // Send library information to n8n via API and store it in Qdrant database
+                await SendLibraryInformationToN8n();
             }
             catch (HttpRequestException httpEx)
             {
@@ -348,6 +351,24 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"Unexpected error: {ex.Message}");
                 MessageBox.Show($"Unexpected error: {ex.Message}");
+            }
+        }
+
+        private async Task SendLibraryInformationToN8n()
+        {
+            try
+            {
+                var libraryInfo = libraryManager.ListAllShapes();
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(libraryInfo), Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{apiEndpoint}/send-library-info", jsonContent);
+                response.EnsureSuccessStatusCode();
+
+                Debug.WriteLine("Library information sent to n8n successfully.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error sending library information to n8n: {ex.Message}");
             }
         }
 

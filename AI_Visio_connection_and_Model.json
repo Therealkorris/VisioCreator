@@ -80,6 +80,357 @@
         380
       ],
       "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "id": "1933afb7-4ab6-4f6a-8155-8c13802118bb",
+      "name": "Ollama Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        120,
+        680
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {}
+      },
+      "id": "7ac248ef-b6ea-4a49-8c94-ef79280093f8",
+      "name": "Action_response1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        500
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "a9cf3ee6-4d39-4b3a-89aa-592074509690",
+      "name": "Respond chat_from_manager",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        220
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the 'reply' field from the input JSON\nlet replyText = $json.reply;\n\n// Ensure that we only return the reply text\nreturn [\n  {\n    \"text\": replyText\n  }\n];\n"
+      },
+      "id": "a7f7c323-70eb-4149-935b-f1326aacdb49",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "id": "942a452d-1208-43cc-ad1c-8eb050cb5fe5",
+      "name": "Merge Chat_Visio and Chat",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        -680,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "id": "9c8fd97d-5efa-4ec9-9603-7812687d9231",
+      "name": "Ollama Model",
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        480
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let output;\n\ntry {\n    // Try to parse the JSON from the Manager response\n    output = JSON.parse($json.text);\n} catch (error) {\n    // If parsing fails, handle it as a regular text message\n    return {\n        route: \"manager\",  // Default route for handling non-JSON inputs\n        reply: $json.text  // Send the raw text as the reply\n    };\n}\n\n// Return both the route and the reply for further processing if JSON parsing succeeds\nreturn {\n    route: output.route,   // Keep route for the Switch node\n    reply: output.reply    // Send reply to the Respond webhook\n};\n"
+      },
+      "id": "63805d69-9240-4ff4-a5c3-0c9cd27a249e",
+      "name": "Code1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "=manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "={{ $('Merge Chat_Visio and Chat').item.json.chatInput }}"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8d8a0903-2a4c-4bf9-9385-b25e8d4c9840",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "action_agent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "={{ $('Merge Chat_Visio and Chat').item.json.chatInput }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "31d3ffd0-0840-4278-9049-87dfca3d4989",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        100,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let output;\n\n// Extract the message from the Chat_Visio input and rename it as chatInput\nif ($json.body && $json.body.message) {\n  output = {\n    chatInput: $json.body.message,  // Rename message to chatInput\n  };\n} else {\n  output = {\n    chatInput: \"No chatInput found\",  // Handle case where message is missing\n  };\n}\n\nreturn output;\n"
+      },
+      "id": "6b128033-b0a9-43dc-97ee-6851c85651eb",
+      "name": "Code2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "d826d6f5-694f-402f-9f2f-f4c29ce6f1d5",
+      "name": "Chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1260,
+        340
+      ],
+      "webhookId": "91938835-5f26-42bf-8482-2555230784e7"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### System:\nYou are the Manager Agent responsible for understanding user input and deciding how to respond.\n\n1. If the user's message is a general chat or question, respond directly with a conversation reply and set the route as `\"manager\"`. \n   Example: \n   - User: \"Hello!\"\n   - Response: { \"route\": \"manager\", \"reply\": \"Hi there! How can I assist you today?\" }\n\n2. If the user's message involves actions like creating, modifying, or deleting, respond with a message indicating that their request has been forwarded and set the route as `\"action_agent\"`.\n   Example: \n   - User: \"Create a red circle.\"\n   - Response: { \"route\": \"action_agent\", \"reply\": \"Your request has been forwarded to the Action Agent.\" }\n\nRespond only with a valid JSON response based on the user's input. \n\n### User:\n{{ $json.chatInput }}\n\n### Assistant:",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.chatInput }}"
+            }
+          ]
+        }
+      },
+      "id": "29575a60-f06b-4d1f-ad5c-f9e3c217f62c",
+      "name": "Chat LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        -480,
+        240
+      ],
+      "typeVersion": 1.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "name": "Color_Tool",
+        "description": "This tool processes the user’s input and extracts the requested color for a shape. If the user specifies a color such as \"blue\", \"red\", or \"green\", the tool will return the color name as a simple string. If no color is provided, the tool will return \"black\" by default.",
+        "language": "python",
+        "pythonCode": "def extract_color(input_text):\n    # List of possible colors to detect\n    colors = ['red', 'green', 'blue', 'yellow', 'pink', 'white', 'black', 'orange', 'brown']\n    \n    # Check if any of the colors are in the input text\n    for color in colors:\n        if color in input_text.lower():  # Case-insensitive check for the color\n            return color  # Return the matched color as a simple string\n    \n    # Default color if no match is found\n    return \"black\"\n\n# Retrieve the input from n8n's input object (for example, \"blue\", \"red\", etc.)\ninput_text = globals().get(\"query\", \"default input\")\n\n# Return the extracted color as a plain string\nreturn extract_color(input_text)\n"
+      },
+      "id": "ddf09589-fba3-4d8e-98ec-7d808cccbc22",
+      "name": "Color Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "name": "Shape_Tool",
+        "description": "This tool extracts the requested shape from the user’s input. The supported shapes are \"circle\", \"rectangle\", \"square\", \"triangle\", and \"ellipse\". It returns the shape as part of a JSON string: {\"shapeType\": \"shape_name\"}.",
+        "language": "python",
+        "pythonCode": "def extract_shape(input_text):\n    # List of possible shapes to detect\n    shapes = ['Circle', 'Rectangle', 'Square', 'Triangle', 'Ellipse', 'Polygon', 'Hexagon']\n    \n    # Check if any of the shapes are in the input text\n    for shape in shapes:\n        if shape in input_text.lower():  # Case-insensitive check for the shape\n            return f'{{\"ShapeType\": \"{shape}\"}}'  # Return the matched shape as a JSON string\n    \n    # Default shape if no match is found\n    return '{\"ShapeType\": \"{shape}\"}'\n\n# Retrieve the input from n8n's input object (for example, \"circle\", \"square\", etc.)\ninput_text = globals().get(\"query\", \"default input\")\n\n# Return the extracted shape as a plain string\nreturn extract_shape(input_text)"
+      },
+      "id": "2fa4a017-f3a2-407b-ba59-e082d9872e0d",
+      "name": "Shape Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "name": "Size_Tool",
+        "description": "This tool extracts the size dimensions (width and height) from the user’s input. It expects size inputs in formats like 15x15 or 15 by 15. The tool returns the size in a JSON string: {\"size\": {\"width\": width_value, \"height\": height_value}}. If no size is specified, a default size of {\"width\": 15, \"height\": 15} will be used.",
+        "language": "python",
+        "pythonCode": "def extract_shape_and_size(input_text):\n    # List of possible shapes to detect\n    shapes = ['Circle', 'Rectangle', 'Square', 'Triangle', 'Ellipse', 'Hexagon']\n    size_keywords = {\n        'small': '{\"width\": 10, \"height\": 10}',\n        'large': '{\"width\": 20, \"height\": 20}',\n        'medium': '{\"width\": 15, \"height\": 15}'\n    }\n    \n    # Default responses\n    extracted_shape = \"rectangle\"\n    extracted_size = None  # No size unless mentioned\n\n    # Check for shape in the input\n    for shape in shapes:\n        if shape in input_text.lower():  # Case-insensitive check for the shape\n            extracted_shape = shape\n            break\n    \n    # Check for qualitative size descriptors in the input\n    for size_keyword, size_value in size_keywords.items():\n        if size_keyword in input_text.lower():\n            extracted_size = size_value  # Match size based on descriptor\n\n    # Build the response\n    shape_json = f'{{\"ShapeType\": \"{extracted_shape}\"}}'\n\n    # If size was found, add it to the response\n    if extracted_size:\n        size_json = f', \"size\": {extracted_size}'\n    else:\n        size_json = ''\n\n    # Return combined JSON string for shape and size\n    return f'{{{shape_json}{size_json}}}'\n\n# Retrieve the input from n8n's input object\ninput_text = globals().get(\"query\", \"default input\")\n\n# Return the extracted shape and size\nreturn extract_shape_and_size(input_text)\n"
+      },
+      "id": "c9a39b8e-aa82-4d71-9edf-a4c25f5eb968",
+      "name": "Size Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "name": "Position_Tool",
+        "description": "This tool extracts the position from the user’s input, translating positional words like \"center\", \"top left\", \"button corner\" and \"bottom-right\" into coordinates on 0-100 scale button is y=0 and top is y 100. The result is returned as a JSON string: {\"position\": {\"x\": x_value, \"y\": y_value}}\n\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is button left, (100,0) is bottom-right, (0,100) is button left, (100,100) is bottom-right",
+        "jsCode": "// Map common positional words to coordinates based on Visio's coordinate system (0, 0) bottom-left\nconst positionMap = {\n    'center': { x: 50, y: 50 },\n    'top left': { x: 0, y: 100 },      // Top-left is (0, 100) in Visio\n    'top right': { x: 100, y: 100 },   // Top-right is (100, 100)\n    'bottom left': { x: 0, y: 0 },     // Bottom-left is (0, 0)\n    'bottom right': { x: 100, y: 0 },  // Bottom-right is (100, 0)\n};\n\n// Convert the input query into lowercase for case-insensitive matching\nconst queryLower = query.toLowerCase();\n\n// Search for keywords in the input query and return the matching position\nfor (const [key, value] of Object.entries(positionMap)) {\n    if (queryLower.includes(key)) {\n        // Return the matched position as a JSON string\n        return JSON.stringify({ position: value });\n    }\n}\n\n// Default to center if no match is found\n//return JSON.stringify({ position: { x: 50, y: 50 } });"
+      },
+      "id": "cb8505db-ee07-41b8-a229-49625a7fde8a",
+      "name": "Position Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "http://localhost:5680/visio-command/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "cd755a3c-b725-4f54-8a10-6d2600510300",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "{{ $('Merge Chat_Visio and Chat').item.json.chatInput }}",
+        "contextWindowLength": 5000
+      },
+      "id": "d00bdf0d-7627-40bc-8b39-23ecc1979804",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "86ce539c-c168-490d-9400-8d9001b19e11",
+      "name": "Chat_Visio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1260,
+        120
+      ],
+      "webhookId": "c09d74e4-06bf-4fde-9c61-879630c13271"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=System:\nYou are an Action Agent responsible for interpreting user requests and generating commands for shapes in a Visio-like system. You have access to a series of tools that extract different parameters needed for creating shapes.\n\nInstructions:\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is top-left, (100,100) is bottom-right\n\n* Your only task is to strictly translate {{ $('Merge Chat_Visio and Chat').item.json.chatInput }} into action and do what the user wants.\nreturn the clean, valid JSON response from the tools, without any tags, explanations, or additional formatting.\n\n* Do not include any language tags (such as <|python_tag|>) or commentary of any kind.\n\n* ALWAYS use the specialized tools to process the user’s request, gather all necessary information (color, shape, size, position) if given, and return the correct JSON response.\n*The JSON response must contain only the data requested by the user.\n\nTool Interaction:\n- Color Tool: Extracts the color for the shape from the user input.\n- Shape Tool: Extracts the shape type from the input.\n- Size Tool: Extracts the dimensions (width and height) from the input.\n- Position Tool: Extracts the position from the input, translating positional words like \"center,\" \"top left\", \"Center\", \"upper right corner\" into numeric coordinates on a x,y scale (min 0, 0 max 100, 100)\n\nCall the Tools:\n- Call the Color Extraction Tool to extract the requested color.\n- Call the Shape Extraction Tool to extract the shape type.\n- Call the Size Extraction Tool to extract the size.\n- Call the Position Extraction Tool to extract the position.\nBuild the Final JSON by adding what is returned from tool:\n{\n   \"command\": \"CreateShape\",\n   \"parameters\": {\n     \"shapeType\": \"{{ shapeType }}\",\n     \"position\": { \"x\": {{ x }}, \"y\": {{ y }} },\n     \"size\": { \"width\": {{ width }}, \"height\": {{ height }} },\n     \"color\": \"{{ color }}\"\n   }\n}\n\nUser message: {{ $('Merge Chat_Visio and Chat').item.json.chatInput }}",
+        "options": {}
+      },
+      "id": "9d8e8f63-06e1-4b36-913d-45f67462ff2b",
+      "name": "action_agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        340,
+        480
+      ]
     }
   ],
   "pinData": {},
@@ -107,6 +458,189 @@
       ]
     },
     "API_Connection_model_visio": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat": {
+      "main": [
+        [
+          {
+            "node": "Merge Chat_Visio and Chat",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Merge Chat_Visio and Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Chat_Visio and Chat": {
+      "main": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "action_agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond chat_from_manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Color Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Size Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Position Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat_Visio": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "action_agent": {
       "main": [
         [
           {

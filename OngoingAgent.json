@@ -351,6 +351,22 @@
         340,
         480
       ]
+    },
+    {
+      "parameters": {
+        "name": "Image_Processing_Tool",
+        "description": "This tool processes an image and extracts shapes, colors, and positions from it. It returns a JSON array of shape objects with properties like shapeType, color, position, and size.",
+        "language": "python",
+        "pythonCode": "def process_image(image_path):\n    # Placeholder function to simulate image processing\n    # In a real implementation, this would use an image processing library\n    # to detect shapes, colors, and positions in the image\n    shapes = [\n        {\"shapeType\": \"circle\", \"color\": \"red\", \"position\": {\"x\": 10, \"y\": 20}, \"size\": {\"width\": 15, \"height\": 15}},\n        {\"shapeType\": \"square\", \"color\": \"blue\", \"position\": {\"x\": 30, \"y\": 40}, \"size\": {\"width\": 20, \"height\": 20}}\n    ]\n    return shapes\n\n# Retrieve the input from n8n's input object\nimage_path = globals().get(\"query\", \"default input\")\n\n# Return the extracted shapes as a JSON array\nreturn process_image(image_path)\n"
+      },
+      "id": "e1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+      "name": "Image Processing Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        760,
+        1060
+      ]
     }
   ],
   "pinData": {},
@@ -533,6 +549,17 @@
           {
             "node": "HTTP Request",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Processing Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_tool",
             "index": 0
           }
         ]
