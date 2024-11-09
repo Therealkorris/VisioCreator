@@ -7,8 +7,12 @@
       "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:visiocommandprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\aichatpane.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:aichatpane.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\thisaddin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:thisaddin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\librarymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:librarymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,7 +22,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -34,15 +38,28 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "AIChatPane.cs",
-              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AIChatPane.cs",
-              "RelativeDocumentMoniker": "AIChatPane.cs",
-              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AIChatPane.cs",
-              "RelativeToolTip": "AIChatPane.cs",
-              "ViewState": "AgIAAFsBAAAAAAAAAAAjwE0BAAAsAAAAAAAAAA==",
+              "DocumentIndex": 2,
+              "Title": "LibraryManager.cs",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\LibraryManager.cs",
+              "RelativeDocumentMoniker": "LibraryManager.cs",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\LibraryManager.cs",
+              "RelativeToolTip": "LibraryManager.cs",
+              "ViewState": "AgIAAIUAAAAAAAAAAAAlwJMAAAAnAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-11-09T18:36:24.671Z",
+              "WhenOpened": "2024-11-09T21:19:33.722Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ThisAddIn.cs",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ThisAddIn.cs",
+              "RelativeDocumentMoniker": "ThisAddIn.cs",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ThisAddIn.cs",
+              "RelativeToolTip": "ThisAddIn.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-11-09T21:19:26.638Z",
               "EditorCaption": ""
             },
             {
@@ -53,7 +70,7 @@
               "RelativeDocumentMoniker": "VisioCommandProcessor.cs",
               "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\VisioCommandProcessor.cs",
               "RelativeToolTip": "VisioCommandProcessor.cs",
-              "ViewState": "AgIAAKYAAAAAAAAAAAAiwKkAAABcAAAAAAAAAA==",
+              "ViewState": "AgIAAKEAAAAAAAAAAAAswK4AAABjAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-09T18:36:18.442Z",
               "EditorCaption": ""

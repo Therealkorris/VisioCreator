@@ -210,7 +210,7 @@ namespace VisioPlugin
             Text = "AI Chat Pane";
             Width = 700;
             Height = 600;
-            MinimumSize = new Size(600, 500); // Enforce minimum size for better usability
+            MinimumSize = new System.Drawing.Size(600, 500); // Enforce minimum size for better usability
         }
 
 
@@ -353,11 +353,11 @@ namespace VisioPlugin
 
                     if (image.Width > maxWidth)
                     {
-                        image = new Bitmap(image, new Size(maxWidth, (int)(maxWidth / aspectRatio)));
+                        image = new Bitmap(image, new System.Drawing.Size(maxWidth, (int)(maxWidth / aspectRatio)));
                     }
                     if (image.Height > maxHeight)
                     {
-                        image = new Bitmap(image, new Size((int)(maxHeight * aspectRatio), maxHeight));
+                        image = new Bitmap(new Bitmap(imagePath), new System.Drawing.Size((int)(maxHeight * aspectRatio), maxHeight));
                     }
 
                     Clipboard.SetImage(image);
