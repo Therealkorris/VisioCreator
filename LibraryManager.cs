@@ -91,51 +91,63 @@ namespace VisioPlugin
         {
             try
             {
-                Debug.WriteLine($"[Debug] Adding shape: {shapeName} from category: {categoryName} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
+                Debug.WriteLine($"[AddShapeToDocument] Adding shape: {shapeName} from category: {categoryName} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
 
                 var activePage = visioApplication?.ActivePage;
                 if (activePage == null)
                 {
-                    Debug.WriteLine("[Error] No active page found in Visio application.");
+                    Debug.WriteLine("[AddShapeToDocument] [Error] No active page found in Visio application.");
                     return;
                 }
 
+                // Retrieve page dimensions from Visio
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
                 var master = GetShape(categoryName, shapeName);
                 if (master == null)
                 {
-                    Debug.WriteLine($"[Error] Shape '{shapeName}' not found in category '{categoryName}'.");
+                    Debug.WriteLine($"[AddShapeToDocument] [Error] Shape '{shapeName}' not found in category '{categoryName}'.");
                     return;
                 }
 
+                // Calculate scaled coordinates and size
                 double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
+                double visioY = ((100 - yPercent) / 100.0) * pageHeight;  // Invert Y-axis
 
-                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
-                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+                double shapeWidth = (widthPercent / 100.0) * pageWidth;
+                double shapeHeight = (heightPercent / 100.0) * pageHeight;
 
+                Debug.WriteLine($"[AddShapeToDocument] Scaled Position - X: {visioX}, Y: {visioY}, Width: {shapeWidth}, Height: {shapeHeight} based on page size: Width={pageWidth}, Height={pageHeight}");
+
+                // Drop shape at calculated coordinates
                 var shape = activePage.Drop(master, visioX, visioY);
-                Debug.WriteLine($"[Debug] Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
+                shape.Cells["PinX"].ResultIU = visioX;
+                shape.Cells["PinY"].ResultIU = visioY;
 
-                if (widthPercent > 0 && heightPercent > 0)
-                {
-                    double shapeWidth = (widthPercent / 100.0) * pageWidth;
-                    double shapeHeight = (heightPercent / 100.0) * pageHeight;
+                // Set shape dimensions explicitly
+                shape.Cells["Width"].ResultIU = shapeWidth;
+                shape.Cells["Height"].ResultIU = shapeHeight;
 
-                    shape.Cells["Width"].ResultIU = Math.Abs(shapeWidth);
-                    shape.Cells["Height"].ResultIU = Math.Abs(shapeHeight);
-
-                    Debug.WriteLine($"[Debug] Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
-                }
+                Debug.WriteLine($"[AddShapeToDocument] Shape placed at (PinX={shape.Cells["PinX"].ResultIU}, PinY={shape.Cells["PinY"].ResultIU}) with final size Width={shape.Cells["Width"].ResultIU}, Height={shape.Cells["Height"].ResultIU}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Error] Error adding shape '{shapeName}' from category '{categoryName}': {ex.Message}");
+                Debug.WriteLine($"[AddShapeToDocument] [Error] Error adding shape '{shapeName}' from category '{categoryName}': {ex.Message}");
                 Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
         }
+
+
+        // Helper method to scale a percentage (0-100) to page dimension
+        private double ScaleToPageDimension(double percent, double dimension)
+        {
+            return (percent / 100.0) * dimension;
+        }
+
+
+
+
 
         public void SetShapeColor(Visio.Shape shape, string colorHex)
         {

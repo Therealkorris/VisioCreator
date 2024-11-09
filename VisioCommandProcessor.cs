@@ -13,6 +13,10 @@ namespace VisioPlugin
         private readonly LibraryManager libraryManager;
         private Dictionary<string, Action<JToken>> commandRegistry;
 
+        private double pageWidth = 0;
+        private double pageHeight = 0;
+        private bool dimensionsFetched = false;
+
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
             this.visioApp = visioApp;
@@ -30,6 +34,26 @@ namespace VisioPlugin
             commandRegistry.Add("ConnectShapes", ConnectShapes);
             commandRegistry.Add("CreateText", CreateText);
             commandRegistry.Add("RetrieveAllShapes", parameters => RetrieveAllShapes());
+        }
+
+        private void FetchPageDimensions()
+        {
+            // Fetch and cache page dimensions if not already done
+            if (!dimensionsFetched)
+            {
+                var activePage = visioApp.ActivePage;
+                if (activePage != null)
+                {
+                    pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                    pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+                    Debug.WriteLine($"[FetchPageDimensions] Canvas dimensions fetched: Width={pageWidth}, Height={pageHeight}");
+                    dimensionsFetched = true;
+                }
+                else
+                {
+                    Debug.WriteLine("[FetchPageDimensions] [Error] No active page found in Visio.");
+                }
+            }
         }
 
         public void ProcessCommand(string jsonCommand)
@@ -86,11 +110,18 @@ namespace VisioPlugin
 
         private void CreateShape(JToken parameters)
         {
+            FetchPageDimensions();  // Ensure page dimensions are available
+
+            if (pageWidth == 0 || pageHeight == 0)
+            {
+                Debug.WriteLine("[CreateShape] [Error] Page dimensions are not valid. Shape creation aborted.");
+                return;
+            }
+
             try
             {
-                Debug.WriteLine($"[CreateShape] Parameters received: {parameters.ToString()}");
+                Debug.WriteLine($"[CreateShape] Parameters received: {parameters}");
 
-                // Extract parameters with fallbacks
                 string shapeType = parameters["shapeType"]?.ToString() ?? "Rectangle";
                 float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;
                 float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;
@@ -107,35 +138,18 @@ namespace VisioPlugin
                     return;
                 }
 
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
-                {
-                    Debug.WriteLine("[CreateShape] [Error] No active page found in Visio.");
-                    return;
-                }
-
-                // Retrieve canvas dimensions
-                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-                // Convert from 100x100 scale to actual canvas size
+                // Map AI's 0–100 scale to actual page dimensions
                 double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = ((100 - yPercent) / 100.0) * pageHeight;
-                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
-                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+                double visioY = ((100 - yPercent) / 100.0) * pageHeight;  // Invert Y-axis
 
-                // Calculate actual width and height
                 double visioWidth = (widthPercent / 100.0) * pageWidth;
                 double visioHeight = (heightPercent / 100.0) * pageHeight;
 
-                Debug.WriteLine($"[CreateShape] Calculated Coordinates: X={visioX}, Y={visioY}, Width={visioWidth}, Height={visioHeight}");
+                Debug.WriteLine($"[CreateShape] Mapped Coordinates and Size - X: {visioX}, Y: {visioY}, Width: {visioWidth}, Height: {visioHeight}");
 
-                // Attempt to add shape
-                Debug.WriteLine($"[CreateShape] Adding shape '{shapeType}' from category '{categoryName}'");
-                libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
+                libraryManager.AddShapeToDocument(categoryName, shapeType, xPercent, yPercent, widthPercent, heightPercent);
 
-                // Apply color if the shape is added successfully
-                Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
+                Visio.Shape addedShape = visioApp.ActivePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
                 if (addedShape != null && !string.IsNullOrEmpty(color))
                 {
                     libraryManager.SetShapeColor(addedShape, color);
@@ -152,7 +166,14 @@ namespace VisioPlugin
             }
         }
 
-        // Define similar improvements in other methods
+
+        // Helper method to scale a percentage (0-100) to page dimension
+        private double ScaleToPageDimension(double percent, double dimension)
+        {
+            return (percent / 100.0) * dimension;
+        }
+
+
 
         private void DeleteShape(JToken parameters)
         {
