@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace VisioPlugin
 {
@@ -10,11 +14,15 @@ namespace VisioPlugin
     {
         private readonly Visio.Application visioApplication;
         private readonly Dictionary<string, ShapeCategory> categories;
+        private readonly HttpClient httpClient;
+        private readonly string apiEndpoint;
 
         public LibraryManager(Visio.Application visioApp)
         {
             visioApplication = visioApp ?? throw new ArgumentNullException(nameof(visioApp));
             categories = new Dictionary<string, ShapeCategory>();
+            httpClient = new HttpClient();
+            apiEndpoint = "http://localhost:5678"; // Set your API endpoint here
             LoadLibraries();
         }
 
@@ -137,6 +145,63 @@ namespace VisioPlugin
             }
         }
 
+        public void AddShapesToDocument(List<ShapeInfo> shapes)
+        {
+            try
+            {
+                var activePage = visioApplication?.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[Error] No active page found in Visio application.");
+                    return;
+                }
+
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                foreach (var shapeInfo in shapes)
+                {
+                    var master = GetShape(shapeInfo.Category, shapeInfo.Name);
+                    if (master == null)
+                    {
+                        Debug.WriteLine($"[Error] Shape '{shapeInfo.Name}' not found in category '{shapeInfo.Category}'.");
+                        continue;
+                    }
+
+                    double visioX = (shapeInfo.Position.X / 100.0) * pageWidth;
+                    double visioY = (1 - (shapeInfo.Position.Y / 100.0)) * pageHeight;
+
+                    visioX = Math.Max(0, Math.Min(visioX, pageWidth));
+                    visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+
+                    var shape = activePage.Drop(master, visioX, visioY);
+                    Debug.WriteLine($"[Debug] Shape added: {shape.Name} at ({shape.Cells["PinX"].ResultIU}, {shape.Cells["PinY"].ResultIU})");
+
+                    if (shapeInfo.Size.Width > 0 && shapeInfo.Size.Height > 0)
+                    {
+                        double shapeWidth = (shapeInfo.Size.Width / 100.0) * pageWidth;
+                        double shapeHeight = (shapeInfo.Size.Height / 100.0) * pageHeight;
+
+                        shape.Cells["Width"].ResultIU = Math.Abs(shapeWidth);
+                        shape.Cells["Height"].ResultIU = Math.Abs(shapeHeight);
+
+                        Debug.WriteLine($"[Debug] Shape resized: Width = {shape.Cells["Width"].ResultIU}, Height = {shape.Cells["Height"].ResultIU}");
+                    }
+
+                    if (!string.IsNullOrEmpty(shapeInfo.Color))
+                    {
+                        SetShapeColor(shape, shapeInfo.Color);
+                        Debug.WriteLine($"[Debug] Shape color set to: {shapeInfo.Color}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Error] Error adding shapes: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+            }
+        }
+
         public void SetShapeColor(Visio.Shape shape, string colorHex)
         {
             try
@@ -200,6 +265,24 @@ namespace VisioPlugin
 
             return shapes;
         }
+
+        public async Task SendLibraryInformationToN8n()
+        {
+            try
+            {
+                var libraryInfo = ListAllShapes();
+                var jsonContent = new StringContent(JsonConvert.SerializeObject(libraryInfo), Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync($"{apiEndpoint}/send-library-info", jsonContent);
+                response.EnsureSuccessStatusCode();
+
+                Debug.WriteLine("Library information sent to n8n successfully.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error sending library information to n8n: {ex.Message}");
+            }
+        }
     }
 
     public class ShapeCategory
@@ -236,11 +319,19 @@ namespace VisioPlugin
         public string Type { get; set; }
         public Position Position { get; set; }
         public string Color { get; set; }
+        public string Category { get; set; }
+        public Size Size { get; set; }
     }
 
     public class Position
     {
         public double X { get; set; }
         public double Y { get; set; }
+    }
+
+    public class Size
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 }

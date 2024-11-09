@@ -37,6 +37,7 @@ namespace VisioPlugin
             commandRegistry.Add("ConnectShapes", ConnectShapes);
             commandRegistry.Add("CreateText", CreateText);
             commandRegistry.Add("RetrieveAllShapes", parameters => RetrieveAllShapes()); // Updated this line
+            commandRegistry.Add("CreateMultipleShapes", CreateMultipleShapes); // Added this line
         }
 
         // The core command processor method
@@ -120,7 +121,7 @@ namespace VisioPlugin
 
                 // Ensure the coordinates fit within the canvas
                 visioX = Math.Max(0, Math.Min(visioX, pageWidth));
-                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
+                visioY = Math.Max(0, Math.min(visioY, pageHeight));
 
                 // Convert percentage size to absolute size
                 double visioWidth = (widthPercent / 100.0) * pageWidth;
@@ -154,6 +155,36 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[CreateShape] [Error] Error creating shape: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Process the CreateMultipleShapes command from AI
+        private void CreateMultipleShapes(JToken parameters)
+        {
+            try
+            {
+                Debug.WriteLine($"[CreateMultipleShapes] Received Parameters: {parameters.ToString()}");
+
+                // Extract parameters from the AI response
+                var shapes = parameters["shapes"]?.ToObject<List<ShapeInfo>>();
+
+                if (shapes == null || !shapes.Any())
+                {
+                    Debug.WriteLine("[CreateMultipleShapes] [Error] No shapes specified.");
+                    return;
+                }
+
+                Debug.WriteLine($"[CreateMultipleShapes] Number of shapes to add: {shapes.Count}");
+
+                // Add the shapes using the library manager
+                libraryManager.AddShapesToDocument(shapes);
+
+                Debug.WriteLine("[CreateMultipleShapes] Shapes added successfully.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CreateMultipleShapes] [Error] Error creating multiple shapes: {ex.Message}");
                 throw;
             }
         }
