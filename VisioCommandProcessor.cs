@@ -11,23 +11,16 @@ namespace VisioPlugin
     {
         private readonly Visio.Application visioApp;
         private readonly LibraryManager libraryManager;
-
-        // Command registry to store command names and their corresponding handlers
         private Dictionary<string, Action<JToken>> commandRegistry;
 
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
             this.visioApp = visioApp;
             this.libraryManager = libraryManager;
-
-            // Initialize the command registry
             commandRegistry = new Dictionary<string, Action<JToken>>(StringComparer.OrdinalIgnoreCase);
-
-            // Register commands and their handlers
             RegisterCommands();
         }
 
-        // Register all available commands dynamically
         private void RegisterCommands()
         {
             commandRegistry.Add("CreateShape", CreateShape);
@@ -36,73 +29,84 @@ namespace VisioPlugin
             commandRegistry.Add("ResizeShape", ResizeShape);
             commandRegistry.Add("ConnectShapes", ConnectShapes);
             commandRegistry.Add("CreateText", CreateText);
-            commandRegistry.Add("RetrieveAllShapes", parameters => RetrieveAllShapes()); // Updated this line
+            commandRegistry.Add("RetrieveAllShapes", parameters => RetrieveAllShapes());
         }
 
-        // The core command processor method
         public void ProcessCommand(string jsonCommand)
         {
             try
             {
                 Debug.WriteLine($"[ProcessCommand] Received Command: {jsonCommand}");
+                JToken commandToken = JToken.Parse(jsonCommand);
 
-                // Parse the JSON command
-                JObject commandObject = JObject.Parse(jsonCommand);
-                string commandName = commandObject["command"]?.ToString();
-
-                Debug.WriteLine($"[ProcessCommand] Extracted command name: {commandName}");
-
-                if (string.IsNullOrEmpty(commandName))
-                    throw new Exception("[ProcessCommand] Command name is missing.");
-
-                // Check if the command is registered
-                if (commandRegistry.ContainsKey(commandName))
+                if (commandToken is JArray commandArray)
                 {
-                    Debug.WriteLine($"[ProcessCommand] Executing Command: {commandName}");
-                    commandRegistry[commandName](commandObject["parameters"]);
+                    foreach (JObject commandObject in commandArray)
+                    {
+                        ExecuteSingleCommand(commandObject);
+                    }
+                }
+                else if (commandToken is JObject singleCommandObject)
+                {
+                    ExecuteSingleCommand(singleCommandObject);
                 }
                 else
                 {
-                    Debug.WriteLine($"[ProcessCommand] Command '{commandName}' is not recognized. Available commands: {string.Join(", ", commandRegistry.Keys)}");
-                    throw new Exception($"[ProcessCommand] Command '{commandName}' is not recognized.");
+                    Debug.WriteLine("[ProcessCommand] Invalid command format.");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ProcessCommand] Error processing command: {ex.Message}");
-                throw;
             }
         }
 
-        // Process the CreateShape command from AI
+        private void ExecuteSingleCommand(JObject commandObject)
+        {
+            try
+            {
+                string commandName = commandObject["command"]?.ToString();
+                Debug.WriteLine($"[ExecuteSingleCommand] Command name extracted: {commandName}");
+
+                if (!string.IsNullOrEmpty(commandName) && commandRegistry.ContainsKey(commandName))
+                {
+                    Debug.WriteLine($"[ExecuteSingleCommand] Executing Command: {commandName}");
+                    commandRegistry[commandName](commandObject["parameters"]);
+                }
+                else
+                {
+                    Debug.WriteLine($"[ExecuteSingleCommand] Unrecognized command '{commandName}'. Command skipped.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExecuteSingleCommand] Error executing command: {ex.Message}");
+            }
+        }
+
         private void CreateShape(JToken parameters)
         {
             try
             {
-                Debug.WriteLine($"[CreateShape] Received Parameters: {parameters.ToString()}");
+                Debug.WriteLine($"[CreateShape] Parameters received: {parameters.ToString()}");
 
-                // Extract parameters from the AI response
-                string shapeType = parameters["shapeType"]?.ToString();
-                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
-                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
-                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;  // Percentage width
-                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;  // Percentage height
-                string color = parameters["color"]?.ToString();
+                // Extract parameters with fallbacks
+                string shapeType = parameters["shapeType"]?.ToString() ?? "Rectangle";
+                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;
+                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;
+                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;
+                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
+                string color = parameters["color"]?.ToString() ?? "Black";
 
-                Debug.WriteLine($"[CreateShape] ShapeType: {shapeType}, X: {xPercent}%, Y: {yPercent}%, Width: {widthPercent}%, Height: {heightPercent}%, Color: {color}");
+                Debug.WriteLine($"[CreateShape] Extracted - ShapeType: {shapeType}, X%: {xPercent}, Y%: {yPercent}, Width%: {widthPercent}, Height%: {heightPercent}, Color: {color}");
 
-                // Get the current category (stencil) to be used to create the shape
-                string categoryName = Globals.ThisAddIn.CurrentCategory; // Use CurrentCategory
-
+                string categoryName = Globals.ThisAddIn.CurrentCategory;
                 if (string.IsNullOrEmpty(categoryName))
                 {
                     Debug.WriteLine("[CreateShape] [Error] No category specified. Cannot add shape.");
                     return;
                 }
 
-                Debug.WriteLine($"[CreateShape] Using Category: {categoryName}");
-
-                // Get the current active Visio page
                 var activePage = visioApp.ActivePage;
                 if (activePage == null)
                 {
@@ -110,68 +114,56 @@ namespace VisioPlugin
                     return;
                 }
 
-                // Retrieve the canvas dimensions
+                // Retrieve canvas dimensions
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                // Convert percentage coordinates to absolute coordinates
+                // Convert from 100x100 scale to actual canvas size
                 double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
-
-                // Ensure the coordinates fit within the canvas
+                double visioY = ((100 - yPercent) / 100.0) * pageHeight;
                 visioX = Math.Max(0, Math.Min(visioX, pageWidth));
                 visioY = Math.Max(0, Math.Min(visioY, pageHeight));
 
-                // Convert percentage size to absolute size
+                // Calculate actual width and height
                 double visioWidth = (widthPercent / 100.0) * pageWidth;
                 double visioHeight = (heightPercent / 100.0) * pageHeight;
 
-                Debug.WriteLine($"[CreateShape] Calculated Coordinates - X: {visioX}, Y: {visioY}, Width: {visioWidth}, Height: {visioHeight}");
+                Debug.WriteLine($"[CreateShape] Calculated Coordinates: X={visioX}, Y={visioY}, Width={visioWidth}, Height={visioHeight}");
 
-                // Add the shape using the category (stencil) and shape type
-                Debug.WriteLine($"[CreateShape] Attempting to add shape '{shapeType}' from category '{categoryName}'");
+                // Attempt to add shape
+                Debug.WriteLine($"[CreateShape] Adding shape '{shapeType}' from category '{categoryName}'");
                 libraryManager.AddShapeToDocument(categoryName, shapeType, visioX, visioY, visioWidth, visioHeight);
 
-                // Get the last added shape to set additional properties (like color)
+                // Apply color if the shape is added successfully
                 Visio.Shape addedShape = activePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
-
-                if (addedShape != null)
+                if (addedShape != null && !string.IsNullOrEmpty(color))
                 {
-                    Debug.WriteLine($"[CreateShape] Shape '{addedShape.Name}' added successfully.");
-
-                    // Apply color if it's specified in the AI command
-                    if (!string.IsNullOrEmpty(color))
-                    {
-                        libraryManager.SetShapeColor(addedShape, color);
-                        Debug.WriteLine($"[CreateShape] Applied color '{color}' to shape '{addedShape.Name}'.");
-                    }
+                    libraryManager.SetShapeColor(addedShape, color);
+                    Debug.WriteLine($"[CreateShape] Applied color '{color}' to shape '{addedShape.Name}'.");
                 }
                 else
                 {
-                    Debug.WriteLine("[CreateShape] [Error] Shape was not added successfully.");
+                    Debug.WriteLine("[CreateShape] Shape was not added successfully or color was not applied.");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[CreateShape] [Error] Error creating shape: {ex.Message}");
-                throw;
             }
         }
 
-        // Process the DeleteShape command from AI
+        // Define similar improvements in other methods
+
         private void DeleteShape(JToken parameters)
         {
             try
             {
-                Debug.WriteLine($"[DeleteShape] Received Parameters: {parameters.ToString()}");
-
-                // Extract parameters from the AI response
+                Debug.WriteLine($"[DeleteShape] Parameters received: {parameters.ToString()}");
                 string color = parameters["color"]?.ToString();
                 string shapeType = parameters["shapeType"]?.ToString();
 
                 Debug.WriteLine($"[DeleteShape] Color: {color}, ShapeType: {shapeType}");
 
-                // Get the current active Visio page
                 var activePage = visioApp.ActivePage;
                 if (activePage == null)
                 {
@@ -179,7 +171,6 @@ namespace VisioPlugin
                     return;
                 }
 
-                // Find the shape by color and shapeType and delete it
                 Visio.Shape shapeToDelete = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.CellsU["FillForegnd"].FormulaU.Contains(color) && s.Name.Contains(shapeType));
                 if (shapeToDelete != null)
                 {
@@ -188,13 +179,12 @@ namespace VisioPlugin
                 }
                 else
                 {
-                    Debug.WriteLine($"[DeleteShape] [Error] Shape with Color '{color}' and ShapeType '{shapeType}' not found.");
+                    Debug.WriteLine($"[DeleteShape] Shape with Color '{color}' and ShapeType '{shapeType}' not found.");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[DeleteShape] [Error] Error deleting shape: {ex.Message}");
-                throw;
             }
         }
 
