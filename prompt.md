@@ -1,6 +1,116 @@
+I have a bug for you to help me fix, but first you need to know about my program read the instructions. then read each file. after that and at the end go through the bug i have and try focus on fixing it. 
+
+it should be between the file called StructuredoutputOllama.json and the file called VisioCommandProcessor.cs.
+
+Bug:
+Command recieved from n8n, is not being correctly applied in the visio by the visiocommand
+
+Error:
+[ProcessWebhookCommand] Received command: {"command":"CreateShape","parameters":{"shapeType":"circle","position":{"x":50,"y":50},"size":{"width":15,"height":15},"color":"red"}}
+[ProcessCommand] Received command: {"command":"CreateShape","parameters":{"shapeType":"circle","position":{"x":50,"y":50},"size":{"width":15,"height":15},"color":"red"}}
+[ProcessCommand] [Error] 'shapes' array is missing in parameters.
+[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.
+
+Keep in mind that we moved away from tools in the n8n to structured output from ollama.
+
+Example:
+Data extraction
+To extract structured data from text, define a schema to represent information. The model then extracts the information and returns the data in the defined schema as JSON:
+
+from ollama import chat
+from pydantic import BaseModel
+
+class Pet(BaseModel):
+  name: str
+  animal: str
+  age: int
+  color: str | None
+  favorite_toy: str | None
+
+class PetList(BaseModel):
+  pets: list[Pet]
+
+response = chat(
+  messages=[
+    {
+      'role': 'user',
+      'content': '''
+        I have two pets.
+        A cat named Luna who is 5 years old and loves playing with yarn. She has grey fur.
+        I also have a 2 year old black cat named Loki who loves tennis balls.
+      ''',
+    }
+  ],
+  model='llama3.1',
+  format=PetList.model_json_schema(),
+)
+
+pets = PetList.model_validate_json(response.message.content)
+print(pets)
+
+Example output
+pets=[
+  Pet(name='Luna', animal='cat', age=5, color='grey', favorite_toy='yarn'), 
+  Pet(name='Loki', animal='cat', age=2, color='black', favorite_toy='tennis balls')
+]
+Image description
+Structured outputs can also be used with vision models. For example, the following code uses llama3.2-vision to describe the following image and returns a structured output:
+
+image
+
+from ollama import chat
+from pydantic import BaseModel
+
+class Object(BaseModel):
+  name: str
+  confidence: float
+  attributes: str 
+
+class ImageDescription(BaseModel):
+  summary: str
+  objects: List[Object]
+  scene: str
+  colors: List[str]
+  time_of_day: Literal['Morning', 'Afternoon', 'Evening', 'Night']
+  setting: Literal['Indoor', 'Outdoor', 'Unknown']
+  text_content: Optional[str] = None
+
+path = 'path/to/image.jpg'
+
+response = chat(
+  model='llama3.2-vision',
+  format=ImageDescription.model_json_schema(),  # Pass in the schema for the response
+  messages=[
+    {
+      'role': 'user',
+      'content': 'Analyze this image and describe what you see, including any objects, the scene, colors and any text you can detect.',
+      'images': [path],
+    },
+  ],
+  options={'temperature': 0},  # Set temperature to 0 for more deterministic output
+)
+
+image_description = ImageDescription.model_validate_json(response.message.content)
+print(image_description)
+Example output
+summary='A palm tree on a sandy beach with blue water and sky.' 
+objects=[
+  Object(name='tree', confidence=0.9, attributes='palm tree'), 
+  Object(name='beach', confidence=1.0, attributes='sand')
+], 
+scene='beach', 
+colors=['blue', 'green', 'white'], 
+time_of_day='Afternoon' 
+setting='Outdoor' 
+text_content=None
+
+----------
+
+
+Instructions:
+***Visio AI-Assistant Plugin: Overview and Capabilities***
 
 ## 1. Introduction
-***Visio AI-Assistant Plugin: Overview and Capabilities***
 
 This document provides a comprehensive overview of the Visio AI-Assistant Plugin, a powerful tool designed to enhance your Visio diagramming experience with the help of artificial intelligence. This plugin allows you to interact with an AI assistant directly within Visio, enabling you to create, modify, and manage your diagrams using natural language commands.
 

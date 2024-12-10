@@ -29,49 +29,82 @@ namespace VisioPlugin
                 JObject commandObject = JsonConvert.DeserializeObject<JObject>(jsonCommand);
 
                 string commandType = commandObject["command"]?.ToString();
-                JObject parameters = commandObject["parameters"] as JObject;
 
+                // Handle empty or invalid commands
                 if (string.IsNullOrEmpty(commandType))
                 {
-                    Debug.WriteLine("[ProcessCommand] [Error] Command type is missing or empty.");
+                    Debug.WriteLine($"[ProcessCommand] [Error] Unknown or missing command type.");
                     return;
                 }
 
-                switch (commandType)
+                // Map command variations to the correct command type
+                if (commandType.Equals("CreateShapes", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "CreateShape":
-                        await ExecuteCreateShapeCommand(parameters);
-                        break;
-                    case "ConnectShapes":
-                        await ExecuteConnectShapesCommand(parameters);
-                        break;
-                    case "AddTextToShape":
-                        await ExecuteAddTextToShapeCommand(parameters);
-                        break;
-                    case "SetShapeStyle":
-                        await ExecuteSetShapeStyleCommand(parameters);
-                        break;
-                    case "GroupShapes":
-                        await ExecuteGroupShapesCommand(parameters);
-                        break;
-                    case "UngroupShapes":
-                        await ExecuteUngroupShapesCommand(parameters);
-                        break;
-                    case "AlignShapes":
-                        await ExecuteAlignShapesCommand(parameters);
-                        break;
-                    case "DistributeShapes":
-                        await ExecuteDistributeShapesCommand(parameters);
-                        break;
-                    case "GetShapeProperties":
-                        await ExecuteGetShapePropertiesCommand(parameters);
-                        break;
-                    case "GetPageSize":
-                        await ExecuteGetPageSizeCommand(parameters);
-                        break;
-                    default:
-                        Debug.WriteLine($"[ProcessCommand] [Error] Unknown command type: {commandType}");
-                        break;
+                    commandType = "CreateShape"; // Correct the command type
+                }
+
+                // Handle different command types
+                if (commandType == "CreateShape")
+                {
+                    // Check for the shapes array (multiple shapes)
+                    if (commandObject["parameters"]?["shapes"] is JArray shapesArray)
+                    {
+                        foreach (JObject shapeObject in shapesArray)
+                        {
+                            await ExecuteCreateShapeCommand(shapeObject);
+                        }
+                    }
+                    // Handle case where parameters are directly in 'parameters' object (single shape)
+                    else if (commandObject["parameters"] is JObject shapeParameters)
+                    {
+                        await ExecuteCreateShapeCommand(shapeParameters);
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[ProcessCommand] [Error] 'parameters' is missing or has an invalid format.");
+                        return;
+                    }
+                }
+                // Add other command types here (e.g., ConnectShapes, AddTextToShape, etc.)
+                else if (commandType == "ConnectShapes")
+                {
+                    await ExecuteConnectShapesCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "AddTextToShape")
+                {
+                    await ExecuteAddTextToShapeCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "SetShapeStyle")
+                {
+                    await ExecuteSetShapeStyleCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "GroupShapes")
+                {
+                    await ExecuteGroupShapesCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "UngroupShapes")
+                {
+                    await ExecuteUngroupShapesCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "AlignShapes")
+                {
+                    await ExecuteAlignShapesCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "DistributeShapes")
+                {
+                    await ExecuteDistributeShapesCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "GetShapeProperties")
+                {
+                    await ExecuteGetShapePropertiesCommand(commandObject["parameters"] as JObject);
+                }
+                else if (commandType == "GetPageSize")
+                {
+                    await ExecuteGetPageSizeCommand(commandObject["parameters"] as JObject);
+                }
+                else
+                {
+                    Debug.WriteLine($"[ProcessCommand] [Error] Unsupported command type: {commandType}");
                 }
             }
             catch (JsonReaderException jEx)
@@ -81,47 +114,82 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ProcessCommand] [Error] Failed to process command: {ex.Message}");
-                // Consider sending detailed error information back to the AI for debugging.
             }
         }
 
-        private async Task ExecuteCreateShapeCommand(JObject parameters)
+        private async Task ExecuteCreateShapeCommand(JObject shapeParameters)
         {
-            if (parameters == null)
+            if (shapeParameters == null)
             {
-                Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] Parameters are missing.");
+                Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] Shape parameters are missing.");
                 return;
             }
 
-            // Extract parameters with more robust error handling
-            string shapeType = parameters["shapeType"]?.ToString();
-            if (string.IsNullOrEmpty(shapeType))
+            // Check if the 'shapes' array exists
+            if (shapeParameters["shapes"] is JArray shapesArray)
             {
-                Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] shapeType is missing or empty.");
-                return; // Consider sending an error message back to the AI
-            }
-
-            JObject positionObject = parameters["position"] as JObject;
-            double x = positionObject?["x"]?.Value<double>() ?? 0;
-            double y = positionObject?["y"]?.Value<double>() ?? 0;
-
-            JObject sizeObject = parameters["size"] as JObject;
-            double width = sizeObject?["width"]?.Value<double>() ?? 10; // Default width
-            double height = sizeObject?["height"]?.Value<double>() ?? 10; // Default height
-
-            string color = parameters["color"]?.ToString();
-
-            // Use the parameters to add the shape
-            libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, x, y, width, height);
-
-            // Optionally, set the shape color if provided
-            if (!string.IsNullOrEmpty(color))
-            {
-                var shapeName = GetLastAddedShapeName();
-                if (!string.IsNullOrEmpty(shapeName))
+                foreach (JObject shapeObject in shapesArray)
                 {
-                    var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
-                    libraryManager.SetShapeColor(shape, color);
+                    string shapeType = shapeObject["type"]?.ToString();
+                    if (string.IsNullOrEmpty(shapeType))
+                    {
+                        Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] shapeType is missing or empty in one of the shape objects.");
+                        continue; // Skip this shape object and move to the next one
+                    }
+
+                    JObject positionObject = shapeObject["position"] as JObject;
+                    double x = positionObject?["x"]?.Value<double>() ?? 0;
+                    double y = positionObject?["y"]?.Value<double>() ?? 0;
+
+                    JObject sizeObject = shapeObject["size"] as JObject;
+                    double width = sizeObject?["width"]?.Value<double>() ?? 10;
+                    double height = sizeObject?["height"]?.Value<double>() ?? 10;
+
+                    string color = shapeObject["color"]?.ToString();
+
+                    libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, x, y, width, height);
+
+                    if (!string.IsNullOrEmpty(color))
+                    {
+                        var shapeName = GetLastAddedShapeName();
+                        if (!string.IsNullOrEmpty(shapeName))
+                        {
+                            var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
+                            libraryManager.SetShapeColor(shape, color);
+                        }
+                    }
+                }
+            }
+            // Handle the case where 'shapes' array is missing but other parameters are present (single shape creation)
+            else
+            {
+                string shapeType = shapeParameters["shapeType"]?.ToString();
+                if (string.IsNullOrEmpty(shapeType))
+                {
+                    Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] shapeType is missing or empty.");
+                    return;
+                }
+
+                JObject positionObject = shapeParameters["position"] as JObject;
+                double x = positionObject?["x"]?.Value<double>() ?? 0;
+                double y = positionObject?["y"]?.Value<double>() ?? 0;
+
+                JObject sizeObject = shapeParameters["size"] as JObject;
+                double width = sizeObject?["width"]?.Value<double>() ?? 10;
+                double height = sizeObject?["height"]?.Value<double>() ?? 10;
+
+                string color = shapeParameters["color"]?.ToString();
+
+                libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, x, y, width, height);
+
+                if (!string.IsNullOrEmpty(color))
+                {
+                    var shapeName = GetLastAddedShapeName();
+                    if (!string.IsNullOrEmpty(shapeName))
+                    {
+                        var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
+                        libraryManager.SetShapeColor(shape, color);
+                    }
                 }
             }
 
@@ -135,7 +203,6 @@ namespace VisioPlugin
                 var activePage = visioApplication.ActivePage;
                 if (activePage != null && activePage.Shapes.Count > 0)
                 {
-                    // Assuming the last added shape is at the end of the Shapes collection
                     return activePage.Shapes[activePage.Shapes.Count].Name;
                 }
             }
@@ -271,7 +338,7 @@ namespace VisioPlugin
                 try
                 {
                     var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync("http://localhost:5680/chat-agent", content); // Replace with your n8n webhook URL
+                    var response = await client.PostAsync("http://localhost:5678/chat-agent", content); // Replace with your n8n webhook URL
                     response.EnsureSuccessStatusCode();
                     Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
                 }

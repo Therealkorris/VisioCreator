@@ -1,0 +1,474 @@
+{
+  "name": "OngoingAgent",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {
+          "format": "json"
+        }
+      },
+      "id": "1933afb7-4ab6-4f6a-8155-8c13802118bb",
+      "name": "Ollama Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        120,
+        680
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {}
+      },
+      "id": "7ac248ef-b6ea-4a49-8c94-ef79280093f8",
+      "name": "Action_response1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        500
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "a9cf3ee6-4d39-4b3a-89aa-592074509690",
+      "name": "Respond chat_from_manager",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        220
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the 'reply' field from the input JSON\nlet replyText = $json.reply;\n\n// Ensure that we only return the reply text\nreturn [\n  {\n    \"text\": replyText\n  }\n];\n"
+      },
+      "id": "a7f7c323-70eb-4149-935b-f1326aacdb49",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "id": "942a452d-1208-43cc-ad1c-8eb050cb5fe5",
+      "name": "Merge Chat_Visio and Chat",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        -680,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {
+          "format": "json"
+        }
+      },
+      "id": "9c8fd97d-5efa-4ec9-9603-7812687d9231",
+      "name": "Ollama Model",
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        480
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "OuW1SzikhVbQMEOL",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let output;\n\ntry {\n    // Try to parse the JSON from the Manager response\n    output = JSON.parse($json.text);\n} catch (error) {\n    // If parsing fails, handle it as a regular text message\n    return {\n        route: \"manager\",  // Default route for handling non-JSON inputs\n        reply: $json.text  // Send the raw text as the reply\n    };\n}\n\n// Return both the route and the reply for further processing if JSON parsing succeeds\nreturn {\n    route: output.route,   // Keep route for the Switch node\n    reply: output.reply    // Send reply to the Respond webhook\n};\n"
+      },
+      "id": "63805d69-9240-4ff4-a5c3-0c9cd27a249e",
+      "name": "Code1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "=manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "={{ $('Merge Chat_Visio and Chat').item.json.chatInput }}"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8d8a0903-2a4c-4bf9-9385-b25e8d4c9840",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "action_agent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "={{ $('Merge Chat_Visio and Chat').item.json.chatInput }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "31d3ffd0-0840-4278-9049-87dfca3d4989",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        100,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let output;\n\n// Extract the message from the Chat_Visio input and rename it as chatInput\nif ($json.body && $json.body.message) {\n  output = {\n    chatInput: $json.body.message,  // Rename message to chatInput\n  };\n} else {\n  output = {\n    chatInput: \"No chatInput found\",  // Handle case where message is missing\n  };\n}\n\nreturn output;\n"
+      },
+      "id": "6b128033-b0a9-43dc-97ee-6851c85651eb",
+      "name": "Code2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "d826d6f5-694f-402f-9f2f-f4c29ce6f1d5",
+      "name": "Chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1260,
+        340
+      ],
+      "webhookId": "91938835-5f26-42bf-8482-2555230784e7"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### System:\nYou are the Manager Agent responsible for understanding user input and deciding how to respond.\n\n1. If the user's message is a general chat or question, respond directly with a conversation reply and set the route as `\"manager\"`. \n   Example: \n   - User: \"Hello!\"\n   - Response: { \"route\": \"manager\", \"reply\": \"Hi there! How can I assist you today?\" }\n\n2. If the user's message involves actions like creating, modifying, or deleting, respond with a message indicating that their request has been forwarded and set the route as `\"action_agent\"`.\n   Example: \n   - User: \"Create a red circle.\"\n   - Response: { \"route\": \"action_agent\", \"reply\": \"Your request has been forwarded to the Action Agent.\" }\n\nRespond only with a valid JSON response based on the user's input. \n\n### User:\n{{ $json.chatInput }}\n\n### Assistant:",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.chatInput }}"
+            }
+          ]
+        }
+      },
+      "id": "29575a60-f06b-4d1f-ad5c-f9e3c217f62c",
+      "name": "Chat LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        -480,
+        240
+      ],
+      "typeVersion": 1.4,
+      "alwaysOutputData": true,
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "http://localhost:5680/visio-command/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "cd755a3c-b725-4f54-8a10-6d2600510300",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "{{ $('Merge Chat_Visio and Chat').item.json.chatInput }}",
+        "contextWindowLength": 5000
+      },
+      "id": "d00bdf0d-7627-40bc-8b39-23ecc1979804",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "86ce539c-c168-490d-9400-8d9001b19e11",
+      "name": "Chat_Visio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1260,
+        120
+      ],
+      "webhookId": "c09d74e4-06bf-4fde-9c61-879630c13271"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### System:\nYou are an Action Agent responsible for interpreting user requests and generating structured commands for shapes in a Visio-like system. You must return a response formatted as a valid JSON, conforming to the provided schema.\n\n### Instructions:\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is top-left, (100,100) is bottom-right\n\n* Your only task is to strictly translate {{ $('Merge Chat_Visio and Chat').item.json.chatInput }} into action and do what the user wants.\n\n* If the user specifies a number of shapes to create, you MUST generate a `shapes` array in your JSON response. Each element in this array should represent a single shape with its own `shapeType`, `position`, and `size`. \n\n**Example for creating multiple shapes:**\n   - User: \"Create 3 red circles\"\n   - Response: \n   ```\n   {\n     \"command\": \"CreateShape\",\n     \"parameters\": {\n       \"shapes\": [\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 20, \"y\": 30},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 40, \"y\": 50},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 60, \"y\": 70},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         }\n       ]\n     }\n   }\n   ```\n\n* If no specific positions are provided for multiple shapes, you should automatically distribute them across the canvas.\n* Do not include any language tags (such as <|python_tag|>) or commentary of any kind.\n* ALWAYS use the schema to process the user’s request, gather all necessary information (color, shape, size, position) if given, and return the correct JSON response.\n\n**IMPORTANT: The `command` field must always be exactly `CreateShape` (singular), even when creating multiple shapes.**\n\n### Schema:\n```\n{{json.schema}}\n```\n\n### User message:\n{{ $('Merge Chat_Visio and Chat').item.json.chatInput }}\n\n### Assistant:",
+        "options": {}
+      },
+      "id": "9d8e8f63-06e1-4b36-913d-45f67462ff2b",
+      "name": "action_agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        340,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const commandSchema = {\n  \"type\": \"object\",\n  \"properties\": {\n    \"command\": {\n      \"type\": \"string\",\n      \"description\": \"The command to be executed in Visio. Currently, only 'CreateShape' is supported.\"\n    },\n    \"parameters\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"shapes\": {\n          \"type\": \"array\",\n          \"description\": \"An array of shapes to be created. Each object in the array represents a single shape.\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"shapeType\": {\n                \"type\": \"string\",\n                \"description\": \"The type of shape to create (e.g., 'rectangle', 'circle', 'triangle').\"\n              },\n              \"position\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"x\": {\n                    \"type\": \"number\",\n                    \"description\": \"The x-coordinate of the shape's position on the canvas (0-100).\"\n                  },\n                  \"y\": {\n                    \"type\": \"number\",\n                    \"description\": \"The y-coordinate of the shape's position on the canvas (0-100).\"\n                  }\n                },\n                \"required\": [\"x\", \"y\"],\n                \"additionalProperties\": false\n              },\n              \"size\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"width\": {\n                    \"type\": \"number\",\n                    \"description\": \"The width of the shape.\"\n                  },\n                  \"height\": {\n                    \"type\": \"number\",\n                    \"description\": \"The height of the shape.\"\n                  }\n                },\n                \"required\": [\"width\", \"height\"],\n                \"additionalProperties\": false\n              },\n              \"color\": {\n                \"type\": \"string\",\n                \"description\": \"The color of the shape (e.g., 'red', 'blue', 'green').\"\n              }\n            },\n            \"required\": [\"shapeType\", \"position\", \"size\"],\n            \"additionalProperties\": false\n          }\n        }\n      },\n      \"required\": [\"shapes\"],\n      \"additionalProperties\": false\n    }\n  },\n  \"required\": [\"command\", \"parameters\"],\n  \"additionalProperties\": false\n};\n\nreturn {\n  schema: JSON.stringify(commandSchema)\n};"
+      },
+      "id": "2c4b72bb-5d8a-46f8-9c5a-77e0c9903c3a",
+      "name": "Define Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        480
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat": {
+      "main": [
+        [
+          {
+            "node": "Merge Chat_Visio and Chat",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Merge Chat_Visio and Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Chat_Visio and Chat": {
+      "main": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Define Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond chat_from_manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chat LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "action_agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat_Visio": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "action_agent": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Schema": {
+      "main": [
+        [
+          {
+            "node": "action_agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "45e42bb3-6fa8-473b-9fde-1006b00fcc40",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8617a31e3f06210fe687111ab485791c35eb905eedc1db78b92cdc917ac4621b"
+  },
+  "id": "G8oot0ir7vErH97e",
+  "tags": []
+}

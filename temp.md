@@ -1,6 +1,86 @@
+This is a project im working on, please read each and every file of them. I need your help to edit and change the agent and how it works in the OngoingAgent.json.
+
+Ollama has just released a new way to output structured data which i need to use.
+Example:
+Remember to change according to our needs with the position, shape, size and color.
+
+Example 1:
+Data extraction
+To extract structured data from text, define a schema to represent information. The model then extracts the information and returns the data in the defined schema as JSON:
+
+from ollama import chat
+from pydantic import BaseModel
+
+class Pet(BaseModel):
+  name: str
+  animal: str
+  age: int
+  color: str | None
+  favorite_toy: str | None
+
+class PetList(BaseModel):
+  pets: list[Pet]
+
+response = chat(
+  messages=[
+    {
+      'role': 'user',
+      'content': '''
+        I have two pets.
+        A cat named Luna who is 5 years old and loves playing with yarn. She has grey fur.
+        I also have a 2 year old black cat named Loki who loves tennis balls.
+      ''',
+    }
+  ],
+  model='llama3.1',
+  format=PetList.model_json_schema(),
+)
+
+pets = PetList.model_validate_json(response.message.content)
+print(pets)
+
+Example 2:
+from ollama import chat
+from pydantic import BaseModel
+
+class Object(BaseModel):
+  name: str
+  confidence: float
+  attributes: str 
+
+class ImageDescription(BaseModel):
+  summary: str
+  objects: List[Object]
+  scene: str
+  colors: List[str]
+  time_of_day: Literal['Morning', 'Afternoon', 'Evening', 'Night']
+  setting: Literal['Indoor', 'Outdoor', 'Unknown']
+  text_content: Optional[str] = None
+
+path = 'path/to/image.jpg'
+
+response = chat(
+  model='llama3.2-vision',
+  format=ImageDescription.model_json_schema(),  # Pass in the schema for the response
+  messages=[
+    {
+      'role': 'user',
+      'content': 'Analyze this image and describe what you see, including any objects, the scene, colors and any text you can detect.',
+      'images': [path],
+    },
+  ],
+  options={'temperature': 0},  # Set temperature to 0 for more deterministic output
+)
+
+image_description = ImageDescription.model_validate_json(response.message.content)
+print(image_description)
+
+
+
+Project information:
+***Visio AI-Assistant Plugin: Overview and Capabilities***
 
 ## 1. Introduction
-***Visio AI-Assistant Plugin: Overview and Capabilities***
 
 This document provides a comprehensive overview of the Visio AI-Assistant Plugin, a powerful tool designed to enhance your Visio diagramming experience with the help of artificial intelligence. This plugin allows you to interact with an AI assistant directly within Visio, enabling you to create, modify, and manage your diagrams using natural language commands.
 
