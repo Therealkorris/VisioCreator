@@ -1,471 +1,306 @@
-using System;
-using System.Linq;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Visio = Microsoft.Office.Interop.Visio;
+using System;
 using System.Diagnostics;
-using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
 {
     public class VisioCommandProcessor
     {
-        private readonly Visio.Application visioApp;
+        private readonly Visio.Application visioApplication;
         private readonly LibraryManager libraryManager;
-        private Dictionary<string, Action<JToken>> commandRegistry;
-
-        private double pageWidth = 0;
-        private double pageHeight = 0;
-        private bool dimensionsFetched = false;
 
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
-            this.visioApp = visioApp;
-            this.libraryManager = libraryManager;
-            commandRegistry = new Dictionary<string, Action<JToken>>(StringComparer.OrdinalIgnoreCase);
-            RegisterCommands();
+            visioApplication = visioApp ?? throw new ArgumentNullException(nameof(visioApp));
+            this.libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
         }
 
-        private void RegisterCommands()
-        {
-            commandRegistry.Add("CreateShape", CreateShape);
-            commandRegistry.Add("DeleteShape", DeleteShape);
-            commandRegistry.Add("MoveShape", MoveShape);
-            commandRegistry.Add("ResizeShape", ResizeShape);
-            commandRegistry.Add("ConnectShapes", ConnectShapes);
-            commandRegistry.Add("CreateText", CreateText);
-            commandRegistry.Add("RetrieveAllShapes", parameters => RetrieveAllShapes());
-        }
-
-        private void FetchPageDimensions()
-        {
-            // Fetch and cache page dimensions if not already done
-            if (!dimensionsFetched)
-            {
-                var activePage = visioApp.ActivePage;
-                if (activePage != null)
-                {
-                    pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                    pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-                    Debug.WriteLine($"[FetchPageDimensions] Canvas dimensions fetched: Width={pageWidth}, Height={pageHeight}");
-                    dimensionsFetched = true;
-                }
-                else
-                {
-                    Debug.WriteLine("[FetchPageDimensions] [Error] No active page found in Visio.");
-                }
-            }
-        }
-
-        public void ProcessCommand(string jsonCommand)
+        public async Task ProcessCommand(string jsonCommand)
         {
             try
             {
-                Debug.WriteLine($"[ProcessCommand] Received Command: {jsonCommand}");
-                JToken commandToken = JToken.Parse(jsonCommand);
+                Debug.WriteLine($"[ProcessCommand] Received command: {jsonCommand}");
+                JObject commandObject = JsonConvert.DeserializeObject<JObject>(jsonCommand);
 
-                if (commandToken is JArray commandArray)
+                string commandType = commandObject["command"]?.ToString();
+                JObject parameters = commandObject["parameters"] as JObject;
+
+                if (string.IsNullOrEmpty(commandType))
                 {
-                    foreach (JObject commandObject in commandArray)
-                    {
-                        ExecuteSingleCommand(commandObject);
-                    }
+                    Debug.WriteLine("[ProcessCommand] [Error] Command type is missing or empty.");
+                    return;
                 }
-                else if (commandToken is JObject singleCommandObject)
+
+                switch (commandType)
                 {
-                    ExecuteSingleCommand(singleCommandObject);
+                    case "CreateShape":
+                        await ExecuteCreateShapeCommand(parameters);
+                        break;
+                    case "ConnectShapes":
+                        await ExecuteConnectShapesCommand(parameters);
+                        break;
+                    case "AddTextToShape":
+                        await ExecuteAddTextToShapeCommand(parameters);
+                        break;
+                    case "SetShapeStyle":
+                        await ExecuteSetShapeStyleCommand(parameters);
+                        break;
+                    case "GroupShapes":
+                        await ExecuteGroupShapesCommand(parameters);
+                        break;
+                    case "UngroupShapes":
+                        await ExecuteUngroupShapesCommand(parameters);
+                        break;
+                    case "AlignShapes":
+                        await ExecuteAlignShapesCommand(parameters);
+                        break;
+                    case "DistributeShapes":
+                        await ExecuteDistributeShapesCommand(parameters);
+                        break;
+                    case "GetShapeProperties":
+                        await ExecuteGetShapePropertiesCommand(parameters);
+                        break;
+                    case "GetPageSize":
+                        await ExecuteGetPageSizeCommand(parameters);
+                        break;
+                    default:
+                        Debug.WriteLine($"[ProcessCommand] [Error] Unknown command type: {commandType}");
+                        break;
                 }
-                else
-                {
-                    Debug.WriteLine("[ProcessCommand] Invalid command format.");
-                }
+            }
+            catch (JsonReaderException jEx)
+            {
+                Debug.WriteLine($"[ProcessCommand] [Error] Invalid JSON format: {jEx.Message}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ProcessCommand] Error processing command: {ex.Message}");
+                Debug.WriteLine($"[ProcessCommand] [Error] Failed to process command: {ex.Message}");
+                // Consider sending detailed error information back to the AI for debugging.
             }
         }
 
-        private void ExecuteSingleCommand(JObject commandObject)
+        private async Task ExecuteCreateShapeCommand(JObject parameters)
         {
-            try
+            if (parameters == null)
             {
-                string commandName = commandObject["command"]?.ToString();
-                Debug.WriteLine($"[ExecuteSingleCommand] Command name extracted: {commandName}");
-
-                if (!string.IsNullOrEmpty(commandName) && commandRegistry.ContainsKey(commandName))
-                {
-                    Debug.WriteLine($"[ExecuteSingleCommand] Executing Command: {commandName}");
-                    commandRegistry[commandName](commandObject["parameters"]);
-                }
-                else
-                {
-                    Debug.WriteLine($"[ExecuteSingleCommand] Unrecognized command '{commandName}'. Command skipped.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ExecuteSingleCommand] Error executing command: {ex.Message}");
-            }
-        }
-
-        private void CreateShape(JToken parameters)
-        {
-            FetchPageDimensions();  // Ensure page dimensions are available
-
-            if (pageWidth == 0 || pageHeight == 0)
-            {
-                Debug.WriteLine("[CreateShape] [Error] Page dimensions are not valid. Shape creation aborted.");
+                Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] Parameters are missing.");
                 return;
             }
 
+            // Extract parameters with more robust error handling
+            string shapeType = parameters["shapeType"]?.ToString();
+            if (string.IsNullOrEmpty(shapeType))
+            {
+                Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] shapeType is missing or empty.");
+                return; // Consider sending an error message back to the AI
+            }
+
+            JObject positionObject = parameters["position"] as JObject;
+            double x = positionObject?["x"]?.Value<double>() ?? 0;
+            double y = positionObject?["y"]?.Value<double>() ?? 0;
+
+            JObject sizeObject = parameters["size"] as JObject;
+            double width = sizeObject?["width"]?.Value<double>() ?? 10; // Default width
+            double height = sizeObject?["height"]?.Value<double>() ?? 10; // Default height
+
+            string color = parameters["color"]?.ToString();
+
+            // Use the parameters to add the shape
+            libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, x, y, width, height);
+
+            // Optionally, set the shape color if provided
+            if (!string.IsNullOrEmpty(color))
+            {
+                var shapeName = GetLastAddedShapeName();
+                if (!string.IsNullOrEmpty(shapeName))
+                {
+                    var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
+                    libraryManager.SetShapeColor(shape, color);
+                }
+            }
+
+            await Task.CompletedTask;
+        }
+
+        private string GetLastAddedShapeName()
+        {
             try
             {
-                Debug.WriteLine($"[CreateShape] Parameters received: {parameters}");
-
-                string shapeType = parameters["shapeType"]?.ToString() ?? "Rectangle";
-                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;
-                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;
-                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;
-                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;
-                string color = parameters["color"]?.ToString() ?? "Black";
-
-                Debug.WriteLine($"[CreateShape] Extracted - ShapeType: {shapeType}, X%: {xPercent}, Y%: {yPercent}, Width%: {widthPercent}, Height%: {heightPercent}, Color: {color}");
-
-                string categoryName = Globals.ThisAddIn.CurrentCategory;
-                if (string.IsNullOrEmpty(categoryName))
+                var activePage = visioApplication.ActivePage;
+                if (activePage != null && activePage.Shapes.Count > 0)
                 {
-                    Debug.WriteLine("[CreateShape] [Error] No category specified. Cannot add shape.");
-                    return;
-                }
-
-                // Map AI's 0–100 scale to actual page dimensions
-                double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = ((100 - yPercent) / 100.0) * pageHeight;  // Invert Y-axis
-
-                double visioWidth = (widthPercent / 100.0) * pageWidth;
-                double visioHeight = (heightPercent / 100.0) * pageHeight;
-
-                Debug.WriteLine($"[CreateShape] Mapped Coordinates and Size - X: {visioX}, Y: {visioY}, Width: {visioWidth}, Height: {visioHeight}");
-
-                libraryManager.AddShapeToDocument(categoryName, shapeType, xPercent, yPercent, widthPercent, heightPercent);
-
-                Visio.Shape addedShape = visioApp.ActivePage.Shapes.Cast<Visio.Shape>().LastOrDefault();
-                if (addedShape != null && !string.IsNullOrEmpty(color))
-                {
-                    libraryManager.SetShapeColor(addedShape, color);
-                    Debug.WriteLine($"[CreateShape] Applied color '{color}' to shape '{addedShape.Name}'.");
-                }
-                else
-                {
-                    Debug.WriteLine("[CreateShape] Shape was not added successfully or color was not applied.");
+                    // Assuming the last added shape is at the end of the Shapes collection
+                    return activePage.Shapes[activePage.Shapes.Count].Name;
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[CreateShape] [Error] Error creating shape: {ex.Message}");
+                Debug.WriteLine($"[GetLastAddedShapeName] Error: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        private async Task ExecuteConnectShapesCommand(JObject parameters)
+        {
+            string shape1Name = parameters?["shape1Name"]?.ToString();
+            string shape2Name = parameters?["shape2Name"]?.ToString();
+            string connectorType = parameters?["connectorType"]?.ToString();
+
+            if (string.IsNullOrEmpty(shape1Name) || string.IsNullOrEmpty(shape2Name))
+            {
+                Debug.WriteLine("[ExecuteConnectShapesCommand] [Error] shape1Name or shape2Name is missing.");
+                return;
+            }
+
+            libraryManager.ConnectShapes(shape1Name, shape2Name, connectorType);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteAddTextToShapeCommand(JObject parameters)
+        {
+            string shapeName = parameters?["shapeName"]?.ToString();
+            string text = parameters?["text"]?.ToString();
+
+            if (string.IsNullOrEmpty(shapeName) || string.IsNullOrEmpty(text))
+            {
+                Debug.WriteLine("[ExecuteAddTextToShapeCommand] [Error] shapeName or text is missing.");
+                return;
+            }
+
+            libraryManager.AddTextToShape(shapeName, text);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteSetShapeStyleCommand(JObject parameters)
+        {
+            string shapeName = parameters?["shapeName"]?.ToString();
+            string lineStyle = parameters?["lineStyle"]?.ToString();
+            string fillPattern = parameters?["fillPattern"]?.ToString();
+
+            if (string.IsNullOrEmpty(shapeName))
+            {
+                Debug.WriteLine("[ExecuteSetShapeStyleCommand] [Error] shapeName is missing.");
+                return;
+            }
+
+            libraryManager.SetShapeStyle(shapeName, lineStyle, fillPattern);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteGroupShapesCommand(JObject parameters)
+        {
+            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
+
+            if (shapeNames == null || shapeNames.Length == 0)
+            {
+                Debug.WriteLine("[ExecuteGroupShapesCommand] [Error] shapeNames is missing or empty.");
+                return;
+            }
+
+            libraryManager.GroupShapes(shapeNames);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteUngroupShapesCommand(JObject parameters)
+        {
+            string shapeName = parameters?["shapeName"]?.ToString();
+
+            if (string.IsNullOrEmpty(shapeName))
+            {
+                Debug.WriteLine("[ExecuteUngroupShapesCommand] [Error] shapeName is missing.");
+                return;
+            }
+
+            libraryManager.UngroupShapes(shapeName);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteAlignShapesCommand(JObject parameters)
+        {
+            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
+            string alignmentType = parameters?["alignmentType"]?.ToString();
+
+            if (shapeNames == null || shapeNames.Length == 0 || string.IsNullOrEmpty(alignmentType))
+            {
+                Debug.WriteLine("[ExecuteAlignShapesCommand] [Error] shapeNames or alignmentType is missing.");
+                return;
+            }
+
+            libraryManager.AlignShapes(shapeNames, alignmentType);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteDistributeShapesCommand(JObject parameters)
+        {
+            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
+            string distributionType = parameters?["distributionType"]?.ToString();
+
+            if (shapeNames == null || shapeNames.Length == 0 || string.IsNullOrEmpty(distributionType))
+            {
+                Debug.WriteLine("[ExecuteDistributeShapesCommand] [Error] shapeNames or distributionType is missing.");
+                return;
+            }
+
+            libraryManager.DistributeShapes(shapeNames, distributionType);
+            await Task.CompletedTask;
+        }
+
+        private async Task ExecuteGetShapePropertiesCommand(JObject parameters)
+        {
+            string shapeName = parameters?["shapeName"]?.ToString();
+            if (string.IsNullOrEmpty(shapeName))
+            {
+                Debug.WriteLine("[ExecuteGetShapePropertiesCommand] [Error] shapeName is missing.");
+                return;
+            }
+
+            // Get the shape properties
+            string propertiesJson = libraryManager.GetShapeProperties(shapeName);
+
+            // Send the properties back to the AI (via n8n)
+            // You'll need to set up an HTTP client to send the data back to your n8n webhook
+            using (var client = new HttpClient())
+            {
+                try
+                {
+                    var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
+                    var response = await client.PostAsync("http://localhost:5680/chat-agent", content); // Replace with your n8n webhook URL
+                    response.EnsureSuccessStatusCode();
+                    Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] [Error] Failed to send properties to n8n: {ex.Message}");
+                }
             }
         }
 
-
-        // Helper method to scale a percentage (0-100) to page dimension
-        private double ScaleToPageDimension(double percent, double dimension)
+        private async Task ExecuteGetPageSizeCommand(JObject parameters)
         {
-            return (percent / 100.0) * dimension;
-        }
+            // Get the page size
+            string pageSizeJson = libraryManager.GetPageSize();
 
-
-
-        private void DeleteShape(JToken parameters)
-        {
-            try
+            // Send the page size back to the AI (via n8n)
+            using (var client = new HttpClient())
             {
-                Debug.WriteLine($"[DeleteShape] Parameters received: {parameters.ToString()}");
-                string color = parameters["color"]?.ToString();
-                string shapeType = parameters["shapeType"]?.ToString();
-
-                Debug.WriteLine($"[DeleteShape] Color: {color}, ShapeType: {shapeType}");
-
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
+                try
                 {
-                    Debug.WriteLine("[DeleteShape] [Error] No active page found in Visio.");
-                    return;
+                    var content = new StringContent(pageSizeJson, Encoding.UTF8, "application/json");
+                    var response = await client.PostAsync("http://localhost:5680/chat-agent", content); // Replace with your n8n webhook URL
+                    response.EnsureSuccessStatusCode();
+                    Debug.WriteLine($"[ExecuteGetPageSizeCommand] Sent page size to n8n.");
                 }
-
-                Visio.Shape shapeToDelete = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.CellsU["FillForegnd"].FormulaU.Contains(color) && s.Name.Contains(shapeType));
-                if (shapeToDelete != null)
+                catch (Exception ex)
                 {
-                    shapeToDelete.Delete();
-                    Debug.WriteLine($"[DeleteShape] Shape with Color '{color}' and ShapeType '{shapeType}' deleted successfully.");
+                    Debug.WriteLine($"[ExecuteGetPageSizeCommand] [Error] Failed to send page size to n8n: {ex.Message}");
                 }
-                else
-                {
-                    Debug.WriteLine($"[DeleteShape] Shape with Color '{color}' and ShapeType '{shapeType}' not found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[DeleteShape] [Error] Error deleting shape: {ex.Message}");
-            }
-        }
-
-        // Process the MoveShape command from AI
-        private void MoveShape(JToken parameters)
-        {
-            try
-            {
-                Debug.WriteLine($"[MoveShape] Received Parameters: {parameters.ToString()}");
-
-                // Extract parameters from the AI response
-                string color = parameters["color"]?.ToString();
-                string shapeType = parameters["shapeType"]?.ToString();
-                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
-                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
-
-                Debug.WriteLine($"[MoveShape] Color: {color}, ShapeType: {shapeType}, X: {xPercent}%, Y: {yPercent}%");
-
-                // Get the current active Visio page
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
-                {
-                    Debug.WriteLine("[MoveShape] [Error] No active page found in Visio.");
-                    return;
-                }
-
-                // Retrieve the canvas dimensions
-                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-                // Convert percentage coordinates to absolute coordinates
-                double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
-
-                // Ensure the coordinates fit within the canvas
-                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
-                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
-
-                Debug.WriteLine($"[MoveShape] Calculated Coordinates - X: {visioX}, Y: {visioY}");
-
-                // Find the shape by color and shapeType and move it
-                Visio.Shape shapeToMove = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.CellsU["FillForegnd"].FormulaU.Contains(color) && s.Name.Contains(shapeType));
-                if (shapeToMove != null)
-                {
-                    shapeToMove.CellsU["PinX"].ResultIU = visioX;
-                    shapeToMove.CellsU["PinY"].ResultIU = visioY;
-                    Debug.WriteLine($"[MoveShape] Shape with Color '{color}' and ShapeType '{shapeType}' moved successfully.");
-                }
-                else
-                {
-                    Debug.WriteLine($"[MoveShape] [Error] Shape with Color '{color}' and ShapeType '{shapeType}' not found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MoveShape] [Error] Error moving shape: {ex.Message}");
-                throw;
-            }
-        }
-
-        // Process the ResizeShape command from AI
-        private void ResizeShape(JToken parameters)
-        {
-            try
-            {
-                Debug.WriteLine($"[ResizeShape] Received Parameters: {parameters.ToString()}");
-
-                // Extract parameters from the AI response
-                string shapeName = parameters["shapeName"]?.ToString();
-                float widthPercent = parameters["size"]?["width"]?.Value<float>() ?? 10;  // Percentage width
-                float heightPercent = parameters["size"]?["height"]?.Value<float>() ?? 10;  // Percentage height
-
-                Debug.WriteLine($"[ResizeShape] ShapeName: {shapeName}, Width: {widthPercent}%, Height: {heightPercent}%");
-
-                // Get the current active Visio page
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
-                {
-                    Debug.WriteLine("[ResizeShape] [Error] No active page found in Visio.");
-                    return;
-                }
-
-                // Retrieve the canvas dimensions
-                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-                // Convert percentage size to absolute size
-                double visioWidth = (widthPercent / 100.0) * pageWidth;
-                double visioHeight = (heightPercent / 100.0) * pageHeight;
-
-                Debug.WriteLine($"[ResizeShape] Calculated Size - Width: {visioWidth}, Height: {visioHeight}");
-
-                // Find the shape by name and resize it
-                Visio.Shape shapeToResize = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName);
-                if (shapeToResize != null)
-                {
-                    shapeToResize.CellsU["Width"].ResultIU = visioWidth;
-                    shapeToResize.CellsU["Height"].ResultIU = visioHeight;
-                    Debug.WriteLine($"[ResizeShape] Shape '{shapeName}' resized successfully.");
-                }
-                else
-                {
-                    Debug.WriteLine($"[ResizeShape] [Error] Shape '{shapeName}' not found.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ResizeShape] [Error] Error resizing shape: {ex.Message}");
-                throw;
-            }
-        }
-
-        // Process the ConnectShapes command from AI
-        private void ConnectShapes(JToken parameters)
-        {
-            try
-            {
-                Debug.WriteLine($"[ConnectShapes] Received Parameters: {parameters.ToString()}");
-
-                // Extract parameters from the AI response
-                string shapeName1 = parameters["shapeName1"]?.ToString();
-                string shapeName2 = parameters["shapeName2"]?.ToString();
-
-                Debug.WriteLine($"[ConnectShapes] ShapeName1: {shapeName1}, ShapeName2: {shapeName2}");
-
-                // Get the current active Visio page
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
-                {
-                    Debug.WriteLine("[ConnectShapes] [Error] No active page found in Visio.");
-                    return;
-                }
-
-                // Find the shapes by name
-                Visio.Shape shape1 = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName1);
-                Visio.Shape shape2 = activePage.Shapes.Cast<Visio.Shape>().FirstOrDefault(s => s.Name == shapeName2);
-
-                if (shape1 != null && shape2 != null)
-                {
-                    // Create a dynamic connector
-                    Visio.Shape connector = activePage.Drop(visioApp.ConnectorToolDataObject, 0, 0);
-
-                    // Connect the shapes
-                    connector.CellsU["BeginX"].GlueTo(shape1.CellsU["PinX"]);
-                    connector.CellsU["EndX"].GlueTo(shape2.CellsU["PinX"]);
-
-                    Debug.WriteLine($"[ConnectShapes] Shapes '{shapeName1}' and '{shapeName2}' connected successfully.");
-                }
-                else
-                {
-                    Debug.WriteLine($"[ConnectShapes] [Error] One or both shapes not found. Shape1: {shapeName1}, Shape2: {shapeName2}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ConnectShapes] [Error] Error connecting shapes: {ex.Message}");
-                throw;
-            }
-        }
-
-        // Process the CreateText command from AI
-        private void CreateText(JToken parameters)
-        {
-            try
-            {
-                Debug.WriteLine($"[CreateText] Received Parameters: {parameters.ToString()}");
-
-                // Extract parameters from the AI response
-                string textContent = parameters["textContent"]?.ToString();
-                float xPercent = parameters["position"]?["x"]?.Value<float>() ?? 50;  // Percentage x-coordinate
-                float yPercent = parameters["position"]?["y"]?.Value<float>() ?? 50;  // Percentage y-coordinate
-                float fontSize = parameters["fontSize"]?.Value<float>() ?? 12;  // Font size
-                string color = parameters["color"]?.ToString();
-
-                Debug.WriteLine($"[CreateText] TextContent: {textContent}, X: {xPercent}%, Y: {yPercent}%, FontSize: {fontSize}, Color: {color}");
-
-                // Get the current active Visio page
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
-                {
-                    Debug.WriteLine("[CreateText] [Error] No active page found in Visio.");
-                    return;
-                }
-
-                // Retrieve the canvas dimensions
-                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
-                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
-
-                // Convert percentage coordinates to absolute coordinates
-                double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = (1 - (yPercent / 100.0)) * pageHeight;
-
-                // Ensure the coordinates fit within the canvas
-                visioX = Math.Max(0, Math.Min(visioX, pageWidth));
-                visioY = Math.Max(0, Math.Min(visioY, pageHeight));
-
-                Debug.WriteLine($"[CreateText] Calculated Coordinates - X: {visioX}, Y: {visioY}");
-
-                // Add the text to the Visio page
-                Visio.Shape textShape = activePage.DrawRectangle(visioX, visioY, visioX + 1, visioY + 1);
-                textShape.Text = textContent;
-                textShape.CellsU["Char.Size"].ResultIU = fontSize;
-
-                // Apply color if it's specified in the AI command
-                if (!string.IsNullOrEmpty(color))
-                {
-                    textShape.CellsU["Char.Color"].FormulaU = $"RGB({color})";
-                    Debug.WriteLine($"[CreateText] Applied color '{color}' to text.");
-                }
-
-                Debug.WriteLine($"[CreateText] Text '{textContent}' added successfully.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CreateText] [Error] Error adding text: {ex.Message}");
-                throw;
-            }
-        }
-
-        // Retrieve all shapes in the active Visio page
-        public List<dynamic> RetrieveAllShapes()
-        {
-            try
-            {
-                Debug.WriteLine("[RetrieveAllShapes] Retrieving all shapes");
-
-                // Get the current active Visio page
-                var activePage = visioApp.ActivePage;
-                if (activePage == null)
-                {
-                    Debug.WriteLine("[RetrieveAllShapes] [Error] No active page found in Visio.");
-                    return new List<dynamic>();
-                }
-
-                // Iterate through all shapes in the active page and collect their properties
-                var shapes = activePage.Shapes.Cast<Visio.Shape>().Select(shape => new
-                {
-                    Name = shape.Name,
-                    Type = shape.Master?.Name ?? "Unknown",
-                    Position = new
-                    {
-                        X = shape.CellsU["PinX"].ResultIU,
-                        Y = shape.CellsU["PinY"].ResultIU
-                    },
-                    Color = shape.CellsU["FillForegnd"].FormulaU
-                }).ToList<dynamic>();
-
-                // Log the retrieved shapes
-                Debug.WriteLine($"[RetrieveAllShapes] Retrieved {shapes.Count} shapes.");
-                foreach (var shape in shapes)
-                {
-                    Debug.WriteLine($"[RetrieveAllShapes] Shape - Name: {shape.Name}, Type: {shape.Type}, Position: ({shape.Position.X}, {shape.Position.Y}), Color: {shape.Color}");
-                }
-
-                return shapes;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[RetrieveAllShapes] [Error] Error retrieving shapes: {ex.Message}");
-                return new List<dynamic>();
             }
         }
     }

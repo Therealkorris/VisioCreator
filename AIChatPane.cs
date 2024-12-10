@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using System.Text; // Added for Encoding
+using System.Net.Http; // Added for HttpClient
 
 namespace VisioPlugin
 {
@@ -135,6 +137,7 @@ namespace VisioPlugin
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Margin = new Padding(10, 0, 10, 10), // Better margin for dropdown
             };
+            modelDropdown.SelectedIndexChanged += ModelDropdown_SelectedIndexChanged; // Add event handler
 
             // Command status ListView
             commandStatusListView = new ListView
@@ -213,7 +216,6 @@ namespace VisioPlugin
             MinimumSize = new System.Drawing.Size(600, 500); // Enforce minimum size for better usability
         }
 
-
         private void PopulateModelDropdown(string[] models)
         {
             modelDropdown.Items.Clear();
@@ -238,30 +240,179 @@ namespace VisioPlugin
         }
 
         // Handles sending messages
-        private void SendButton_Click(object sender, EventArgs e)
+        private async void SendButton_Click(object sender, EventArgs e)
         {
             string userMessage = chatInput.Text.Trim();
             if (string.IsNullOrEmpty(userMessage)) return;
 
             chatInput.Clear();
+            AppendToChatHistory($"You: {userMessage}"); // Append user message immediately
 
-            // Send message via VisioChatManager
-            chatManager.SendMessage(userMessage);
-
-            // Try processing the message as a JSON command
-            if (IsValidJson(userMessage))
+            try
             {
-                // Process the message as a JSON command
-                commandProcessor.ProcessCommand(userMessage);
+                // Send message via VisioChatManager
+                await chatManager.SendMessage(userMessage);
+            }
+            catch (Exception ex)
+            {
+                AppendToChatHistory($"Error: {ex.Message}");
+                Debug.WriteLine($"[Error] Sending message: {ex.Message}");
+                UpdateCommandStatus(userMessage, "Failed");
+            }
+        }
+
+        private void ModelDropdown_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            chatManager.SelectedModel = modelDropdown.SelectedItem.ToString();
+            AppendToChatHistory($"Model changed to: {modelDropdown.SelectedItem.ToString()}");
+        }
+
+        // Handles uploading and sending images
+        private async void UploadImageButton_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "Image Files|*.jpg;*.jpeg;*.png";
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    string imagePath = openFileDialog.FileName;
+                    AppendImageToChatHistory(imagePath);
+
+                    // Send image to n8n using the new SendImageToN8n method
+                    await chatManager.SendImageToN8n(imagePath);
+                }
+            }
+        }
+
+
+
+        // Handles drag-and-drop image uploads
+        private void ChatHistory_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files.Length > 0)
+                {
+                    string filePath = files[0];
+                    if (filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                        filePath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                        filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AppendImageToChatHistory(filePath);
+                        // Send image to n8n (consider async/await)
+                        _ = chatManager.SendImageToN8n(filePath);
+                    }
+                }
+            }
+        }
+
+        private void ChatHistory_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+                e.Effect = DragDropEffects.Copy;
+        }
+
+        // Append text to chat history
+        public void AppendToChatHistory(string message)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string>(AppendToChatHistory), message);
             }
             else
             {
-                // If it's not valid JSON, still append it as plain text
-                AppendToChatHistory($"You: {userMessage}");
+                if (!chatHistory.IsDisposed)
+                {
+                    chatHistory.AppendText(message + Environment.NewLine);
+                    chatHistory.ScrollToCaret();
+                }
             }
+        }
 
-            // Update command status
-            UpdateCommandStatus(userMessage, "Sent");
+        // Append image to chat history
+        private void AppendImageToChatHistory(string imagePath)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string>(AppendImageToChatHistory), imagePath);
+            }
+            else
+            {
+                try
+                {
+                    Image image = Image.FromFile(imagePath);
+                    float aspectRatio = (float)image.Width / image.Height;
+                    int maxWidth = chatHistory.ClientSize.Width - 20; // Adjust for padding
+                    int maxHeight = chatHistory.ClientSize.Height / 3; // Limit height
+
+                    if (image.Width > maxWidth)
+                    {
+                        image = new Bitmap(image, new Size(maxWidth, (int)(maxWidth / aspectRatio)));
+                    }
+                    if (image.Height > maxHeight)
+                    {
+                        image = new Bitmap(new Bitmap(imagePath), new Size((int)(maxHeight * aspectRatio), maxHeight));
+                    }
+
+                    Clipboard.SetImage(image);
+                    chatHistory.ReadOnly = false;
+                    chatHistory.Paste();
+                    chatHistory.ReadOnly = true;
+                    chatHistory.AppendText(Environment.NewLine); // Add newline
+                    chatHistory.ScrollToCaret();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error loading image: {ex.Message}");
+                }
+            }
+        }
+
+
+
+
+        // Update command status
+        public void UpdateCommandStatus(string command, string status)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string, string>(UpdateCommandStatus), command, status);
+            }
+            else
+            {
+                var item = new ListViewItem(new[] { command, status });
+                item.ForeColor = status == "Success" ? Color.Green : Color.Red; // Conditional coloring
+                commandStatusListView.Items.Add(item);
+            }
+        }
+
+        // Toggle the visibility of the status panel
+        private void ToggleStatusButton_Click(object sender, EventArgs e)
+        {
+            statusPanel.Visible = !statusPanel.Visible;
+            toggleStatusButton.Text = statusPanel.Visible ? "Hide Status" : "Show Status"; // Update button text
+        }
+
+        private void ResizeListViewColumns()
+        {
+            if (commandStatusListView.Columns.Count == 2)
+            {
+                int totalWidth = commandStatusListView.ClientSize.Width;
+                commandStatusListView.Columns[0].Width = (int)(totalWidth * 0.7);
+                commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.3);
+            }
+        }
+
+        private void AdjustOtherColumnWidth(int changedColumnIndex)
+        {
+            if (commandStatusListView.Columns.Count != 2) return;
+
+            int totalWidth = commandStatusListView.ClientSize.Width;
+            int changedColumnWidth = commandStatusListView.Columns[changedColumnIndex].Width;
+            int otherColumnIndex = 1 - changedColumnIndex;
+
+            commandStatusListView.Columns[otherColumnIndex].Width = totalWidth - changedColumnWidth;
         }
 
         // Continue with the same JSON validation method
@@ -283,140 +434,5 @@ namespace VisioPlugin
             return false;
         }
 
-
-        // Handles uploading and sending images
-        private void UploadImageButton_Click(object sender, EventArgs e)
-        {
-            using (OpenFileDialog openFileDialog = new OpenFileDialog())
-            {
-                openFileDialog.Filter = "Image Files|*.jpg;*.jpeg;*.png";
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    string imagePath = openFileDialog.FileName;
-                    AppendImageToChatHistory(imagePath);
-                }
-            }
-        }
-
-        // Handles drag-and-drop image uploads
-        private void ChatHistory_DragDrop(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files.Length > 0)
-                {
-                    string filePath = files[0];
-                    if (filePath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AppendImageToChatHistory(filePath);
-                    }
-                }
-            }
-        }
-
-        private void ChatHistory_DragEnter(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-                e.Effect = DragDropEffects.Copy;
-        }
-
-        // Append text to chat history
-        private void AppendToChatHistory(string message)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(new Action<string>(AppendToChatHistory), message);
-            }
-            else
-            {
-                chatHistory.AppendText(message + Environment.NewLine);
-                chatHistory.ScrollToCaret();
-            }
-        }
-
-        // Append image to chat history
-        private void AppendImageToChatHistory(string imagePath)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(new Action<string>(AppendImageToChatHistory), imagePath);
-            }
-            else
-            {
-                try
-                {
-                    Image image = Image.FromFile(imagePath);
-                    float aspectRatio = (float)image.Width / image.Height;
-                    int maxWidth = chatHistory.ClientSize.Width - 20; // Adjust for padding
-                    int maxHeight = chatHistory.ClientSize.Height / 3; // Limit height to a third of chat history height
-
-                    if (image.Width > maxWidth)
-                    {
-                        image = new Bitmap(image, new System.Drawing.Size(maxWidth, (int)(maxWidth / aspectRatio)));
-                    }
-                    if (image.Height > maxHeight)
-                    {
-                        image = new Bitmap(new Bitmap(imagePath), new System.Drawing.Size((int)(maxHeight * aspectRatio), maxHeight));
-                    }
-
-                    Clipboard.SetImage(image);
-                    chatHistory.ReadOnly = false;
-                    chatHistory.Paste();
-                    chatHistory.ReadOnly = true;
-                    chatHistory.AppendText(Environment.NewLine); // Add a newline after the image
-                    chatHistory.ScrollToCaret();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error loading image: {ex.Message}");
-                }
-            }
-        }
-
-        // Update command status
-        public void UpdateCommandStatus(string command, string status)
-        {
-            if (InvokeRequired)
-            {
-                Invoke(new Action<string, string>(UpdateCommandStatus), command, status);
-            }
-            else
-            {
-                var item = new ListViewItem(new[] { command, status });
-                item.ForeColor = status == "Success" ? Color.Green : Color.Red;
-                commandStatusListView.Items.Add(item);
-            }
-        }
-
-
-        // Toggle the visibility of the status panel
-        private void ToggleStatusButton_Click(object sender, EventArgs e)
-        {
-            statusPanel.Visible = !statusPanel.Visible;
-        }
-
-        private void ResizeListViewColumns()
-        {
-            if (commandStatusListView.Columns.Count == 2)
-            {
-                int totalWidth = commandStatusListView.ClientSize.Width;
-                commandStatusListView.Columns[0].Width = (int)(totalWidth * 0.7);
-                commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.3);
-            }
-        }
-
-        // Add this method to the AIChatPane class
-        private void AdjustOtherColumnWidth(int changedColumnIndex)
-        {
-            if (commandStatusListView.Columns.Count != 2) return;
-
-            int totalWidth = commandStatusListView.ClientSize.Width;
-            int changedColumnWidth = commandStatusListView.Columns[changedColumnIndex].Width;
-            int otherColumnIndex = 1 - changedColumnIndex; // This works because we only have 2 columns (0 and 1)
-
-            // Set the width of the other column to fill the remaining space
-            commandStatusListView.Columns[otherColumnIndex].Width = totalWidth - changedColumnWidth;
-        }
     }
 }

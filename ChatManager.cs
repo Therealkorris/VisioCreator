@@ -4,12 +4,14 @@ using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Text;
+using System.Net.Http.Headers;
+using System.IO;
 
 namespace VisioPlugin
 {
     public class VisioChatManager
     {
-        private string selectedModel;
+        public string SelectedModel { get; set; } // Now with a setter!
         private readonly string apiEndpoint;
         private readonly HttpClient httpClient;
         private readonly LibraryManager libraryManager;
@@ -19,17 +21,17 @@ namespace VisioPlugin
 
         public VisioChatManager(string model, string apiEndpoint, string[] models, LibraryManager libraryManager, Action<string> appendToChatHistory, AIChatPane chatPane)
         {
-            this.selectedModel = model;
+            this.SelectedModel = model; // Initialize SelectedModel
             this.apiEndpoint = apiEndpoint;
             this.httpClient = new HttpClient();
             this.libraryManager = libraryManager;
             this.appendToChatHistory = appendToChatHistory;
             this.commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);
-            this.chatPane = chatPane;  // Store the reference to AIChatPane
+            this.chatPane = chatPane;
         }
 
         // Send a message to the AI and process the response (chat or command)
-        public async void SendMessage(string userMessage)
+        public async Task SendMessage(string userMessage)  // Return Task
         {
             if (string.IsNullOrEmpty(userMessage)) return;
             try
@@ -37,45 +39,68 @@ namespace VisioPlugin
                 var payload = new
                 {
                     message = userMessage,
-                    model = selectedModel  // Model specified for AI processing
+                    model = SelectedModel  // Use the SelectedModel property
                 };
 
                 // Convert the payload to JSON
                 var jsonContent = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
 
-                // Send the message to the external API
-                Debug.WriteLine($"[Debug] Sending request to API endpoint: {apiEndpoint}/chat-agent");
-
                 var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
+                response.EnsureSuccessStatusCode();
 
-                Debug.WriteLine($"[Debug] API response status: {response.StatusCode}");
-
-                response.EnsureSuccessStatusCode();  // Ensure the API call succeeded
-
-                // Read the response from AI
                 var responseString = await response.Content.ReadAsStringAsync();
 
-                // Log the full raw response for debugging purposes
                 Debug.WriteLine($"[Debug] Full AI Response (raw): {responseString}");
 
-                // Process AI response - either chat or a command
-                await ProcessCommand(responseString, userMessage);
+                await ProcessCommand(responseString, userMessage);  // Await ProcessCommand
             }
             catch (HttpRequestException ex)
             {
                 appendToChatHistory("Error sending message (HttpRequestException): " + ex.Message);
                 Debug.WriteLine($"[Error] Sending message failed: {ex.Message}");
-
-                // Update command status to Failed
                 chatPane.UpdateCommandStatus(userMessage, "Failed");
             }
             catch (Exception ex)
             {
                 appendToChatHistory("Error: " + ex.Message);
                 Debug.WriteLine($"[Error] Sending message: {ex.Message}");
-
-                // Update command status to Failed
                 chatPane.UpdateCommandStatus(userMessage, "Failed");
+            }
+        }
+
+        // Send an image to n8n
+        public async Task SendImageToN8n(string imagePath)
+        {
+            try
+            {
+                using (var multipartFormContent = new MultipartFormDataContent())
+                {
+                    // Add the image file
+                    var imageStream = File.OpenRead(imagePath);
+                    var imageContent = new StreamContent(imageStream);
+                    imageContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/jpeg"); // Or image/png, adjust as needed.
+                    multipartFormContent.Add(imageContent, name: "image", fileName: Path.GetFileName(imagePath));
+
+                    // Add the model information as well
+                    var modelInfo = new StringContent(SelectedModel, Encoding.UTF8, "text/plain");
+                    multipartFormContent.Add(modelInfo, "model");
+
+                    // Send the request to the /chat-agent webhook, which now handles image uploads
+                    var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", multipartFormContent);
+                    response.EnsureSuccessStatusCode();
+
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"[SendImageToN8n] Response: {responseString}");
+
+                    // Process the response as before (chat message or command)
+                    await ProcessCommand(responseString, $"Image: {Path.GetFileName(imagePath)}");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SendImageToN8n] Error sending image: {ex.Message}");
+                appendToChatHistory($"Error sending image: {ex.Message}");
             }
         }
 

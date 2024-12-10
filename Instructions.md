@@ -1,162 +1,88 @@
-docker run -p 6333:6333 qdrant/qdrant:latest
-uvicorn main:app --reload
 
+***Visio AI-Assistant Plugin: Overview and Capabilities***
 
-**Visio AI-Assisted Plugin - Programming Project Plan**
+## 1. Introduction
 
-### **1. Project Overview**
+This document provides a comprehensive overview of the Visio AI-Assistant Plugin, a powerful tool designed to enhance your Visio diagramming experience with the help of artificial intelligence. This plugin allows you to interact with an AI assistant directly within Visio, enabling you to create, modify, and manage your diagrams using natural language commands.
 
-**Objective**: Develop a Visio plugin that allows real-time interaction with an AI assistant for live editing and preview of technical diagrams. The plugin will feature a chat interface where users can issue commands, and changes will be reflected instantly on the Visio canvas. The plugin must be performant, run in parallel where appropriate, and integrate AI effectively.
+## 2. Key Features
 
-### **2. Architecture Overview**
+### 2.1. AI-Powered Chat Interface
 
-- **Platform**: .NET-based Visio plugin using C#.
-- **Development Environment**: Visual Studio Code and .NET SDK.
-- **AI Integration**: Local LLM (e.g., Llama 3 Vision) via RESTful API.
-- **Communication**: Bidirectional via HTTP requests or socket connections.
-- **Concurrency**: Multi-threading to ensure responsiveness and parallel task execution.
+*   **Natural Language Interaction:** Communicate with the AI using everyday language. No need to remember complex commands or menus.
+*   **Custom Task Pane:** A dedicated "AI Chat Pane" is integrated into the Visio interface, providing a seamless chat experience.
+*   **Chat History:**  The chat pane displays a history of your interactions with the AI, allowing you to easily track your progress.
+*   **Model Selection:** Choose from a list of available AI models to find the one that best suits your needs.
+*   **Status Panel:** Monitor the execution of your commands with a dedicated panel, displaying success or failure notifications for each action.
+*   **Image Upload and Processing:** Upload images directly into the chat and let the AI process them, performing actions based on the image content.
 
-### **3. Core Components**
+### 2.2. Real-time Diagram Editing
 
-#### **3.1 Plugin Structure**
+*   **Instant Feedback:** See your changes reflected on the Visio canvas immediately as the AI processes your commands.
+*   **Automated Actions:** The AI can perform a wide range of actions, including:
+    *   **Adding Shapes:** Create new shapes based on your descriptions (e.g., "add a red circle", "create a square").
+    *   **Connecting Shapes:** Automatically connect shapes with appropriate connectors.
+    *   **Styling Shapes:** Modify the appearance of shapes, including color, line style, and fill.
+    *   **Adding Text:** Add text labels to shapes.
+    *   **Grouping and Ungrouping:**  Combine shapes into groups or separate grouped shapes.
+    *   **Aligning and Distributing:**  Organize shapes neatly using alignment and distribution commands.
+    *   **Retrieving Shape Properties:** Get information about shapes, such as their position, size, color, and text.
+    *   **Retrieving Page Size:** Get the dimensions of the current Visio page.
+*   **Visual Confirmation:** The status panel provides clear visual feedback on the success or failure of each command.
 
-- **Plugin Type**: COM Add-in using C#.
-- **Language and Tools**:
-  - **C#** for development.
-  - **Visual Studio Code** for editing, paired with `.NET CLI` for build management.
-- **Libraries and Dependencies**:
-  - **Microsoft.Office.Interop.Visio** for Visio automation.
-  - **System.Threading** for multi-threading management.
-  - **Newtonsoft.Json** (or similar) for parsing AI responses.
-- **Communication with AI**:
-  - Establish a RESTful API connection to the local AI model server (using Flask or FastAPI).
-  - Use **HTTP requests** for sending user commands and receiving AI responses.
-- **Library Management**:
-  - Allow users to select a default library for each project, enabling the plugin to use the correct function blocks and stencils based on the project's requirements.
+### 2.3. Intelligent Automation
 
-#### **3.2 Multi-threading Setup**
+*   **Library Management:** The plugin can access and utilize shapes from your Visio stencils.
+*   **Shape Catalog:** The available shapes are organized into a catalog, making it easy for the AI to understand your requests.
+*   **AI-Driven Actions:** The AI interprets your natural language commands and translates them into specific actions within Visio.
 
-- **Concurrency Model**:
-  - **Threading Approach**: Use threads to handle different tasks (UI updates, AI communication, Visio operations) concurrently.
-  - **Tasks**:
-    - **Main Thread**: UI handling and event-driven actions.
-    - **Worker Threads**: Handle AI communication, Visio updates, and data processing.
-- **Thread-Safety**:
-  - Utilize **lock statements** to manage access to shared resources, ensuring correct updates to the Visio diagram.
-- **Real-time Responsiveness**:
-  - Implement **Thread Pooling** to manage resource utilization efficiently.
-  - **Task Parallel Library (TPL)** for simple, fast asynchronous operations.
+### 2.4. Seamless Integration
 
-### **4. User Interface**
+*   **Visio Add-in:** The plugin is built as a Visio COM Add-in, ensuring deep integration with the Visio application.
+*   **n8n Workflow:** The plugin communicates with a powerful n8n workflow that handles the AI processing.
+*   **Ollama Server:**  The n8n workflow interacts with a local Ollama server, which hosts the AI language models.
 
-#### **4.1 Custom Task Pane**
+## 3. How It Works
 
-- **Component**: Develop a custom task pane within Visio to host the live chat interface.
-- **GUI Elements**:
-  - **Chat Box**: Text input area for user commands.
-  - **Response Area**: Display area for AI messages and visual feedback.
-  - **Live Editing Controls**: Buttons for triggering specific functions such as "Add Image" or "Undo".
-  - **File Upload Button**: Allows user to upload an image or technical drawing.
-  - **Library Selection Dropdown**: Allow users to select the specific function block library to be used for the current project.
-- **Live Editing Pane**:
-  - Dedicated pane for AI-assisted real-time updates, showing logs or step-by-step actions being executed.
+1. **User Input:** You type a command or question into the chat input box in the "AI Chat Pane."
+2. **Image Upload (Optional):** You can upload an image by clicking the "Upload" button or dragging and dropping it onto the chat history.
+3. **Send to n8n:** The plugin sends your message or image to the `chat-agent` endpoint of your local n8n workflow.
+4. **AI Processing (n8n):** The n8n workflow routes your request to the appropriate AI agent (either a chat model or an action agent).
+    *   **Specialized Tools:** The action agent utilizes tools (Color Tool, Shape Tool, Size Tool, Position Tool) to extract relevant parameters from your input (e.g., shape type, color, size, position).
+    *   **Command Generation:** The action agent constructs a JSON command based on your request and the extracted parameters.
+5. **Command Execution (Visio):** The n8n workflow sends the JSON command to the Visio plugin via a webhook listener (`/visio-command/`). The plugin then:
+    *   **Interprets the Command:**  The `VisioCommandProcessor` parses the JSON command.
+    *   **Executes the Action:** The `LibraryManager` performs the corresponding action in Visio (e.g., adding a shape, connecting shapes).
+6. **Feedback and Updates:**
+    *   **Chat History:** The AI's response is displayed in the chat history.
+    *   **Status Panel:** The status of the command (success or failure) is shown in the status panel.
+    *   **Visio Canvas:** The Visio diagram is updated in real-time to reflect the changes.
 
-#### **4.2 Communication Panel**
+## 4. Getting Started
 
-- **Connect to AI Server**:
-  - Include input fields for specifying API address and authentication keys if necessary.
-  - Provide a "Connect" button to initiate communication with the AI model server.
+1. **Prerequisites:** Ensure you have Visio, Visual Studio (with .NET and Office development workloads), n8n, and Ollama installed and running.
+2. **Install the Plugin:** Build the Visio plugin solution in Visual Studio and run it. This will install the plugin into Visio.
+3. **Import n8n Workflow:** Import the `OngoingAgent.json` workflow into your n8n instance and activate it.
+4. **Connect:** In the plugin's Ribbon tab, click "Connect" to establish communication with the AI server (via n8n).
+5. **Select a Model:** Choose an AI model from the dropdown menu in the "AI Chat Pane."
+6. **Start Chatting:** Type your commands into the chat input box and press Enter or click "Send."
 
-### **5. Visio Automation and AI Integration**
+## 5. Example Commands
 
-#### **5.1 AI Communication Flow**
+Here are a few examples of commands you can use:
 
-- **Command Flow**:
-  - **User Command Input**: User enters a command in the task pane.
-  - **Send Request**: Plugin sends a request to the AI server with user input.
-  - **Process AI Response**: Receive AI response and translate it into Visio actions.
-  - **Action Execution**: Execute actions such as adding shapes, modifying labels, or creating connections based on the selected library.
+*   "Add a blue circle in the center."
+*   "Create a rectangle and a square."
+*   "Connect the circle and the square."
+*   "Make the rectangle red."
+*   "Add the text 'Start' to the circle."
+*   "Group the circle and the square."
+*   "Align the shapes to the left."
+*   "Distribute the shapes horizontally."
+*   "What is the color of the circle?"
+*   "What is the size of the page?"
+*   "Upload an image of a flowchart and describe it." (After uploading an image)
 
-#### **5.2 Visio Object Model Manipulation**
+## 6. Using this document as an AI Prompt
 
-- **Shape Addition and Manipulation**:
-  - **Stencils and Masters**: Load required function block shapes from the selected stencil library.
-  - **Programmatic Placement**: Use `page.Drop()` method to add shapes based on AI-provided coordinates.
-  - **Connections**: Use the `GlueTo` method to link connectors between shapes, ensuring terminals are accurately connected.
-- **API Address Configuration**:
-  - API endpoint to connect to the local AI model server must be configurable within the plugin.
-  - Implement error handling for connectivity issues.
-
-### **6. Real-time Editing and Preview**
-
-#### **6.1 Live Updates**
-
-- **Immediate Execution**: Changes based on AI suggestions should be executed as soon as the response is received, ensuring real-time preview.
-- **Visual Feedback**:
-  - Highlight new or modified shapes briefly to provide feedback.
-  - Implement color coding for different actions (e.g., red for deletions, green for additions).
-
-#### **6.2 Undo/Redo Functionality**
-
-- **Integration with Visio's Undo Stack**:
-  - All actions performed via AI should be registered within Visio's native undo stack.
-  - **Custom Undo Commands**: Allow users to roll back any recent changes made by AI with a single button click in the task pane.
-
-### **7. Concurrency and Asynchronous Design**
-
-#### **7.1 Threading and Task Management**
-
-- **Asynchronous API Calls**:
-  - Use **async/await** keywords for non-blocking AI communication.
-- **UI and Worker Threads Separation**:
-  - Ensure UI thread remains responsive by running AI requests and Visio updates on separate worker threads.
-  - **BackgroundWorker** or **Task.Run** can be used to manage lengthy operations.
-
-#### **7.2 Real-time Data Handling**
-
-- **Queue-Based Task Management**:
-  - Use a **task queue** to manage incoming commands from the user.
-  - Process commands sequentially to maintain consistency while allowing the user to continue interacting with the UI.
-
-### **8. Error Handling and User Feedback**
-
-#### **8.1 AI and Visio Communication**
-
-- **Error Scenarios**:
-  - **AI Unreachable**: Display error message and retry option if the AI server is unreachable.
-  - **Invalid Commands**: Provide user feedback if AI returns an unrecognized command.
-- **Logging**:
-  - Maintain logs for every action performed, including AI responses and Visio updates.
-  - Display recent logs in the task pane for user review.
-
-### **9. Performance Optimization**
-
-#### **9.1 Efficient Rendering**
-
-- **Batching Updates**:
-  - Minimize frequent small updates by batching multiple operations into a single Visio update where possible.
-- **Caching AI Responses**:
-  - Cache responses or predictions to avoid redundant API calls, especially for repeated commands.
-
-#### **9.2 Resource Management**
-
-- **Thread Pool Utilization**:
-  - Use thread pooling for efficient resource utilization during concurrent tasks.
-- **Memory Optimization**:
-  - Clean up unused objects and connections immediately after use to prevent memory leaks.
-
-### **10. Summary of Key Features**
-
-- **Custom Task Pane**: Chat interface for issuing AI commands.
-- **Multi-threading Support**: Ensure responsiveness and parallel task execution.
-- **Visio Integration**: Programmatic manipulation of Visio objects, including shapes, labels, and connections.
-- **Library Selection**: Allow users to choose the appropriate library for each project, ensuring accurate function block usage.
-- **Real-time Updates**: Immediate execution of AI responses with visual feedback.
-- **Asynchronous API Communication**: Seamless interaction with local AI model for real-time responsiveness.
-
-### **Next Steps**
-
-1. **Set Up Development Environment**: Install Visual Studio Code, .NET SDK, and configure project dependencies.
-2. **Implement Core Plugin Structure**: Develop the basic plugin architecture, including task pane and AI communication.
-3. **Prototype AI Communication**: Set up basic interaction with the AI model, including sending commands and receiving responses.
-4. **Iterate and Refine**: Add multi-threading, Visio automation, and real-time feedback features incrementally.
+You can copy and paste the entire content of this document into an AI chatbot or prompt to give it context about your Visio plugin project. This will help the AI better understand your questions and requests related to the plugin's functionality and development.

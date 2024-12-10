@@ -29,15 +29,10 @@ namespace VisioPlugin
         private HttpClient httpClient = new HttpClient();
         private string selectedModel = "llama3.2";
         private AIChatPane aiChatPane;
-        private readonly AIChatPane chatPane;  // Reference to AIChatPane
+        private readonly AIChatPane chatPane;
         private VisioCommandProcessor commandProcessor;
-
-        // Class-level declaration of HttpListener
         private HttpListener listener;
-
-        // Initialize VisioChatManager for webhook listening
         private VisioChatManager visioChatManager;
-
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -58,18 +53,13 @@ namespace VisioPlugin
                 uiControl = new System.Windows.Forms.Control();
                 uiControl.CreateControl();
 
-                // Initialize VisioCommandProcessor
-                Debug.WriteLine("Initializing VisioCommandProcessor...");
-                commandProcessor = new VisioCommandProcessor(visioApplication, libraryManager); // Initialize the commandProcessor here
+                commandProcessor = new VisioCommandProcessor(visioApplication, libraryManager);
 
                 Debug.WriteLine("Initializing VisioChatManager...");
                 visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, appendToChatHistory, chatPane);
 
-                // Start the webhook listener on port 5680
                 Debug.WriteLine("Starting webhook listener...");
-                _ = StartWebhookListener(5680); // Use _ to discard the task
-
-                Debug.WriteLine("VisioChatManager webhook listener started on port 5680.");
+                _ = StartWebhookListener(5680);
             }
             catch (Exception ex)
             {
@@ -78,18 +68,39 @@ namespace VisioPlugin
             }
         }
 
+        // Ensure that SendShapesToN8nAsync is implemented as an async Task method in ThisAddIn.cs
+        private async Task SendShapesToN8nAsync()
+        {
+            try
+            {
+                Debug.WriteLine("[SendShapesToN8nAsync] Preparing to send shape catalog to n8n...");
+                var shapesCatalog = libraryManager.GetShapesCatalog();
+                var jsonString = JsonConvert.SerializeObject(shapesCatalog);
+                var content = new StringContent(jsonString, Encoding.UTF8, "application/json");
+
+                string n8nWebhookUrl = "http://localhost:5678/webhook/shape_catalog";
+
+                var response = await httpClient.PostAsync(n8nWebhookUrl, content);
+                response.EnsureSuccessStatusCode();
+
+                Debug.WriteLine("[SendShapesToN8nAsync] Shape catalog sent successfully to /webhook/shape_catalog.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SendShapesToN8nAsync] Failed to send shape catalog: {ex.Message}");
+            }
+        }
+
         private void appendToChatHistory(string obj)
         {
-            // Implementation for chat history, if required.
             Debug.WriteLine("Append to chat history: " + obj);
         }
 
-        // Start a webhook listener for receiving commands
         public async Task StartWebhookListener(int port)
         {
             listener = new HttpListener();
             listener.Prefixes.Add($"http://localhost:{port}/visio-command/");
-            listener.Prefixes.Add($"http://localhost:{port}/list-shapes/"); // Add this line
+            listener.Prefixes.Add($"http://localhost:{port}/list-shapes/");
             try
             {
                 listener.Start();
@@ -108,7 +119,6 @@ namespace VisioPlugin
                         await ProcessWebhookCommand(jsonCommand);
                     }
 
-                    // Respond to the webhook
                     HttpListenerResponse response = context.Response;
                     byte[] buffer = Encoding.UTF8.GetBytes("Request processed.");
                     response.ContentLength64 = buffer.Length;
@@ -133,7 +143,6 @@ namespace VisioPlugin
             await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
         }
 
-        // Stop the webhook listener
         public void StopWebhookListener()
         {
             if (listener != null)
@@ -144,10 +153,8 @@ namespace VisioPlugin
             }
         }
 
-        // In the Shutdown method, stop the server
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
-            // Stop the webhook listener before shutdown
             StopWebhookListener();
         }
 
@@ -155,13 +162,11 @@ namespace VisioPlugin
         {
             try
             {
-                // Log the received command
                 Debug.WriteLine($"[ProcessWebhookCommand] Received command: {jsonCommand}");
 
-                // Pass the command to the VisioCommandProcessor to handle
                 if (commandProcessor != null)
                 {
-                    await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand)); // Process the command asynchronously
+                    await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand));
                     Debug.WriteLine("[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.");
                 }
                 else
@@ -271,8 +276,14 @@ namespace VisioPlugin
         {
             try
             {
-                Debug.WriteLine("Starting connection to API...");
-                Task.Run(async () => await LoadModelsAsync()); // Background async task
+                Debug.WriteLine("Starting connection to API and sending shape catalog...");
+
+                // Run LoadModelsAsync and SendShapesToN8nAsync concurrently as background tasks
+                Task.Run(async () =>
+                {
+                    await LoadModelsAsync();       // Load models from the API
+                    await SendShapesToN8nAsync();  // Send shape catalog to n8n
+                });
             }
             catch (Exception ex)
             {

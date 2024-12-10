@@ -6,9 +6,7 @@
         "url": "http://127.0.0.1:11434/v1/models",
         "sendBody": true,
         "bodyParameters": {
-          "parameters": [
-            {}
-          ]
+          "parameters": [ {} ]
         },
         "options": {}
       },
@@ -80,9 +78,59 @@
         380
       ],
       "webhookId": "52989a61-80e0-4499-bc5d-b1e822792bad"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/shape_catalog",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-shape-catalog",
+      "name": "Shape Catalog Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        140,
+        600
+      ],
+      "webhookId": "shape_catalog_webhook_id"
+    },
+    {
+      "parameters": {
+        "functionCode": "const categories = $json;\n\nconst shapeEntries = [];\n\nfor (const category in categories) {\n  const shapes = categories[category];\n  shapes.forEach(shape => {\n    shapeEntries.push({\n      category,\n      shapeName: shape\n    });\n  });\n}\n\nreturn shapeEntries.map(entry => ({ json: entry }));"
+      },
+      "id": "code-process-shape-data",
+      "name": "Process Shape Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        320,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "table": "shapes",
+        "columns": [
+          "category",
+          "shapeName"
+        ],
+        "values": [
+          "={{$json[\"category\"]}}",
+          "={{$json[\"shapeName\"]}}"
+        ]
+      },
+      "id": "save-shape-data",
+      "name": "Save Shape Data",
+      "type": "n8n-nodes-base.sqlite",
+      "typeVersion": 1,
+      "position": [
+        500,
+        600
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
     "HTTP Request": {
       "main": [
@@ -111,6 +159,28 @@
         [
           {
             "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Catalog Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Shape Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Shape Data": {
+      "main": [
+        [
+          {
+            "node": "Save Shape Data",
             "type": "main",
             "index": 0
           }

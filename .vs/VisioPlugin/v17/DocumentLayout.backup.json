@@ -3,11 +3,31 @@
   "WorkspaceRootPath": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\visiocommandprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\visiocommandprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:visiocommandprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\librarymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\instructions.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:instructions.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\ai_visio_connection_and_model.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:ai_visio_connection_and_model.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\thisaddin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:thisaddin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\aichatpane.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:aichatpane.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|c:\\users\\jonas\\source\\repos\\visiocreator\\chatmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:chatmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\librarymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:librarymanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -18,7 +38,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 8,
           "Children": [
             {
               "$type": "Bookmark",
@@ -34,26 +54,91 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Instructions.md",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\Instructions.md",
+              "RelativeDocumentMoniker": "Instructions.md",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\Instructions.md",
+              "RelativeToolTip": "Instructions.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAMAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2024-12-07T11:21:49.861Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "ChatManager.cs",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ChatManager.cs",
+              "RelativeDocumentMoniker": "ChatManager.cs",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ChatManager.cs",
+              "RelativeToolTip": "ChatManager.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-12-07T10:58:19.234Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "AIChatPane.cs",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AIChatPane.cs",
+              "RelativeDocumentMoniker": "AIChatPane.cs",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AIChatPane.cs",
+              "RelativeToolTip": "AIChatPane.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAKQBAAAhAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-11-09T22:26:09.316Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "ThisAddIn.cs",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ThisAddIn.cs",
+              "RelativeDocumentMoniker": "ThisAddIn.cs",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ThisAddIn.cs",
+              "RelativeToolTip": "ThisAddIn.cs",
+              "ViewState": "AgIAADYAAAAAAAAAAAAIwFAAAABVAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-11-09T22:26:00.324Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AI_Visio_connection_and_Model.json",
+              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AI_Visio_connection_and_Model.json",
+              "RelativeDocumentMoniker": "AI_Visio_connection_and_Model.json",
+              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AI_Visio_connection_and_Model.json",
+              "RelativeToolTip": "AI_Visio_connection_and_Model.json",
+              "ViewState": "AgIAAMIAAAAAAAAAAAAAwMoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2024-11-09T22:14:31.8Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 0,
               "Title": "VisioCommandProcessor.cs",
               "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\VisioCommandProcessor.cs",
               "RelativeDocumentMoniker": "VisioCommandProcessor.cs",
               "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\VisioCommandProcessor.cs",
               "RelativeToolTip": "VisioCommandProcessor.cs",
-              "ViewState": "AgIAAJIAAAAAAAAAAAAAwKYAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAABkBAAAAAAAAAAAkwCYBAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-09T21:39:17.998Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 6,
               "Title": "LibraryManager.cs",
               "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\LibraryManager.cs",
               "RelativeDocumentMoniker": "LibraryManager.cs",
               "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\LibraryManager.cs",
               "RelativeToolTip": "LibraryManager.cs",
-              "ViewState": "AgIAAHIAAAAAAAAAAAAowIUAAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAB8BAAAAAAAAAAAswFQBAAARAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-09T21:39:07.614Z",
               "EditorCaption": ""
