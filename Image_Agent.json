@@ -1,0 +1,144 @@
+{
+    "name": "ImageAgentWorkflow",
+    "nodes": [
+      {
+        "parameters": {
+          "model": "llama3.2-vision:latest",
+          "options": {
+            "format": "json"
+          }
+        },
+        "id": "image-chat-model",
+        "name": "Image Chat Model",
+        "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+        "typeVersion": 1,
+        "position": [
+          120,
+          680
+        ],
+        "credentials": {
+          "ollamaApi": {
+            "id": "OuW1SzikhVbQMEOL",
+            "name": "Ollama account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const imageDescriptionSchema = {\n  \"type\": \"object\",\n  \"properties\": {\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"A brief summary of the image content.\"\n    },\n    \"objects\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\",\n            \"description\": \"Name of the object detected in the image.\"\n          },\n          \"confidence\": {\n            \"type\": \"number\",\n            \"format\": \"float\",\n            \"description\": \"Confidence level of the object detection (0.0 - 1.0).\"\n          },\n          \"attributes\": {\n            \"type\": \"string\",\n            \"description\": \"Attributes or descriptive features of the object.\"\n          }\n        },\n        \"required\": [\"name\", \"confidence\"]\n      }\n    },\n    \"scene\": {\n      \"type\": \"string\",\n      \"description\": \"Description of the overall scene in the image.\"\n    },\n    \"colors\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"description\": \"Dominant colors present in the image.\"\n      }\n    },\n    \"time_of_day\": {\n      \"type\": \"string\",\n      \"enum\": [\"Morning\", \"Afternoon\", \"Evening\", \"Night\"],\n      \"description\": \"Estimated time of day depicted in the image.\"\n    },\n    \"setting\": {\n      \"type\": \"string\",\n      \"enum\": [\"Indoor\", \"Outdoor\", \"Unknown\"],\n      \"description\": \"Setting of the image.\"\n    },\n    \"text_content\": {\n      \"type\": \"string\",\n      \"nullable\": true,\n      \"description\": \"Any text detected within the image. Null if no text is found.\"\n    }\n  },\n  \"required\": [\"summary\", \"objects\", \"scene\", \"colors\", \"time_of_day\", \"setting\"]\n};\n\nreturn {\n  schema: JSON.stringify(imageDescriptionSchema)\n};"
+        },
+        "id": "define-image-schema",
+        "name": "Define Image Schema",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          120,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "/image-agent",
+          "responseMode": "responseNode",
+          "options": {
+            "binaryData": true
+          }
+        },
+        "id": "image-webhook",
+        "name": "Image Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -200,
+          240
+        ],
+        "webhookId": "image-webhook-id"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "=Analyze this image and describe what you see, including any objects, the scene, colors and any text you can detect.\n\nSchema:\n```\n{{json.schema}}\n```",
+          "image": "={{ $('Image Webhook').item.binary.image.data }}",
+          "options": {}
+        },
+        "id": "image-agent",
+        "name": "Image Agent",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 1.6,
+        "position": [
+          340,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://localhost:5678/webhook/chat-agent",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"message\": {\n    \"route\": \"action_agent\",\n    \"reply\": {{ $json.output }}\n  }\n}",
+          "options": {}
+        },
+        "id": "send-to-action-agent",
+        "name": "Send to Action Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          620,
+          480
+        ]
+      }
+    ],
+    "connections": {
+      "Image Webhook": {
+        "main": [
+          [
+            {
+              "node": "Define Image Schema",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Define Image Schema": {
+        "main": [
+          [
+            {
+              "node": "Image Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Image Agent": {
+        "main": [
+          [
+            {
+              "node": "Send to Action Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Image Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Image Agent",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": true,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "id": "ImageAgentWorkflow"
+  }

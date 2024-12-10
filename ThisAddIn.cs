@@ -29,7 +29,6 @@ namespace VisioPlugin
         private HttpClient httpClient = new HttpClient();
         private string selectedModel = "llama3.2";
         private AIChatPane aiChatPane;
-        private readonly AIChatPane chatPane;
         private VisioCommandProcessor commandProcessor;
         private HttpListener listener;
         private VisioChatManager visioChatManager;
@@ -56,7 +55,7 @@ namespace VisioPlugin
                 commandProcessor = new VisioCommandProcessor(visioApplication, libraryManager);
 
                 Debug.WriteLine("Initializing VisioChatManager...");
-                visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, appendToChatHistory, chatPane);
+                visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, AppendToChatHistory, aiChatPane);
 
                 Debug.WriteLine("Starting webhook listener...");
                 _ = StartWebhookListener(5680);
@@ -65,6 +64,22 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"Error in ThisAddIn_Startup: {ex.Message}");
                 MessageBox.Show($"Error during startup: {ex.Message}");
+            }
+        }
+
+        private void AppendToChatHistory(string message)
+        {
+            // Make sure this method is invoked on the UI thread
+            if (aiChatPane != null && !aiChatPane.IsDisposed)
+            {
+                if (aiChatPane.InvokeRequired)
+                {
+                    aiChatPane.Invoke(new Action<string>(AppendToChatHistory), message);
+                }
+                else
+                {
+                    aiChatPane.AppendToChatHistory(message);
+                }
             }
         }
 
@@ -91,16 +106,12 @@ namespace VisioPlugin
             }
         }
 
-        private void appendToChatHistory(string obj)
-        {
-            Debug.WriteLine("Append to chat history: " + obj);
-        }
-
-        public async Task StartWebhookListener(int port)
+        private async Task StartWebhookListener(int port)
         {
             listener = new HttpListener();
             listener.Prefixes.Add($"http://localhost:{port}/visio-command/");
             listener.Prefixes.Add($"http://localhost:{port}/list-shapes/");
+            listener.Prefixes.Add($"http://localhost:{port}/image-agent/"); // Changed path
             try
             {
                 listener.Start();
@@ -108,10 +119,15 @@ namespace VisioPlugin
                 while (listener.IsListening)
                 {
                     HttpListenerContext context = await listener.GetContextAsync();
-
-                    if (context.Request.Url.LocalPath == "/list-shapes/")
+                    string requestPath = context.Request.Url.LocalPath;
+                    if (requestPath == "/list-shapes/")
                     {
                         await HandleListShapesRequest(context);
+                    }
+                    else if (requestPath == "/image-agent/") // Changed path
+                    {
+                        //string jsonResponse = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                        //AppendToChatHistory($"AI: {jsonResponse}");
                     }
                     else
                     {
@@ -180,7 +196,6 @@ namespace VisioPlugin
             }
         }
 
-
         public string[] GetCategories()
         {
             return libraryManager.GetCategories().ToArray();
@@ -229,7 +244,6 @@ namespace VisioPlugin
             CurrentCategory = selectedId;
             Debug.WriteLine($"[OnCategorySelectionChange] Current category set to: {CurrentCategory}");
         }
-
 
         public void OnAddTestShapeClick(Office.IRibbonControl control)
         {

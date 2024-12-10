@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Text; // Added for Encoding
 using System.Net.Http; // Added for HttpClient
+using System.IO;
 
 namespace VisioPlugin
 {
@@ -25,6 +26,7 @@ namespace VisioPlugin
         private readonly LibraryManager libraryManager;
         private readonly VisioChatManager chatManager;
         private readonly VisioCommandProcessor commandProcessor;
+        private string pendingImagePath = null;
 
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
@@ -243,10 +245,43 @@ namespace VisioPlugin
         private async void SendButton_Click(object sender, EventArgs e)
         {
             string userMessage = chatInput.Text.Trim();
-            if (string.IsNullOrEmpty(userMessage)) return;
 
-            chatInput.Clear();
-            AppendToChatHistory($"You: {userMessage}"); // Append user message immediately
+            if (!string.IsNullOrEmpty(pendingImagePath))
+            {
+                // If there's a pending image, prepend image information to the message
+                userMessage = $"Image: {Path.GetFileName(pendingImagePath)}\n{userMessage}";
+
+                // Switch to the vision model
+                chatManager.SelectedModel = "llama3.2-vision:latest";
+                modelDropdown.SelectedItem = "llama3.2-vision:latest";
+
+                // Send the image
+                try
+                {
+                    await chatManager.SendImageToN8n(pendingImagePath);
+                }
+                catch (Exception ex)
+                {
+                    AppendToChatHistory($"Error sending image: {ex.Message}");
+                    Debug.WriteLine($"[Error] Sending image: {ex.Message}");
+                }
+                finally
+                {
+                    pendingImagePath = null; // Reset pending image
+                }
+            }
+
+            // Clear the chat input
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => chatInput.Clear()));
+            }
+            else
+            {
+                chatInput.Clear();
+            }
+
+            AppendToChatHistory($"You: {userMessage}");
 
             try
             {
@@ -268,7 +303,7 @@ namespace VisioPlugin
         }
 
         // Handles uploading and sending images
-        private async void UploadImageButton_Click(object sender, EventArgs e)
+        private void UploadImageButton_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
@@ -276,15 +311,35 @@ namespace VisioPlugin
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     string imagePath = openFileDialog.FileName;
-                    AppendImageToChatHistory(imagePath);
 
-                    // Send image to n8n using the new SendImageToN8n method
-                    await chatManager.SendImageToN8n(imagePath);
+                    // Instead of appending the image to the chat history, add it to the chat input box
+                    AddImageToChatInput(imagePath);
+
+                    // Store the path for later sending
+                    pendingImagePath = imagePath;
                 }
             }
         }
 
-
+        private void AddImageToChatInput(string imagePath)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string>(AddImageToChatInput), imagePath);
+            }
+            else
+            {
+                try
+                {
+                    // Add the image to the chat input box instead of the chat history
+                    chatInput.Text = $"[Image: {Path.GetFileName(imagePath)}] {chatInput.Text}";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error adding image to chat input: {ex.Message}");
+                }
+            }
+        }
 
         // Handles drag-and-drop image uploads
         private void ChatHistory_DragDrop(object sender, DragEventArgs e)
@@ -299,9 +354,12 @@ namespace VisioPlugin
                         filePath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
                         filePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
                     {
-                        AppendImageToChatHistory(filePath);
-                        // Send image to n8n (consider async/await)
-                        _ = chatManager.SendImageToN8n(filePath);
+                        // Add the image to the chat input box instead of the chat history
+                        AddImageToChatInput(filePath);
+
+                        // Store the path for later sending
+                        pendingImagePath = filePath;
+
                     }
                 }
             }
@@ -346,21 +404,36 @@ namespace VisioPlugin
                     int maxWidth = chatHistory.ClientSize.Width - 20; // Adjust for padding
                     int maxHeight = chatHistory.ClientSize.Height / 3; // Limit height
 
-                    if (image.Width > maxWidth)
+                    // Calculate new dimensions
+                    int newWidth = image.Width;
+                    int newHeight = image.Height;
+
+                    if (newWidth > maxWidth)
                     {
-                        image = new Bitmap(image, new Size(maxWidth, (int)(maxWidth / aspectRatio)));
-                    }
-                    if (image.Height > maxHeight)
-                    {
-                        image = new Bitmap(new Bitmap(imagePath), new Size((int)(maxHeight * aspectRatio), maxHeight));
+                        newWidth = maxWidth;
+                        newHeight = (int)(newWidth / aspectRatio);
                     }
 
-                    Clipboard.SetImage(image);
+                    if (newHeight > maxHeight)
+                    {
+                        newHeight = maxHeight;
+                        newWidth = (int)(newHeight * aspectRatio);
+                    }
+
+                    // Resize the image
+                    Image resizedImage = new Bitmap(image, new Size(newWidth, newHeight));
+
+                    // Insert the resized image into the chat history
+                    Clipboard.SetImage(resizedImage);
                     chatHistory.ReadOnly = false;
+                    chatHistory.SelectionStart = chatHistory.TextLength;
                     chatHistory.Paste();
                     chatHistory.ReadOnly = true;
-                    chatHistory.AppendText(Environment.NewLine); // Add newline
+                    chatHistory.AppendText(Environment.NewLine);
                     chatHistory.ScrollToCaret();
+
+                    image.Dispose();
+                    resizedImage.Dispose();
                 }
                 catch (Exception ex)
                 {

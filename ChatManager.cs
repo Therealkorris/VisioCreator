@@ -85,8 +85,8 @@ namespace VisioPlugin
                     var modelInfo = new StringContent(SelectedModel, Encoding.UTF8, "text/plain");
                     multipartFormContent.Add(modelInfo, "model");
 
-                    // Send the request to the /chat-agent webhook, which now handles image uploads
-                    var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", multipartFormContent);
+                    // Send the request to the /image-agent webhook
+                    var response = await httpClient.PostAsync($"{apiEndpoint}/image-agent", multipartFormContent);
                     response.EnsureSuccessStatusCode();
 
                     var responseString = await response.Content.ReadAsStringAsync();
