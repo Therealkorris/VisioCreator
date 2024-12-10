@@ -125,6 +125,18 @@ namespace VisioPlugin
                 return;
             }
 
+            // Get the active page from the Visio application
+            var activePage = visioApplication.ActivePage;
+            if (activePage == null)
+            {
+                Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] No active page found.");
+                return;
+            }
+
+            // Get the page dimensions
+            double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+            double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
             // Check if the 'shapes' array exists
             if (shapeParameters["shapes"] is JArray shapesArray)
             {
@@ -138,23 +150,42 @@ namespace VisioPlugin
                     }
 
                     JObject positionObject = shapeObject["position"] as JObject;
-                    double x = positionObject?["x"]?.Value<double>() ?? 0;
-                    double y = positionObject?["y"]?.Value<double>() ?? 0;
+                    double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
+                    double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
 
                     JObject sizeObject = shapeObject["size"] as JObject;
-                    double width = sizeObject?["width"]?.Value<double>() ?? 10;
-                    double height = sizeObject?["height"]?.Value<double>() ?? 10;
+                    double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
+                    double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
+
+                    // Ensure percentages are within bounds
+                    xPercent = Math.Max(0, Math.Min(100, xPercent));
+                    yPercent = Math.Max(0, Math.Min(100, yPercent));
+                    widthPercent = Math.Max(0, Math.Min(100, widthPercent));
+                    heightPercent = Math.Max(0, Math.Min(100, heightPercent));
+
+                    // Adjust position to keep shape within canvas
+                    double shapeWidth = (widthPercent / 100.0) * pageWidth;
+                    double shapeHeight = (heightPercent / 100.0) * pageHeight;
+                    double x = (xPercent / 100.0) * pageWidth - shapeWidth / 2;
+                    double y = (yPercent / 100.0) * pageHeight - shapeHeight / 2;
+
+                    x = Math.Max(0, Math.Min(pageWidth - shapeWidth, x));
+                    y = Math.Max(0, Math.Min(pageHeight - shapeHeight, y));
+
+                    // Convert adjusted position back to percentage
+                    double adjustedXPercent = (x / pageWidth) * 100;
+                    double adjustedYPercent = (y / pageHeight) * 100;
 
                     string color = shapeObject["color"]?.ToString();
 
-                    libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, x, y, width, height);
+                    libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
 
                     if (!string.IsNullOrEmpty(color))
                     {
                         var shapeName = GetLastAddedShapeName();
                         if (!string.IsNullOrEmpty(shapeName))
                         {
-                            var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
+                            var shape = activePage.Shapes.ItemU[shapeName];
                             libraryManager.SetShapeColor(shape, color);
                         }
                     }
@@ -171,23 +202,42 @@ namespace VisioPlugin
                 }
 
                 JObject positionObject = shapeParameters["position"] as JObject;
-                double x = positionObject?["x"]?.Value<double>() ?? 0;
-                double y = positionObject?["y"]?.Value<double>() ?? 0;
+                double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
+                double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
 
                 JObject sizeObject = shapeParameters["size"] as JObject;
-                double width = sizeObject?["width"]?.Value<double>() ?? 10;
-                double height = sizeObject?["height"]?.Value<double>() ?? 10;
+                double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
+                double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
+
+                // Ensure percentages are within bounds
+                xPercent = Math.Max(0, Math.Min(100, xPercent));
+                yPercent = Math.Max(0, Math.Min(100, yPercent));
+                widthPercent = Math.Max(0, Math.Min(100, widthPercent));
+                heightPercent = Math.Max(0, Math.Min(100, heightPercent));
+
+                // Adjust position to keep shape within canvas
+                double shapeWidth = (widthPercent / 100.0) * pageWidth;
+                double shapeHeight = (heightPercent / 100.0) * pageHeight;
+                double x = (xPercent / 100.0) * pageWidth - shapeWidth / 2;
+                double y = (yPercent / 100.0) * pageHeight - shapeHeight / 2;
+
+                x = Math.Max(0, Math.Min(pageWidth - shapeWidth, x));
+                y = Math.Max(0, Math.Min(pageHeight - shapeHeight, y));
+
+                // Convert adjusted position back to percentage
+                double adjustedXPercent = (x / pageWidth) * 100;
+                double adjustedYPercent = (y / pageHeight) * 100;
 
                 string color = shapeParameters["color"]?.ToString();
 
-                libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, x, y, width, height);
+                libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
 
                 if (!string.IsNullOrEmpty(color))
                 {
                     var shapeName = GetLastAddedShapeName();
                     if (!string.IsNullOrEmpty(shapeName))
                     {
-                        var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
+                        var shape = activePage.Shapes.ItemU[shapeName];
                         libraryManager.SetShapeColor(shape, color);
                     }
                 }
