@@ -33,8 +33,8 @@
         "type": "n8n-nodes-base.respondToWebhook",
         "typeVersion": 1.1,
         "position": [
-          1360,
-          700
+          920,
+          500
         ],
         "alwaysOutputData": false
       },
@@ -56,15 +56,15 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract the 'reply' field from the input JSON\nlet replyText = $json.reply;\n\n// Ensure that we only return the reply text\nreturn [\n  {\n    \"text\": replyText\n  }\n];\n"
+          "jsCode": "let output;\n\ntry {\n    // Try to parse the JSON from the Manager response or Image Agent\n    output = JSON.parse($json.text || $json.reply);\n} catch (error) {\n    // If parsing fails, handle it as a regular text message\n    return {\n        route: \"manager\",  // Default route for handling non-JSON inputs\n        reply: $json.text || $json.reply // Send the raw text as the reply\n    };\n}\n\n// Check if the 'command' property exists, indicating an action agent response\nif (output.command) {\n  return {\n    route: \"action_agent\",\n    output: output,\n  };\n}\n\n// Return both the route and the reply for further processing if JSON parsing succeeds\nreturn {\n    route: output.route,   // Keep route for the Switch node\n    reply: output.reply    // Send reply to the Respond webhook\n};"
         },
         "id": "a7f7c323-70eb-4149-935b-f1326aacdb49",
-        "name": "Code",
+        "name": "Code1",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          500,
-          220
+          -120,
+          240
         ]
       },
       {
@@ -101,19 +101,6 @@
             "name": "Ollama account"
           }
         }
-      },
-      {
-        "parameters": {
-          "jsCode": "let output;\n\ntry {\n    // Try to parse the JSON from the Manager response\n    output = JSON.parse($json.text);\n} catch (error) {\n    // If parsing fails, handle it as a regular text message\n    return {\n        route: \"manager\",  // Default route for handling non-JSON inputs\n        reply: $json.text  // Send the raw text as the reply\n    };\n}\n\n// Return both the route and the reply for further processing if JSON parsing succeeds\nreturn {\n    route: output.route,   // Keep route for the Switch node\n    reply: output.reply    // Send reply to the Respond webhook\n};\n"
-        },
-        "id": "63805d69-9240-4ff4-a5c3-0c9cd27a249e",
-        "name": "Code1",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -120,
-          240
-        ]
       },
       {
         "parameters": {
@@ -164,29 +151,6 @@
                   "combinator": "and"
                 },
                 "renameOutput": "={{ $('Merge Chat_Visio and Chat').item.json.chatInput }}"
-              },
-              {
-                "conditions": {
-                  "options": {
-                    "caseSensitive": true,
-                    "leftValue": "",
-                    "typeValidation": "strict",
-                    "version": 2
-                  },
-                  "conditions": [
-                    {
-                      "leftValue": "={{ $json.command }}",
-                      "rightValue": "=CreateShape",
-                      "operator": {
-                        "type": "string",
-                        "operation": "equals",
-                        "name": "filter.operator.equals"
-                      }
-                    }
-                  ],
-                  "combinator": "and"
-                },
-                "renameOutput": null
               }
             ]
           },
@@ -287,7 +251,7 @@
       {
         "parameters": {
           "httpMethod": "POST",
-          "path": "/chat-agent-text",
+          "path": "/chat-agent",
           "responseMode": "responseNode",
           "options": {}
         },
@@ -304,7 +268,7 @@
       {
         "parameters": {
           "promptType": "define",
-          "text": "=### System:\nYou are an Action Agent responsible for interpreting user requests and generating structured commands for shapes in a Visio-like system. You must return a response formatted as a valid JSON, conforming to the provided schema.\n\n### Instructions:\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is top-left, (100,100) is bottom-right\n\n* Your only task is to strictly translate {{ $('Merge Chat_Visio and Chat').item.json.chatInput }} into action and do what the user wants.\n\n* If the user specifies a number of shapes to create, you MUST generate a `shapes` array in your JSON response. Each element in this array should represent a single shape with its own `shapeType`, `position`, and `size`. \n\n**Example for creating multiple shapes:**\n   - User: \"Create 3 red circles\"\n   - Response: \n   ```\n   {\n     \"command\": \"CreateShape\",\n     \"parameters\": {\n       \"shapes\": [\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 20, \"y\": 30},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 40, \"y\": 50},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 60, \"y\": 70},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         }\n       ]\n     }\n   }\n   ```\n\n* If no specific positions are provided for multiple shapes, you should automatically distribute them across the canvas.\n* Do not include any language tags (such as <|python_tag|>) or commentary of any kind.\n* ALWAYS use the schema to process the user’s request, gather all necessary information (color, shape, size, position) if given, and return the correct JSON response.\n\n**IMPORTANT: The `command` field must always be exactly `CreateShape` (singular), even when creating multiple shapes.**\n\n### Schema:\n```\n{{json.schema}}\n```\n\n### User message:\n{{ $('Merge Chat_Visio and Chat').item.json.chatInput }}\n\n### Assistant:",
+          "text": "=### System:\nYou are an Action Agent responsible for interpreting user requests and generating structured commands for shapes in a Visio-like system. You must return a response formatted as a valid JSON, conforming to the provided schema.\n\n### Instructions:\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is top-left, (100,100) is bottom-right\n\n* Your only task is to strictly translate user input into action,  or translate image description into action and do what the user wants.\n\n* If the user specifies a number of shapes to create, you MUST generate a `shapes` array in your JSON response. Each element in this array should represent a single shape with its own `shapeType`, `position`, and `size`. \n\n**Example for creating multiple shapes:**\n   - User: \"Create 3 red circles\"\n   - Response: \n   ```\n   {\n     \"command\": \"CreateShape\",\n     \"parameters\": {\n       \"shapes\": [\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 20, \"y\": 30},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 40, \"y\": 50},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 60, \"y\": 70},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         }\n       ]\n     }\n   }\n   ```\n\n- When specifying the position of shapes, ensure the 'x' and 'y' coordinates are within the range of 0 to 100, where (0,0) represents the top-left corner and (100,100) represents the bottom-right corner of the canvas.\n- Shapes should be positioned so that they are fully contained within the canvas. Adjust the position if necessary to prevent any part of the shape from extending beyond the canvas boundaries.\n- When creating multiple shapes without specific positions, distribute them within the canvas area, ensuring no shapes overlap with each other or the canvas boundaries.\n- For shape sizes, ensure the dimensions ('width' and 'height') are appropriate for the canvas size and are always included. Shapes should not be so large that they cannot fit within the canvas boundaries.\n- **The 'width' and 'height' values must never be null.** If a size is not specified, provide default values that are reasonable for the canvas size (e.g., width: 10, height: 10).\n- If a shape's size would cause it to exceed the canvas boundaries, reduce the size proportionally to fit within the canvas, maintaining the aspect ratio where possible.\n\n* If no specific positions are provided for multiple shapes, you should automatically distribute them across the canvas.\n* Do not include any language tags (such as <|python_tag|>) or commentary of any kind.\n* ALWAYS use the schema to process the user’s request, gather all necessary information (color, shape, size, position) if given, and return the correct JSON response.\n\n**IMPORTANT: The `command` field must always be exactly `CreateShape` (singular), even when creating multiple shapes.**\n\n### Schema:\n```\n{{json.schema}}\n```\n\n### User message or image description:\n\n{{ $json.output }}\n\n### Assistant:",
           "options": {}
         },
         "id": "9d8e8f63-06e1-4b36-913d-45f67462ff2b",
@@ -328,107 +292,25 @@
           120,
           480
         ]
-      },
-      {
-        "parameters": {
-          "model": "llama3.2-vision:latest",
-          "options": {
-            "format": "json"
-          }
-        },
-        "id": "image-chat-model",
-        "name": "Image Chat Model",
-        "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
-        "typeVersion": 1,
-        "position": [
-          -260,
-          680
-        ],
-        "credentials": {
-          "ollamaApi": {
-            "id": "OuW1SzikhVbQMEOL",
-            "name": "Ollama account"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "respondWith": "text",
-          "options": {}
-        },
-        "id": "image-response",
-        "name": "Image Response",
-        "type": "n8n-nodes-base.respondToWebhook",
-        "typeVersion": 1.1,
-        "position": [
-          920,
-          980
-        ],
-        "alwaysOutputData": false
-      },
-      {
-        "parameters": {
-          "jsCode": "const imageDescriptionSchema = {\n  \"type\": \"object\",\n  \"properties\": {\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"A brief summary of the image content.\"\n    },\n    \"objects\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"shapeType\": {\n            \"type\": \"string\",\n            \"description\": \"Type of the shape detected (e.g., circle, rectangle, triangle).\"\n          },\n          \"color\": {\n            \"type\": \"string\",\n            \"description\": \"Color of the shape.\"\n          },\n          \"position\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"x\": {\n                \"type\": \"number\",\n                \"format\": \"float\",\n                \"description\": \"X-coordinate of the shape's center (0-100).\"\n              },\n              \"y\": {\n                \"type\": \"number\",\n                \"format\": \"float\",\n                \"description\": \"Y-coordinate of the shape's center (0-100).\"\n              }\n            },\n            \"required\": [\n              \"x\",\n              \"y\"\n            ]\n          },\n          \"size\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"width\": {\n                \"type\": \"number\",\n                \"format\": \"float\",\n                \"description\": \"Width of the shape.\"\n              },\n              \"height\": {\n                \"type\": \"number\",\n                \"format\": \"float\",\n                \"description\": \"Height of the shape.\"\n              }\n            },\n            \"required\": [\n              \"width\",\n              \"height\"\n            ]\n          },\n          \"confidence\": {\n            \"type\": \"number\",\n            \"format\": \"float\",\n            \"description\": \"Confidence level of the shape detection (0.0 - 1.0).\"\n          }\n        },\n        \"required\": [\n          \"shapeType\",\n          \"color\",\n          \"position\",\n          \"size\",\n          \"confidence\"\n        ]\n      }\n    },\n    \"scene\": {\n      \"type\": \"string\",\n      \"description\": \"Description of the overall scene in the image.\"\n    },\n    \"colors\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"description\": \"Dominant colors present in the image.\"\n      }\n    },\n    \"time_of_day\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"Morning\",\n        \"Afternoon\",\n        \"Evening\",\n        \"Night\"\n      ],\n      \"description\": \"Estimated time of day depicted in the image.\"\n    },\n    \"setting\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"Indoor\",\n        \"Outdoor\",\n        \"Unknown\"\n      ],\n      \"description\": \"Setting of the image.\"\n    },\n    \"text_content\": {\n      \"type\": \"string\",\n      \"nullable\": true,\n      \"description\": \"Any text detected within the image. Null if no text is found.\"\n    }\n  },\n  \"required\": [\n    \"summary\",\n    \"objects\",\n    \"scene\",\n    \"colors\",\n    \"time_of_day\",\n    \"setting\"\n  ]\n};\n\nreturn {\n  schema: JSON.stringify(imageDescriptionSchema)\n};"
-        },
-        "id": "define-image-schema",
-        "name": "Define Image Schema",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -260,
-          980
-        ]
-      },
-      {
-        "parameters": {
-          "httpMethod": "POST",
-          "path": "/image-agent",
-          "responseMode": "responseNode",
-          "options": {
-            "binaryData": true
-          }
-        },
-        "id": "image-webhook",
-        "name": "Image_Chat_Visio",
-        "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2,
-        "position": [
-          -680,
-          -60
-        ],
-        "webhookId": "image-webhook-id"
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "=### System:\nYou are an image analysis agent. Analyze the provided image and extract information about the shapes present. For each shape detected, provide its type (e.g., circle, rectangle, triangle), color, position (x, y coordinates where x=0,y=0 is top-left and x=100,y=100 is bottom-right), and size (width, height).\n\nUse the following coordinate system:\n- (0, 0) is the top-left corner of the image.\n- (100, 100) is the bottom-right corner of the image.\n\nFormat your response as a JSON object that conforms to the following schema:\n\nSchema:\n```\n{{json.schema}}\n```\n\n### User:\nHere is the image. (Image attached)\nPlease identify the shapes, their colors, positions, and sizes.\n\n### Assistant:\n",
-          "image": "={{ $('Image_Chat_Visio').item.binary.image.data }}",
-          "options": {}
-        },
-        "id": "image-agent",
-        "name": "Image Agent",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 1.6,
-        "position": [
-          -40,
-          980
-        ]
-      },
-      {
-        "parameters": {
-          "jsCode": "const imageDescription = $json.body; // Assuming the Image Agent output is in body\nlet createShapeCommand = {\n  \"command\": \"CreateShape\",\n  \"parameters\": {\n    \"shapes\": []\n  }\n};\n\nif (imageDescription && imageDescription.objects) {\n  for (const shape of imageDescription.objects) {\n    createShapeCommand.parameters.shapes.push({\n      \"shapeType\": shape.shapeType,\n      \"color\": shape.color,\n      \"position\": {\n        \"x\": shape.position.x,\n        \"y\": shape.position.y\n      },\n      \"size\": {\n        \"width\": shape.size.width,\n        \"height\": shape.size.height\n      }\n    });\n  }\n}\n\nreturn {\n  json: createShapeCommand\n};\n"
-        },
-        "id": "b27748d2-3857-4ba3-9fe3-9c6797813436",
-        "name": "Image to Command",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          360,
-          980
-        ]
       }
     ],
-    "pinData": {},
+    "pinData": {
+      "Code1": [
+        {
+          "json": {
+            "route": "action_agent",
+            "reply": "{\"command\":\"CreateShape\",\"parameters\":{\"shapes\":[{\"shapeType\":\"circle\",\"position\":{\"x\":25,\"y\":20},\"size\":{\"width\":12,\"height\":15}},{\"shapeType\":\"square\",\"position\":{\"x\":55,\"y\":60},\"size\":{\"width\":18,\"height\":8},\"color\":\"blue\"},{\"shapeType\":\"triangle\",\"position\":{\"x\":85,\"y\":10},\"size\":{\"width\":10,\"height\":22}},{\"shapeType\":\"circle\",\"position\":{\"x\":20,\"y\":70},\"size\":{\"width\":10,\"height\":18},\"color\":\"green\"},{\"shapeType\":\"rectangle\",\"position\":{\"x\":50,\"y\":40},\"size\":{\"width\":15,\"height\":12},\"color\":\"yellow\"},{\"shapeType\":\"pentagon\",\"position\":{\"x\":30,\"y\":90},\"size\":{\"width\":10,\"height\":20}},{\"shapeType\":\"circle\",\"position\":{\"x\":65,\"y\":60},\"size\":{\"width\":12,\"height\":15},\"color\":\"orange\"},{\"shapeType\":\"square\",\"position\":{\"x\":90,\"y\":20},\"size\":{\"width\":18,\"height\":8},\"color\":\"blue\"},{\"shapeType\":\"triangle\",\"position\":{\"x\":25,\"y\":80},\"size\":{\"width\":10,\"height\":22}},{\"shapeType\":\"rectangle\",\"position\":{\"x\":55,\"y\":50},\"size\":{\"width\":15,\"height\":12},\"color\":\"yellow\"}]}}"
+          }
+        }
+      ],
+      "action_agent": [
+        {
+          "json": {
+            "output": "```json\n{\"command\":\"CreateShape\",\"parameters\":{\"shapes\":[{\"shapeType\":\"circle\",\"position\":{\"x\":25,\"y\":20},\"size\":{\"width\":12,\"height\":15}},{\"shapeType\":\"square\",\"position\":{\"x\":55,\"y\":60},\"size\":{\"width\":18,\"height\":8},\"color\":\"blue\"},{\"shapeType\":\"triangle\",\"position\":{\"x\":85,\"y\":10},\"size\":{\"width\":10,\"height\":22}},{\"shapeType\":\"circle\",\"position\":{\"x\":20,\"y\":70},\"size\":{\"width\":10,\"height\":18},\"color\":\"green\"},{\"shapeType\":\"rectangle\",\"position\":{\"x\":50,\"y\":40},\"size\":{\"width\":15,\"height\":12},\"color\":\"yellow\"},{\"shapeType\":\"pentagon\",\"position\":{\"x\":30,\"y\":90},\"size\":{\"width\":10,\"height\":20}},{\"shapeType\":\"circle\",\"position\":{\"x\":65,\"y\":60},\"size\":{\"width\":12,\"height\":15},\"color\":\"orange\"},{\"shapeType\":\"square\",\"position\":{\"x\":90,\"y\":20},\"size\":{\"width\":18,\"height\":8},\"color\":\"blue\"},{\"shapeType\":\"triangle\",\"position\":{\"x\":25,\"y\":80},\"size\":{\"width\":10,\"height\":22}},{\"shapeType\":\"rectangle\",\"position\":{\"x\":55,\"y\":50},\"size\":{\"width\":15,\"height\":12},\"color\":\"yellow\"}]}}\n```"
+          }
+        }
+      ]
+    },
     "connections": {
       "Chat": {
         "main": [
@@ -497,13 +379,6 @@
           [
             {
               "node": "Define Schema",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "HTTP Request",
               "type": "main",
               "index": 0
             }
@@ -586,71 +461,9 @@
             }
           ]
         ]
-      },
-      "Image_Chat_Visio": {
-        "main": [
-          [
-            {
-              "node": "Merge Chat_Visio and Chat",
-              "type": "main",
-              "index": 1
-            },
-            [
-              {
-                "node": "Define Image Schema",
-                "type": "main",
-                "index": 0
-              }
-            ]
-          ]
-        ]
-      },
-      "Define Image Schema": {
-        "main": [
-          [
-            {
-              "node": "Image Agent",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Image Agent": {
-        "main": [
-          [
-            {
-              "node": "Image to Command",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Image Chat Model": {
-        "ai_languageModel": [
-          [
-            {
-              "node": "Image Agent",
-              "type": "ai_languageModel",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Image to Command": {
-        "main": [
-          [
-            {
-              "node": "HTTP Request",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
       }
     },
-    "active": false,
+    "active": true,
     "settings": {
       "executionOrder": "v1"
     },

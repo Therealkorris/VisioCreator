@@ -89,7 +89,7 @@
     },
     {
       "parameters": {
-        "jsCode": "let output;\n\ntry {\n    // Try to parse the JSON from the Manager response\n    output = JSON.parse($json.text);\n} catch (error) {\n    // If parsing fails, handle it as a regular text message\n    return {\n        route: \"manager\",  // Default route for handling non-JSON inputs\n        reply: $json.text  // Send the raw text as the reply\n    };\n}\n\n// Return both the route and the reply for further processing if JSON parsing succeeds\nreturn {\n    route: output.route,   // Keep route for the Switch node\n    reply: output.reply    // Send reply to the Respond webhook\n};\n"
+        "jsCode": "let output;\n\ntry {\n    // Try to parse the JSON from the Manager response or Image Agent\n    output = JSON.parse($json.text || $json.reply);\n} catch (error) {\n    // If parsing fails, handle it as a regular text message\n    return {\n        route: \"manager\",  // Default route for handling non-JSON inputs\n        reply: $json.text || $json.reply // Send the raw text as the reply\n    };\n}\n\n// Check if the 'command' property exists, indicating an action agent response\nif (output.command) {\n  return {\n    route: \"action_agent\",\n    output: output,\n  };\n}\n\n// Return both the route and the reply for further processing if JSON parsing succeeds\nreturn {\n    route: output.route,   // Keep route for the Switch node\n    reply: output.reply    // Send reply to the Respond webhook\n};"
       },
       "id": "6d8a609c-6874-46cf-86fd-9d5cdf34da07",
       "name": "Code1",
@@ -227,8 +227,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2480,
-        480
+        2100,
+        260
       ]
     },
     {
@@ -266,7 +266,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=### System:\nYou are an Action Agent responsible for interpreting user requests and generating structured commands for shapes in a Visio-like system. You must return a response formatted as a valid JSON, conforming to the provided schema.\n\n### Instructions:\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is top-left, (100,100) is bottom-right\n\n* Your only task is to strictly translate {{ $('Merge Chat_Visio and Chat').item.json.chatInput }} into action and do what the user wants.\n\n* If the user specifies a number of shapes to create, you MUST generate a `shapes` array in your JSON response. Each element in this array should represent a single shape with its own `shapeType`, `position`, and `size`. \n\n**Example for creating multiple shapes:**\n   - User: \"Create 3 red circles\"\n   - Response: \n   ```\n   {\n     \"command\": \"CreateShape\",\n     \"parameters\": {\n       \"shapes\": [\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 20, \"y\": 30},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 40, \"y\": 50},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 60, \"y\": 70},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         }\n       ]\n     }\n   }\n   ```\n\n* If no specific positions are provided for multiple shapes, you should automatically distribute them across the canvas.\n* Do not include any language tags (such as <|python_tag|>) or commentary of any kind.\n* ALWAYS use the schema to process the user’s request, gather all necessary information (color, shape, size, position) if given, and return the correct JSON response.\n\n**IMPORTANT: The `command` field must always be exactly `CreateShape` (singular), even when creating multiple shapes.**\n\n### Schema:\n```\n{{json.schema}}\n```\n\n### User message:\n{{ $('Merge Chat_Visio and Chat').item.json.chatInput }}\n\n### Assistant:",
+        "text": "=### System:\nYou are an Action Agent responsible for interpreting user requests and generating structured commands for shapes in a Visio-like system. You must return a response formatted as a valid JSON, conforming to the provided schema.\n\n### Instructions:\nCanvas information:\n- Size: 100x100 units\n- Coordinate system: (0,0) is top-left, (100,100) is bottom-right\n\n* Your only task is to strictly translate user input into action,  or translate image description into action and do what the user wants.\n\n* If the user specifies a number of shapes to create, you MUST generate a `shapes` array in your JSON response. Each element in this array should represent a single shape with its own `shapeType`, `position`, and `size`. \n\n**Example for creating multiple shapes:**\n   - User: \"Create 3 red circles\"\n   - Response: \n   ```\n   {\n     \"command\": \"CreateShape\",\n     \"parameters\": {\n       \"shapes\": [\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 20, \"y\": 30},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 40, \"y\": 50},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         },\n         {\n           \"shapeType\": \"circle\",\n           \"position\": {\"x\": 60, \"y\": 70},\n           \"size\": {\"width\": 10, \"height\": 10},\n           \"color\": \"red\"\n         }\n       ]\n     }\n   }\n   ```\n\n- When specifying the position of shapes, ensure the 'x' and 'y' coordinates are within the range of 0 to 100, where (0,0) represents the top-left corner and (100,100) represents the bottom-right corner of the canvas.\n- Shapes should be positioned so that they are fully contained within the canvas. Adjust the position if necessary to prevent any part of the shape from extending beyond the canvas boundaries.\n- When creating multiple shapes without specific positions, distribute them within the canvas area, ensuring no shapes overlap with each other or the canvas boundaries.\n- For shape sizes, ensure the dimensions ('width' and 'height') are appropriate for the canvas size and are always included. Shapes should not be so large that they cannot fit within the canvas boundaries.\n- **The 'width' and 'height' values must never be null.** If a size is not specified, provide default values that are reasonable for the canvas size (e.g., width: 10, height: 10).\n- If a shape's size would cause it to exceed the canvas boundaries, reduce the size proportionally to fit within the canvas, maintaining the aspect ratio where possible.\n\n* If no specific positions are provided for multiple shapes, you should automatically distribute them across the canvas.\n* Do not include any language tags (such as <|python_tag|>) or commentary of any kind.\n* ALWAYS use the schema to process the user’s request, gather all necessary information (color, shape, size, position) if given, and return the correct JSON response.\n\n**IMPORTANT: The `command` field must always be exactly `CreateShape` (singular), even when creating multiple shapes.**\n\n### Schema:\n```\n{{ $json.schema }}\n```\n\n### User message or image description:\n\n{{ $('Merge Chat_Visio and Chat').item.json.chatInput }}\n\n### Assistant:",
         "options": {}
       },
       "id": "db900ffb-cff6-43cf-a464-e6fb3a555820",
@@ -445,11 +445,11 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "dbea67a6-62ec-4fdd-a8c3-897ae2c3d5a6",
+  "versionId": "9bd5abd9-9410-42f2-ae25-911918d934e2",
   "meta": {
     "instanceId": "1fe0c6202bfba1ce3a446bbc8c0fdcc7309bed16fe9c5af4d2864f9dd0680304"
   },
