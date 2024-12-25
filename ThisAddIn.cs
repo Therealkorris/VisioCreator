@@ -27,7 +27,7 @@ namespace VisioPlugin
         public bool isConnected = false;
         private string[] availableModels = new string[0];
         private HttpClient httpClient = new HttpClient();
-        private string selectedModel = "llama3.2";
+        private string selectedModel = "phi-4";
         private AIChatPane aiChatPane;
         private VisioCommandProcessor commandProcessor;
         private HttpListener listener;
@@ -124,10 +124,13 @@ namespace VisioPlugin
                     {
                         await HandleListShapesRequest(context);
                     }
-                    else if (requestPath == "/image-agent/") // Changed path
+                    else if (requestPath == "/image-agent/")
                     {
-                        //string jsonResponse = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
-                        //AppendToChatHistory($"AI: {jsonResponse}");
+                        string jsonResponse = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                        Debug.WriteLine($"[Image-Agent] Received: {jsonResponse}");
+                        AppendToChatHistory($"AI: {jsonResponse}");
+
+                        // Optional: Process the response in a custom way if needed
                     }
                     else
                     {

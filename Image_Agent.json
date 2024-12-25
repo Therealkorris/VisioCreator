@@ -1,144 +1,226 @@
 {
-    "name": "ImageAgentWorkflow",
-    "nodes": [
-      {
-        "parameters": {
-          "model": "llama3.2-vision:latest",
-          "options": {
-            "format": "json"
-          }
-        },
-        "id": "image-chat-model",
-        "name": "Image Chat Model",
-        "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
-        "typeVersion": 1,
-        "position": [
-          120,
-          680
-        ],
-        "credentials": {
-          "ollamaApi": {
-            "id": "OuW1SzikhVbQMEOL",
-            "name": "Ollama account"
-          }
+  "nodes": [
+    {
+      "parameters": {
+        "model": "llama3.2-vision:latest",
+        "options": {
+          "format": "json"
         }
       },
-      {
-        "parameters": {
-          "jsCode": "const imageDescriptionSchema = {\n  \"type\": \"object\",\n  \"properties\": {\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"A brief summary of the image content.\"\n    },\n    \"objects\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\",\n            \"description\": \"Name of the object detected in the image.\"\n          },\n          \"confidence\": {\n            \"type\": \"number\",\n            \"format\": \"float\",\n            \"description\": \"Confidence level of the object detection (0.0 - 1.0).\"\n          },\n          \"attributes\": {\n            \"type\": \"string\",\n            \"description\": \"Attributes or descriptive features of the object.\"\n          }\n        },\n        \"required\": [\"name\", \"confidence\"]\n      }\n    },\n    \"scene\": {\n      \"type\": \"string\",\n      \"description\": \"Description of the overall scene in the image.\"\n    },\n    \"colors\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"description\": \"Dominant colors present in the image.\"\n      }\n    },\n    \"time_of_day\": {\n      \"type\": \"string\",\n      \"enum\": [\"Morning\", \"Afternoon\", \"Evening\", \"Night\"],\n      \"description\": \"Estimated time of day depicted in the image.\"\n    },\n    \"setting\": {\n      \"type\": \"string\",\n      \"enum\": [\"Indoor\", \"Outdoor\", \"Unknown\"],\n      \"description\": \"Setting of the image.\"\n    },\n    \"text_content\": {\n      \"type\": \"string\",\n      \"nullable\": true,\n      \"description\": \"Any text detected within the image. Null if no text is found.\"\n    }\n  },\n  \"required\": [\"summary\", \"objects\", \"scene\", \"colors\", \"time_of_day\", \"setting\"]\n};\n\nreturn {\n  schema: JSON.stringify(imageDescriptionSchema)\n};"
-        },
-        "id": "define-image-schema",
-        "name": "Define Image Schema",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          120,
-          480
-        ]
+      "id": "1436b311-9a06-40bd-a30d-952cfd184783",
+      "name": "Image Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        360,
+        780
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ScoyOTvEmGxVsfpn",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/image-agent",
+        "responseMode": "responseNode",
+        "options": {}
       },
-      {
-        "parameters": {
-          "httpMethod": "POST",
-          "path": "/image-agent",
-          "responseMode": "responseNode",
-          "options": {
-            "binaryData": true
+      "id": "f1978354-c47f-414f-8a3c-bfcc4cbf413f",
+      "name": "Image Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        80,
+        160
+      ],
+      "webhookId": "image-webhook-id"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a helpful assistant that describes images in detail.\n\nDescribe what this image is about",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a helpful assistant that describes images in detail.\n\nDescribe what this image is about"
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "messageType": "imageBinary",
+              "binaryImageDataKey": "data"
+            }
+          ]
+        }
+      },
+      "id": "5cf3a158-5e3e-4681-af3f-a06227d98ff7",
+      "name": "Image Agent",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [500, 180],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/chat-agent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": {\n    \"route\": \"action_agent\",\n    \"reply\": {{ $json.output }}\n  }\n}",
+        "options": {}
+      },
+      "id": "25c69334-c48a-4c4e-8a17-27fc3550a1fb",
+      "name": "Send to Action Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "7c94df84-5b11-4edf-9030-e132567fecc8",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        980,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://images.pexels.com/photos/1267338/pexels-photo-1267338.jpeg?auto=compress&cs=tinysrgb&w=600",
+        "options": {}
+      },
+      "id": "1abcf929-9d18-4cc0-a9b7-3877adcf2463",
+      "name": "Get Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        320,
+        340
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "options": {
+          "allowFileUploads": true,
+          "allowedFilesMimeTypes": "*"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        340
+      ],
+      "id": "f2597b26-1b98-4266-963e-4342ce4428f7",
+      "name": "When chat message received",
+      "webhookId": "814a71cf-ee3f-4631-b9af-38d94773f5b6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Standardize binary data field name to 'data'\nconst item = $input.first();\n\nif (item.binary) {\n    // If from chat (data0)\n    if (item.binary.data0) {\n        return {\n            binary: {\n                data: item.binary.data0\n            }\n        };\n    }\n    // If from webhook (image)\n    else if (item.binary.image) {\n        return {\n            binary: {\n                data: item.binary.image\n            }\n        };\n    }\n}\n\n// If no binary data found, return empty\nreturn {\n    binary: {\n        data: null\n    }\n};"
+      },
+      "id": "standardize-data",
+      "name": "Standardize Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [380, 180]
+    }
+  ],
+  "connections": {
+    "Image Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Image Agent",
+            "type": "ai_languageModel",
+            "index": 0
           }
-        },
-        "id": "image-webhook",
-        "name": "Image Webhook",
-        "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2,
-        "position": [
-          -200,
-          240
-        ],
-        "webhookId": "image-webhook-id"
-      },
-      {
-        "parameters": {
-          "promptType": "define",
-          "text": "=Analyze this image and describe what you see, including any objects, the scene, colors and any text you can detect.\n\nSchema:\n```\n{{json.schema}}\n```",
-          "image": "={{ $('Image Webhook').item.binary.image.data }}",
-          "options": {}
-        },
-        "id": "image-agent",
-        "name": "Image Agent",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 1.6,
-        "position": [
-          340,
-          480
         ]
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "http://localhost:5678/webhook/chat-agent",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={\n  \"message\": {\n    \"route\": \"action_agent\",\n    \"reply\": {{ $json.output }}\n  }\n}",
-          "options": {}
-        },
-        "id": "send-to-action-agent",
-        "name": "Send to Action Agent",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          620,
-          480
-        ]
-      }
-    ],
-    "connections": {
-      "Image Webhook": {
-        "main": [
-          [
-            {
-              "node": "Define Image Schema",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Define Image Schema": {
-        "main": [
-          [
-            {
-              "node": "Image Agent",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Image Agent": {
-        "main": [
-          [
-            {
-              "node": "Send to Action Agent",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Image Chat Model": {
-        "ai_languageModel": [
-          [
-            {
-              "node": "Image Agent",
-              "type": "ai_languageModel",
-              "index": 0
-            }
-          ]
-        ]
-      }
+      ]
     },
-    "active": true,
-    "settings": {
-      "executionOrder": "v1"
+    "Image Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "id": "ImageAgentWorkflow"
-  }
+    "Image Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send to Action Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image": {
+      "main": [
+        [
+          {
+            "node": "Image Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Get Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Standardize Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standardize Data": {
+      "main": [
+        [
+          {
+            "node": "Image Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}

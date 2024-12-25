@@ -7,16 +7,12 @@
       "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:thisaddin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\visiocommandprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:visiocommandprocessor.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\chatmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:chatmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\aichatpane.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:aichatpane.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|C:\\Users\\jonas\\source\\repos\\VisioCreator\\chatmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B5C52FC5-E7B6-4F22-87CE-918504248368}|VisioPlugin.csproj|solutionrelative:chatmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -48,7 +44,7 @@
               "RelativeDocumentMoniker": "ThisAddIn.cs",
               "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ThisAddIn.cs",
               "RelativeToolTip": "ThisAddIn.cs",
-              "ViewState": "AgIAAIgAAAAAAAAAAAAiwJEAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAAABsAAAA5AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-12-10T18:18:57.148Z",
               "EditorCaption": ""
@@ -56,24 +52,12 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "VisioCommandProcessor.cs",
-              "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\VisioCommandProcessor.cs",
-              "RelativeDocumentMoniker": "VisioCommandProcessor.cs",
-              "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\VisioCommandProcessor.cs",
-              "RelativeToolTip": "VisioCommandProcessor.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAIYBAAA7AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-12-10T18:11:43.116Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
               "Title": "ChatManager.cs",
               "DocumentMoniker": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ChatManager.cs",
               "RelativeDocumentMoniker": "ChatManager.cs",
               "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\ChatManager.cs",
               "RelativeToolTip": "ChatManager.cs",
-              "ViewState": "AgIAAK0AAAAAAAAAAAAkwMMAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-12-07T10:58:19.234Z"
             },
@@ -85,7 +69,7 @@
               "RelativeDocumentMoniker": "AIChatPane.cs",
               "ToolTip": "C:\\Users\\jonas\\source\\repos\\VisioCreator\\AIChatPane.cs",
               "RelativeToolTip": "AIChatPane.cs",
-              "ViewState": "AgIAAOkBAAAAAAAAAAAAAPoBAAAZAAAAAAAAAA==",
+              "ViewState": "AgIAAOkBAAAAAAAAAAAAAPMBAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-11-09T22:26:09.316Z"
             }

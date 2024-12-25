@@ -75,34 +75,48 @@ namespace VisioPlugin
             {
                 using (var multipartFormContent = new MultipartFormDataContent())
                 {
-                    // Add the image file
+                    // Open the image file as a stream
                     var imageStream = File.OpenRead(imagePath);
-                    var imageContent = new StreamContent(imageStream);
-                    imageContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/jpeg"); // Or image/png, adjust as needed.
-                    multipartFormContent.Add(imageContent, name: "image", fileName: Path.GetFileName(imagePath));
 
-                    // Add the model information as well
+                    // Create StreamContent for the image and set the Content-Type
+                    var imageContent = new StreamContent(imageStream);
+                    imageContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/jpeg"); // Adjust MIME type if needed
+
+                    // Add the image content to the form
+                    multipartFormContent.Add(imageContent, "image", Path.GetFileName(imagePath));
+
+                    // Add the selected model as a separate form field
                     var modelInfo = new StringContent(SelectedModel, Encoding.UTF8, "text/plain");
                     multipartFormContent.Add(modelInfo, "model");
 
-                    // Send the request to the /image-agent webhook
+                    Debug.WriteLine($"[SendImageToN8n] Sending image: {Path.GetFileName(imagePath)} with model {SelectedModel} to {apiEndpoint}/image-agent");
+
+                    // Send the POST request to the /image-agent endpoint
                     var response = await httpClient.PostAsync($"{apiEndpoint}/image-agent", multipartFormContent);
                     response.EnsureSuccessStatusCode();
 
+                    // Read the response content
                     var responseString = await response.Content.ReadAsStringAsync();
                     Debug.WriteLine($"[SendImageToN8n] Response: {responseString}");
 
-                    // Process the response as before (chat message or command)
+                    // Process the AI response
                     await ProcessCommand(responseString, $"Image: {Path.GetFileName(imagePath)}");
-
                 }
+            }
+            catch (HttpRequestException ex)
+            {
+                Debug.WriteLine($"[SendImageToN8n] HttpRequestException: {ex.Message}");
+                appendToChatHistory($"Error sending image: {ex.Message}");
+                chatPane.UpdateCommandStatus($"Image: {Path.GetFileName(imagePath)}", "Failed");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SendImageToN8n] Error sending image: {ex.Message}");
+                Debug.WriteLine($"[SendImageToN8n] Exception: {ex.Message}");
                 appendToChatHistory($"Error sending image: {ex.Message}");
+                chatPane.UpdateCommandStatus($"Image: {Path.GetFileName(imagePath)}", "Failed");
             }
         }
+
 
         // Process the AI's response and decide if it's a chat message or a command
         private async Task ProcessCommand(string aiResponse, string userMessage)
