@@ -264,8 +264,9 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <None Include="AI_Visio_connection_and_Model.json" />
     <None Include="app.config" />
+    <None Include="Get_Stensils.json" />
+    <None Include="Image_Agent.json" />
     <None Include="Instructions.md" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
@@ -287,9 +288,9 @@
       <DependentUpon>ThisAddIn.Designer.xml</DependentUpon>
     </Compile>
     <AppDesigner Include="Properties\" />
-    <None Include="VisioChat_Agents.json" />
-    <None Include="VisioCommandProcessorWorkflow.json" />
     <None Include="VisioPlugin_TemporaryKey.pfx" />
+    <None Include="Visio_connection_Ollama.json" />
+    <None Include="Working_Agent_multi_creation.json" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
