@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
@@ -15,11 +16,22 @@ namespace VisioPlugin
         private readonly Visio.Application visioApplication;
         private readonly LibraryManager libraryManager;
         private static readonly HttpClient httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
+        private List<Visio.Shape> lastAffectedShapes = new List<Visio.Shape>();
 
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
             visioApplication = visioApp ?? throw new ArgumentNullException(nameof(visioApp));
             this.libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
+        }
+
+        public IEnumerable<Visio.Shape> GetLastAffectedShapes()
+        {
+            Debug.WriteLine($"[GetLastAffectedShapes] Returning {lastAffectedShapes.Count} shapes:");
+            foreach (var shape in lastAffectedShapes)
+            {
+                Debug.WriteLine($"[GetLastAffectedShapes] Shape ID: {shape.ID16}");
+            }
+            return new List<Visio.Shape>(lastAffectedShapes);
         }
 
         public async Task ProcessCommand(string jsonCommand)
@@ -44,6 +56,10 @@ namespace VisioPlugin
                     commandType = "CreateShape"; // Correct the command type
                 }
 
+                // Clear the affected shapes list before processing new command
+                lastAffectedShapes = new List<Visio.Shape>();
+                Debug.WriteLine("[ProcessCommand] Cleared affected shapes list.");
+
                 // Handle different command types
                 if (commandType == "CreateShape")
                 {
@@ -52,13 +68,23 @@ namespace VisioPlugin
                     {
                         foreach (JObject shapeObject in shapesArray)
                         {
-                            await ExecuteCreateShapeCommand(shapeObject);
+                            var shape = ExecuteCreateShapeCommand(shapeObject);
+                            if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
+                            {
+                                lastAffectedShapes.Add(shape);
+                                Debug.WriteLine($"[ProcessCommand] Added shape to affected shapes. ID: {shape.ID16}");
+                            }
                         }
                     }
                     // Handle case where parameters are directly in 'parameters' object (single shape)
                     else if (commandObject["parameters"] is JObject shapeParameters)
                     {
-                        await ExecuteCreateShapeCommand(shapeParameters);
+                        var shape = ExecuteCreateShapeCommand(shapeParameters);
+                        if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
+                        {
+                            lastAffectedShapes.Add(shape);
+                            Debug.WriteLine($"[ProcessCommand] Added single shape to affected shapes. ID: {shape.ID16}");
+                        }
                     }
                     else
                     {
@@ -66,69 +92,76 @@ namespace VisioPlugin
                         return;
                     }
                 }
-                // Add other command types here (e.g., ConnectShapes, AddTextToShape, etc.)
                 else if (commandType == "ConnectShapes")
                 {
-                    await ExecuteConnectShapesCommand(commandObject["parameters"] as JObject);
+                    ExecuteConnectShapesCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "AddTextToShape")
                 {
-                    await ExecuteAddTextToShapeCommand(commandObject["parameters"] as JObject);
+                    ExecuteAddTextToShapeCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "SetShapeStyle")
                 {
-                    await ExecuteSetShapeStyleCommand(commandObject["parameters"] as JObject);
+                    ExecuteSetShapeStyleCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "GroupShapes")
                 {
-                    await ExecuteGroupShapesCommand(commandObject["parameters"] as JObject);
+                    ExecuteGroupShapesCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "UngroupShapes")
                 {
-                    await ExecuteUngroupShapesCommand(commandObject["parameters"] as JObject);
+                    ExecuteUngroupShapesCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "AlignShapes")
                 {
-                    await ExecuteAlignShapesCommand(commandObject["parameters"] as JObject);
+                    ExecuteAlignShapesCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "DistributeShapes")
                 {
-                    await ExecuteDistributeShapesCommand(commandObject["parameters"] as JObject);
+                    ExecuteDistributeShapesCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "GetShapeProperties")
                 {
-                    await ExecuteGetShapePropertiesCommand(commandObject["parameters"] as JObject);
+                    ExecuteGetShapePropertiesCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "GetPageSize")
                 {
-                    await ExecuteGetPageSizeCommand(commandObject["parameters"] as JObject);
+                    ExecuteGetPageSizeCommand(commandObject["parameters"] as JObject);
                 }
                 else if (commandType == "CreateTextBox")
                 {
                     ExecuteCreateTextBoxCommand(commandObject["parameters"] as JObject);
                 }
-
                 else
                 {
                     Debug.WriteLine($"[ProcessCommand] [Error] Unsupported command type: {commandType}");
+                }
+
+                // Debug output for affected shapes
+                Debug.WriteLine($"[ProcessCommand] Final number of affected shapes: {lastAffectedShapes.Count}");
+                foreach (var shape in lastAffectedShapes.Distinct())
+                {
+                    Debug.WriteLine($"[ProcessCommand] Final affected shape ID: {shape.ID16}");
                 }
             }
             catch (JsonReaderException jEx)
             {
                 Debug.WriteLine($"[ProcessCommand] [Error] Invalid JSON format: {jEx.Message}");
+                lastAffectedShapes.Clear();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ProcessCommand] [Error] Failed to process command: {ex.Message}");
+                lastAffectedShapes.Clear();
             }
         }
 
-        private async Task ExecuteCreateShapeCommand(JObject shapeParameters)
+        private Visio.Shape ExecuteCreateShapeCommand(JObject shapeParameters)
         {
             if (shapeParameters == null)
             {
                 Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] Shape parameters are missing.");
-                return;
+                return null;
             }
 
             // Get the active page from the Visio application
@@ -136,7 +169,7 @@ namespace VisioPlugin
             if (activePage == null)
             {
                 Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] No active page found.");
-                return;
+                return null;
             }
 
             // Get the page dimensions
@@ -146,110 +179,87 @@ namespace VisioPlugin
             // Check if the 'shapes' array exists
             if (shapeParameters["shapes"] is JArray shapesArray)
             {
+                Visio.Shape lastShape = null;
                 foreach (JObject shapeObject in shapesArray)
                 {
-                    string shapeType = shapeObject["type"]?.ToString();
-                    if (string.IsNullOrEmpty(shapeType))
+                    var shape = CreateSingleShape(shapeObject, activePage, pageWidth, pageHeight);
+                    if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
                     {
-                        Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] shapeType is missing or empty in one of the shape objects.");
-                        continue; // Skip this shape object and move to the next one
-                    }
-
-                    JObject positionObject = shapeObject["position"] as JObject;
-                    double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
-                    double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
-
-                    JObject sizeObject = shapeObject["size"] as JObject;
-                    double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
-                    double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
-
-                    // Ensure percentages are within bounds
-                    xPercent = Math.Max(0, Math.Min(100, xPercent));
-                    yPercent = Math.Max(0, Math.Min(100, yPercent));
-                    widthPercent = Math.Max(0, Math.Min(100, widthPercent));
-                    heightPercent = Math.Max(0, Math.Min(100, heightPercent));
-
-                    // Adjust position to keep shape within canvas
-                    double shapeWidth = (widthPercent / 100.0) * pageWidth;
-                    double shapeHeight = (heightPercent / 100.0) * pageHeight;
-                    double x = (xPercent / 100.0) * pageWidth - shapeWidth / 2;
-                    double y = (yPercent / 100.0) * pageHeight - shapeHeight / 2;
-
-                    x = Math.Max(0, Math.Min(pageWidth - shapeWidth, x));
-                    y = Math.Max(0, Math.Min(pageHeight - shapeHeight, y));
-
-                    // Convert adjusted position back to percentage
-                    double adjustedXPercent = (x / pageWidth) * 100;
-                    double adjustedYPercent = (y / pageHeight) * 100;
-
-                    string color = shapeObject["color"]?.ToString();
-
-                    libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
-
-                    if (!string.IsNullOrEmpty(color))
-                    {
-                        var shapeName = GetLastAddedShapeName();
-                        if (!string.IsNullOrEmpty(shapeName))
-                        {
-                            var shape = activePage.Shapes.ItemU[shapeName];
-                            libraryManager.SetShapeColor(shape, color);
-                        }
+                        lastAffectedShapes.Add(shape);
+                        lastShape = shape;
+                        Debug.WriteLine($"[ExecuteCreateShapeCommand] Added shape to affected shapes. ID: {shape.ID16}");
                     }
                 }
+                return lastShape;
             }
-            // Handle the case where 'shapes' array is missing but other parameters are present (single shape creation)
+            // Handle single shape creation
             else
             {
-                string shapeType = shapeParameters["shapeType"]?.ToString();
-                if (string.IsNullOrEmpty(shapeType))
+                var shape = CreateSingleShape(shapeParameters, activePage, pageWidth, pageHeight);
+                if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
                 {
-                    Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] shapeType is missing or empty.");
-                    return;
+                    lastAffectedShapes.Add(shape);
+                    Debug.WriteLine($"[ExecuteCreateShapeCommand] Added single shape to affected shapes. ID: {shape.ID16}");
                 }
+                return shape;
+            }
+        }
 
-                JObject positionObject = shapeParameters["position"] as JObject;
-                double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
-                double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
-
-                JObject sizeObject = shapeParameters["size"] as JObject;
-                double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
-                double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
-
-                // Ensure percentages are within bounds
-                xPercent = Math.Max(0, Math.Min(100, xPercent));
-                yPercent = Math.Max(0, Math.Min(100, yPercent));
-                widthPercent = Math.Max(0, Math.Min(100, widthPercent));
-                heightPercent = Math.Max(0, Math.Min(100, heightPercent));
-
-                // Adjust position to keep shape within canvas
-                double shapeWidth = (widthPercent / 100.0) * pageWidth;
-                double shapeHeight = (heightPercent / 100.0) * pageHeight;
-                double x = (xPercent / 100.0) * pageWidth - shapeWidth / 2;
-                double y = (yPercent / 100.0) * pageHeight - shapeHeight / 2;
-
-                x = Math.Max(0, Math.Min(pageWidth - shapeWidth, x));
-                y = Math.Max(0, Math.Min(pageHeight - shapeHeight, y));
-
-                // Convert adjusted position back to percentage
-                double adjustedXPercent = (x / pageWidth) * 100;
-                double adjustedYPercent = (y / pageHeight) * 100;
-
-                string color = shapeParameters["color"]?.ToString();
-
-                libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
-
-                if (!string.IsNullOrEmpty(color))
-                {
-                    var shapeName = GetLastAddedShapeName();
-                    if (!string.IsNullOrEmpty(shapeName))
-                    {
-                        var shape = activePage.Shapes.ItemU[shapeName];
-                        libraryManager.SetShapeColor(shape, color);
-                    }
-                }
+        private Visio.Shape CreateSingleShape(JObject shapeObject, Visio.Page activePage, double pageWidth, double pageHeight)
+        {
+            string shapeType = shapeObject["type"]?.ToString() ?? shapeObject["shapeType"]?.ToString();
+            if (string.IsNullOrEmpty(shapeType))
+            {
+                Debug.WriteLine("[CreateSingleShape] [Error] shapeType is missing or empty.");
+                return null;
             }
 
-            await Task.CompletedTask;
+            JObject positionObject = shapeObject["position"] as JObject;
+            double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
+            double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
+
+            JObject sizeObject = shapeObject["size"] as JObject;
+            double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
+            double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
+
+            // Ensure percentages are within bounds
+            xPercent = Math.Max(0, Math.Min(100, xPercent));
+            yPercent = Math.Max(0, Math.Min(100, yPercent));
+            widthPercent = Math.Max(0, Math.Min(100, widthPercent));
+            heightPercent = Math.Max(0, Math.Min(100, heightPercent));
+
+            // Adjust position to keep shape within canvas
+            double shapeWidth = (widthPercent / 100.0) * pageWidth;
+            double shapeHeight = (heightPercent / 100.0) * pageHeight;
+            double x = (xPercent / 100.0) * pageWidth - shapeWidth / 2;
+            double y = (yPercent / 100.0) * pageHeight - shapeHeight / 2;
+
+            x = Math.Max(0, Math.Min(pageWidth - shapeWidth, x));
+            y = Math.Max(0, Math.Min(pageHeight - shapeHeight, y));
+
+            // Convert adjusted position back to percentage
+            double adjustedXPercent = (x / pageWidth) * 100;
+            double adjustedYPercent = (y / pageHeight) * 100;
+
+            string color = shapeObject["color"]?.ToString();
+
+            // Get the created shape directly from AddShapeToDocument
+            var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
+
+            if (shape != null)
+            {
+                Debug.WriteLine($"[CreateSingleShape] Created shape of type {shapeType} with ID: {shape.ID16}");
+                if (!string.IsNullOrEmpty(color))
+                {
+                    libraryManager.SetShapeColor(shape, color);
+                }
+            }
+            else
+            {
+                Debug.WriteLine("[CreateSingleShape] Failed to create shape.");
+            }
+
+            return shape;
         }
 
         private string GetLastAddedShapeName()
@@ -270,7 +280,7 @@ namespace VisioPlugin
             return null;
         }
 
-        private async Task ExecuteConnectShapesCommand(JObject parameters)
+        private void ExecuteConnectShapesCommand(JObject parameters)
         {
             string shape1Name = parameters?["shape1Name"]?.ToString();
             string shape2Name = parameters?["shape2Name"]?.ToString();
@@ -282,11 +292,25 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.ConnectShapes(shape1Name, shape2Name, connectorType);
-            await Task.CompletedTask;
+            var activePage = visioApplication.ActivePage;
+            if (activePage != null)
+            {
+                var shape1 = activePage.Shapes.ItemU[shape1Name];
+                var shape2 = activePage.Shapes.ItemU[shape2Name];
+                if (shape1 != null && shape2 != null)
+                {
+                    var connectorShape = libraryManager.ConnectShapes(shape1Name, shape2Name, connectorType);
+                    if (connectorShape != null)
+                    {
+                        lastAffectedShapes.Add(shape1);
+                        lastAffectedShapes.Add(shape2);
+                        lastAffectedShapes.Add(connectorShape);
+                    }
+                }
+            }
         }
 
-        private async Task ExecuteAddTextToShapeCommand(JObject parameters)
+        private void ExecuteAddTextToShapeCommand(JObject parameters)
         {
             string shapeName = parameters?["shapeName"]?.ToString();
             string text = parameters?["text"]?.ToString();
@@ -297,11 +321,14 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.AddTextToShape(shapeName, text);
-            await Task.CompletedTask;
+            var shape = libraryManager.AddTextToShape(shapeName, text);
+            if (shape != null)
+            {
+                lastAffectedShapes.Add(shape);
+            }
         }
 
-        private async Task ExecuteSetShapeStyleCommand(JObject parameters)
+        private void ExecuteSetShapeStyleCommand(JObject parameters)
         {
             string shapeName = parameters?["shapeName"]?.ToString();
             string lineStyle = parameters?["lineStyle"]?.ToString();
@@ -313,8 +340,11 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.SetShapeStyle(shapeName, lineStyle, fillPattern);
-            await Task.CompletedTask;
+            var shape = libraryManager.SetShapeStyle(shapeName, lineStyle, fillPattern);
+            if (shape != null)
+            {
+                lastAffectedShapes.Add(shape);
+            }
         }
 
         private void ExecuteCreateTextBoxCommand(JObject parameters)
@@ -362,6 +392,9 @@ namespace VisioPlugin
                 textShape.CellsU["Char.Size"].FormulaU = fontSize.ToString();
                 textShape.CellsU["Char.Color"].FormulaU = $"RGB({ConvertColorToRGB(color)})";
 
+                // Track the affected shape
+                lastAffectedShapes.Add(textShape);
+
                 Debug.WriteLine($"[ExecuteCreateTextBoxCommand] Added text box: '{content}' at ({visioX}, {visioY}).");
             }
             catch (Exception ex)
@@ -383,9 +416,7 @@ namespace VisioPlugin
             };
         }
 
-
-
-        private async Task ExecuteGroupShapesCommand(JObject parameters)
+        private void ExecuteGroupShapesCommand(JObject parameters)
         {
             var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
 
@@ -395,11 +426,14 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.GroupShapes(shapeNames);
-            await Task.CompletedTask;
+            var groupedShape = libraryManager.GroupShapes(shapeNames);
+            if (groupedShape != null)
+            {
+                lastAffectedShapes.Add(groupedShape);
+            }
         }
 
-        private async Task ExecuteUngroupShapesCommand(JObject parameters)
+        private void ExecuteUngroupShapesCommand(JObject parameters)
         {
             string shapeName = parameters?["shapeName"]?.ToString();
 
@@ -409,11 +443,14 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.UngroupShapes(shapeName);
-            await Task.CompletedTask;
+            var ungroupedShapes = libraryManager.UngroupShapes(shapeName);
+            if (ungroupedShapes.Any())
+            {
+                lastAffectedShapes.AddRange(ungroupedShapes);
+            }
         }
 
-        private async Task ExecuteAlignShapesCommand(JObject parameters)
+        private void ExecuteAlignShapesCommand(JObject parameters)
         {
             var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
             string alignmentType = parameters?["alignmentType"]?.ToString();
@@ -424,11 +461,14 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.AlignShapes(shapeNames, alignmentType);
-            await Task.CompletedTask;
+            var alignedShapes = libraryManager.AlignShapes(shapeNames, alignmentType);
+            if (alignedShapes.Any())
+            {
+                lastAffectedShapes.AddRange(alignedShapes);
+            }
         }
 
-        private async Task ExecuteDistributeShapesCommand(JObject parameters)
+        private void ExecuteDistributeShapesCommand(JObject parameters)
         {
             var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
             string distributionType = parameters?["distributionType"]?.ToString();
@@ -439,11 +479,14 @@ namespace VisioPlugin
                 return;
             }
 
-            libraryManager.DistributeShapes(shapeNames, distributionType);
-            await Task.CompletedTask;
+            var distributedShapes = libraryManager.DistributeShapes(shapeNames, distributionType);
+            if (distributedShapes.Any())
+            {
+                lastAffectedShapes.AddRange(distributedShapes);
+            }
         }
 
-        private async Task ExecuteGetShapePropertiesCommand(JObject parameters)
+        private void ExecuteGetShapePropertiesCommand(JObject parameters)
         {
             string shapeName = parameters?["shapeName"]?.ToString();
             if (string.IsNullOrEmpty(shapeName))
@@ -459,7 +502,7 @@ namespace VisioPlugin
             try
             {
                 var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync("http://localhost:5678/chat-agent", content); // Replace with your n8n webhook URL
+                var response = httpClient.PostAsync("http://localhost:5678/chat-agent", content).Result; // Replace with your n8n webhook URL
                 response.EnsureSuccessStatusCode();
                 Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
             }
@@ -469,7 +512,7 @@ namespace VisioPlugin
             }
         }
 
-        private async Task ExecuteGetPageSizeCommand(JObject parameters)
+        private void ExecuteGetPageSizeCommand(JObject parameters)
         {
             // Get the page size
             string pageSizeJson = libraryManager.GetPageSize();
@@ -478,7 +521,7 @@ namespace VisioPlugin
             try
             {
                 var content = new StringContent(pageSizeJson, Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync("http://localhost:5680/chat-agent", content); // Replace with your n8n webhook URL
+                var response = httpClient.PostAsync("http://localhost:5680/chat-agent", content).Result; // Replace with your n8n webhook URL
                 response.EnsureSuccessStatusCode();
                 Debug.WriteLine($"[ExecuteGetPageSizeCommand] Sent page size to n8n.");
             }

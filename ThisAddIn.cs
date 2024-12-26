@@ -164,7 +164,6 @@ namespace VisioPlugin
                         {
                             string jsonString = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
                             Debug.WriteLine($"[Chat-Agent] Received JSON: {jsonString}");
-                            string userMessage = "Summary of created shapes"; // Default message for status
                             
                             try 
                             {
@@ -179,10 +178,16 @@ namespace VisioPlugin
                                 
                                 AppendToChatHistory($"AI: {formattedText}");
                                 
-                                // Update command status
+                                // Only update the existing command if it exists
                                 if (aiChatPane != null && !aiChatPane.IsDisposed)
                                 {
-                                    aiChatPane.UpdateCommandStatus(userMessage, "Success");
+                                    var currentCommand = aiChatPane.GetCurrentCommand();
+                                    if (currentCommand != null)
+                                    {
+                                        currentCommand.Status = "Success";
+                                        currentCommand.AIResponse = formattedText;
+                                        aiChatPane.UpdateCommandStatus(currentCommand);
+                                    }
                                 }
                             }
                             catch (Exception ex)
@@ -192,10 +197,16 @@ namespace VisioPlugin
                                 string cleanText = CleanupJsonText(jsonString);
                                 AppendToChatHistory($"AI: {cleanText}");
                                 
-                                // Update command status even if there was an error
+                                // Only update the existing command if it exists
                                 if (aiChatPane != null && !aiChatPane.IsDisposed)
                                 {
-                                    aiChatPane.UpdateCommandStatus(userMessage, "Failed");
+                                    var currentCommand = aiChatPane.GetCurrentCommand();
+                                    if (currentCommand != null)
+                                    {
+                                        currentCommand.Status = "Failed";
+                                        currentCommand.AIResponse = cleanText;
+                                        aiChatPane.UpdateCommandStatus(currentCommand);
+                                    }
                                 }
                             }
                             

@@ -246,9 +246,7 @@
     can be found.
   -->
   <ItemGroup>
-    <Compile Include="AIChatPane.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Include="AIChatPane.cs" />
     <Compile Include="ChatManager.cs" />
     <Compile Include="VisioCommandProcessor.cs" />
     <Compile Include="LibraryManager.cs" />

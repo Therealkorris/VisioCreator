@@ -129,7 +129,7 @@ namespace VisioPlugin
             return null;
         }
 
-        public void AddShapeToDocument(string categoryName, string shapeName, double xPercent, double yPercent, double widthPercent, double heightPercent)
+        public Visio.Shape AddShapeToDocument(string categoryName, string shapeName, double xPercent, double yPercent, double widthPercent, double heightPercent)
         {
             try
             {
@@ -139,7 +139,7 @@ namespace VisioPlugin
                 if (activePage == null)
                 {
                     Debug.WriteLine("[AddShapeToDocument] [Error] No active page found in Visio application.");
-                    return;
+                    return null;
                 }
 
                 // Retrieve page dimensions from Visio
@@ -150,7 +150,7 @@ namespace VisioPlugin
                 if (master == null)
                 {
                     Debug.WriteLine($"[AddShapeToDocument] [Error] Shape '{shapeName}' not found in category '{categoryName}'.");
-                    return;
+                    return null;
                 }
 
                 // Calculate scaled coordinates and size
@@ -172,17 +172,20 @@ namespace VisioPlugin
                 shape.Cells["Height"].ResultIU = shapeHeight;
 
                 Debug.WriteLine($"[AddShapeToDocument] Shape placed at (PinX={shape.Cells["PinX"].ResultIU}, PinY={shape.Cells["PinY"].ResultIU}) with final size Width={shape.Cells["Width"].ResultIU}, Height={shape.Cells["Height"].ResultIU}");
+
+                return shape;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[AddShapeToDocument] [Error] Error adding shape '{shapeName}' from category '{categoryName}': {ex.Message}");
                 Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+                return null;
             }
         }
 
         // New and enhanced functions for greater Visio control:
 
-        public void ConnectShapes(string shape1Name, string shape2Name, string connectorType)
+        public Visio.Shape ConnectShapes(string shape1Name, string shape2Name, string connectorType)
         {
             try
             {
@@ -215,28 +218,32 @@ namespace VisioPlugin
                 }
 
                 Debug.WriteLine($"Connected shapes: {shape1Name} and {shape2Name} with connector type: {connectorType}");
+                return connectorShape;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error connecting shapes: {ex.Message}");
+                return null;
             }
         }
 
-        public void AddTextToShape(string shapeName, string text)
+        public Visio.Shape AddTextToShape(string shapeName, string text)
         {
             try
             {
                 var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
                 shape.Text = text;
                 Debug.WriteLine($"Added text '{text}' to shape: {shapeName}");
+                return shape;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error adding text to shape: {ex.Message}");
+                return null;
             }
         }
 
-        public void SetShapeStyle(string shapeName, string lineStyle, string fillPattern)
+        public Visio.Shape SetShapeStyle(string shapeName, string lineStyle, string fillPattern)
         {
             try
             {
@@ -250,14 +257,16 @@ namespace VisioPlugin
                     shape.CellsU["FillPattern"].FormulaU = fillPattern;
                 }
                 Debug.WriteLine($"Set style for shape: {shapeName} (Line: {lineStyle}, Fill: {fillPattern})");
+                return shape;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error setting shape style: {ex.Message}");
+                return null;
             }
         }
 
-        public void GroupShapes(string[] shapeNames)
+        public Visio.Shape GroupShapes(string[] shapeNames)
         {
             try
             {
@@ -269,36 +278,56 @@ namespace VisioPlugin
                 }
                 var groupedShape = selection.Group();
                 Debug.WriteLine($"Grouped shapes: {string.Join(", ", shapeNames)} into {groupedShape.Name}");
+                return groupedShape;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error grouping shapes: {ex.Message}");
+                return null;
             }
         }
 
-        public void UngroupShapes(string shapeName)
+        public List<Visio.Shape> UngroupShapes(string shapeName)
         {
             try
             {
                 var shape = visioApplication.ActivePage.Shapes.ItemU[shapeName];
-                shape.Ungroup();
+                var ungroupedShapes = new List<Visio.Shape>();
+                
+                // Create a selection and select the shape to ungroup
+                var selection = visioApplication.ActiveWindow.Selection;
+                selection.DeselectAll();
+                selection.Select(shape, (short)Visio.VisSelectArgs.visSelect);
+                
+                // Ungroup and collect the resulting shapes
+                selection.Ungroup();
+                foreach (Visio.Shape ungroupedShape in visioApplication.ActiveWindow.Selection)
+                {
+                    ungroupedShapes.Add(ungroupedShape);
+                }
+                
                 Debug.WriteLine($"Ungrouped shape: {shapeName}");
+                return ungroupedShapes;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error ungrouping shape: {ex.Message}");
+                return new List<Visio.Shape>();
             }
         }
 
-        public void AlignShapes(string[] shapeNames, string alignmentType)
+        public List<Visio.Shape> AlignShapes(string[] shapeNames, string alignmentType)
         {
             try
             {
                 var activePage = visioApplication.ActivePage;
                 var selection = activePage.CreateSelection(Visio.VisSelectionTypes.visSelTypeEmpty);
+                var shapes = new List<Visio.Shape>();
                 foreach (var shapeName in shapeNames)
                 {
-                    selection.Select(activePage.Shapes.ItemU[shapeName], (short)Visio.VisSelectArgs.visSelect);
+                    var shape = activePage.Shapes.ItemU[shapeName];
+                    selection.Select(shape, (short)Visio.VisSelectArgs.visSelect);
+                    shapes.Add(shape);
                 }
 
                 switch (alignmentType.ToLower())
@@ -324,22 +353,27 @@ namespace VisioPlugin
                 }
 
                 Debug.WriteLine($"Aligned shapes: {string.Join(", ", shapeNames)} to {alignmentType}");
+                return shapes;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error aligning shapes: {ex.Message}");
+                return new List<Visio.Shape>();
             }
         }
 
-        public void DistributeShapes(string[] shapeNames, string distributionType)
+        public List<Visio.Shape> DistributeShapes(string[] shapeNames, string distributionType)
         {
             try
             {
                 var activePage = visioApplication.ActivePage;
                 var selection = activePage.CreateSelection(Visio.VisSelectionTypes.visSelTypeEmpty);
+                var shapes = new List<Visio.Shape>();
                 foreach (var shapeName in shapeNames)
                 {
-                    selection.Select(activePage.Shapes.ItemU[shapeName], (short)Visio.VisSelectArgs.visSelect);
+                    var shape = activePage.Shapes.ItemU[shapeName];
+                    selection.Select(shape, (short)Visio.VisSelectArgs.visSelect);
+                    shapes.Add(shape);
                 }
 
                 switch (distributionType.ToLower())
@@ -353,10 +387,12 @@ namespace VisioPlugin
                 }
 
                 Debug.WriteLine($"Distributed shapes: {string.Join(", ", shapeNames)} {distributionType}");
+                return shapes;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error distributing shapes: {ex.Message}");
+                return new List<Visio.Shape>();
             }
         }
 
