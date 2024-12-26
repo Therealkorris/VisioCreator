@@ -1,0 +1,120 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "url": "http://127.0.0.1:11434/v1/models",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "options": {}
+        },
+        "id": "3c437576-7935-4457-b9de-f0e5d520f0c8",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          780,
+          580
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Extract the models from the HTTP request response (assuming they are inside \"data\")\nconst models = $input.first().json.data.map(model => model.id);\n\n// Return the models in a structured response\nreturn [\n  {\n    json: {\n      status: 'Success',\n      availableModels: models\n    }\n  }\n];\n"
+        },
+        "id": "e06e30ed-6e65-4eaf-a0ed-6e0619f0a50f",
+        "name": "Code",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          980,
+          580
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json.availableModels }}",
+          "options": {}
+        },
+        "id": "e6da1456-ab5e-45b6-8c0b-fa4e9ccc6757",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          1200,
+          580
+        ]
+      },
+      {
+        "parameters": {
+          "content": "## Connection and Ollama\n** Connects via Webhook, and connects to API\n** List models back to AIChatPane",
+          "height": 300,
+          "width": 956
+        },
+        "id": "53ac8f95-c143-4c5d-b6fe-a81ad361b616",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          460,
+          460
+        ]
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "/connection_model_list",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "ff2c634d-ca57-4838-b3b3-251d84cb8cd6",
+        "name": "API_Connection_model_visio",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          540,
+          580
+        ],
+        "webhookId": "0b982041-1f25-44b1-947c-d68c5e827e57"
+      }
+    ],
+    "connections": {
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Code",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API_Connection_model_visio": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {}
+  }

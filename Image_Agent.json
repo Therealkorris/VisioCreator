@@ -2,18 +2,96 @@
   "nodes": [
     {
       "parameters": {
+        "options": {
+          "allowFileUploads": true,
+          "allowedFilesMimeTypes": "*"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1140,
+        -760
+      ],
+      "id": "b5cd197d-7041-4f26-bb7f-272c4e5196d6",
+      "name": "When chat message received",
+      "webhookId": "814a71cf-ee3f-4631-b9af-38d94773f5b6"
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "http://localhost:5680/visio-command/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "1452a6c0-7a20-4753-8d82-cc5c5e4993df",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### System:\nYou are an Image Agent responsible for analyzing images and generating structured JSON commands for a Visio-like system. You must interpret the image content and translate it into valid JSON commands.\n\n### Instructions:\n1. **Analyze the Image:** Examine the provided image to identify all visible objects, their shapes, sizes, positions, and colors.\n2. **Extract Key Details:** For each object in the image, determine the following:\n   - Shape type (e.g., circle, rectangle, triangle).\n   - Position (top-left corner coordinates \"x\" and \"y\" on a 100x100 unit canvas).\n   - Size (width and height of the shape in units).\n   - Color (identify the dominant color of the object).\n\n### Output Format:\nYour output must strictly conform to the following JSON structure:\n```\n{\n  \"command\": \"CreateShape\",\n  \"parameters\": {\n    \"shapes\": [\n      {\n        \"shapeType\": \"<type>\",\n        \"position\": {\"x\": <x>, \"y\": <y>},\n        \"size\": {\"width\": <width>, \"height\": <height>},\n        \"color\": \"<color>\"\n      }\n    ]\n  }\n}\n```\n\n### Guidelines:\n1. Ensure all coordinates \"x\" and \"y\" are within the range 0 to 100 (canvas boundaries).\n2. Adjust object sizes and positions to fit entirely within the canvas if necessary.\n3. Avoid overlapping shapes unless explicitly required.\n4. If no size is specified, use a default size of width: 10 and height: 10 units.\n5. Ensure every shape entry includes \"shapeType\", \"position\", \"size\", and \"color\" fields.\n6. Distribute multiple shapes evenly across the canvas when positions are unspecified.\n\n### Image Input:\n{{ $binary.image }}\n\n### Schema:\n{{ $json.schema }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "### Image Input\n{{ $binary.image }}"
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "messageType": "imageBinary",
+              "binaryImageDataKey": "image"
+            }
+          ]
+        }
+      },
+      "id": "1b0be5dc-627f-42b8-bdf9-df860880930f",
+      "name": "Image Agent2",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -460,
+        880
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "id": "d11a1fc2-304d-4b34-b727-f2c97fe273d0",
+      "name": "Respond to Webhook2",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        440,
+        980
+      ]
+    },
+    {
+      "parameters": {
         "model": "llama3.2-vision:latest",
         "options": {
           "format": "json"
         }
       },
-      "id": "1436b311-9a06-40bd-a30d-952cfd184783",
-      "name": "Image Chat Model",
+      "id": "44982f90-17da-4014-b46e-85cd04b2d13a",
+      "name": "Image Chat Model2",
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
-        360,
-        780
+        -620,
+        1100
       ],
       "credentials": {
         "ollamaApi": {
@@ -29,56 +107,131 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "f1978354-c47f-414f-8a3c-bfcc4cbf413f",
+      "id": "688a3885-87d3-4907-8bc7-0f8a30f4cfd0",
       "name": "Image Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        80,
-        160
+        -1120,
+        880
       ],
       "webhookId": "image-webhook-id"
     },
     {
       "parameters": {
+        "model": "vanilj/Phi-4:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        1460
+      ],
+      "id": "324b3ffc-72e5-40b2-82de-f3cee658ea19",
+      "name": "Ollama Model2",
+      "credentials": {
+        "ollamaApi": {
+          "id": "ScoyOTvEmGxVsfpn",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "prompt": "=Instructions:\n--------------\nAnalyze the provided image and identify the shapes visible in the image. For each shape, extract the following details: shape type (e.g., circle, rectangle, triangle), position (x, y coordinates), size (width and height), and color (dominant color of the shape). Ensure the JSON output conforms to the schema and all shapes fit within a 100x100 unit canvas.\n--------------\nCompletion:\n--------------\nThe completion should provide valid JSON output in the following structure:\n```\n{\n  \"command\": \"CreateShape\",\n  \"parameters\": {\n    \"shapes\": [\n      {\n        \"shapeType\": \"<type>\",\n        \"position\": {\"x\": <x>, \"y\": <y>},\n        \"size\": {\"width\": <width>, \"height\": <height>},\n        \"color\": \"<color>\"\n      }\n    ]\n  }\n}\n```\n--------------\n\nAbove, the completion did not satisfy the constraints given in the Instructions. If the completion deviates from the schema, adjust to ensure compliance and fix errors like missing fields, invalid coordinates, or unsupported values.\nError:\n--------------\n{error}\n--------------\n\nPlease try again. Provide an answer that fully satisfies the constraints laid out in the Instructions."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        1240
+      ],
+      "id": "4565b85c-e5a5-41e0-ac09-549eeb163e7e",
+      "name": "Auto-fixing Output Parser"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "const commandSchema = {\n  \"type\": \"object\",\n  \"properties\": {\n    \"command\": {\n      \"type\": \"string\",\n      \"description\": \"The command to be executed in Visio. Currently, only 'CreateShape' is supported.\"\n    },\n    \"parameters\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"shapes\": {\n          \"type\": \"array\",\n          \"description\": \"An array of shapes to be created. Each object in the array represents a single shape.\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"shapeType\": {\n                \"type\": \"string\",\n                \"description\": \"The type of shape to create (e.g., 'rectangle', 'circle', 'triangle').\"\n              },\n              \"position\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"x\": {\n                    \"type\": \"number\",\n                    \"description\": \"The x-coordinate of the shape's position on the canvas (0-100).\"\n                  },\n                  \"y\": {\n                    \"type\": \"number\",\n                    \"description\": \"The y-coordinate of the shape's position on the canvas (0-100).\"\n                  }\n                },\n                \"required\": [\"x\", \"y\"],\n                \"additionalProperties\": false\n              },\n              \"size\": {\n                \"type\": \"object\",\n                \"properties\": {\n                  \"width\": {\n                    \"type\": \"number\",\n                    \"description\": \"The width of the shape.\"\n                  },\n                  \"height\": {\n                    \"type\": \"number\",\n                    \"description\": \"The height of the shape.\"\n                  }\n                },\n                \"required\": [\"width\", \"height\"],\n                \"additionalProperties\": false\n              },\n              \"color\": {\n                \"type\": \"string\",\n                \"description\": \"The color of the shape (e.g., 'red', 'blue', 'green').\"\n              }\n            },\n            \"required\": [\"shapeType\", \"position\", \"size\"],\n            \"additionalProperties\": false\n          }\n        }\n      },\n      \"required\": [\"shapes\"],\n      \"additionalProperties\": false\n    }\n  },\n  \"required\": [\"command\", \"parameters\"],\n  \"additionalProperties\": false\n};\n\nreturn {\n  schema: JSON.stringify(commandSchema)\n};"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -240,
+        1460
+      ],
+      "id": "8dd51f21-084e-4de7-99a1-4b7aca91f463",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
         "promptType": "define",
-        "text": "=You are a helpful assistant that describes images in detail.\n\nDescribe what this image is about",
+        "text": "=### Image Input:\n{{ $binary.data0 }}\n\n### User Input:\n{{ $json.chatInput }}\n",
+        "hasOutputParser": true,
         "messages": {
           "messageValues": [
             {
-              "message": "=You are a helpful assistant that describes images in detail.\n\nDescribe what this image is about"
+              "message": "=### System:\nYou are Vision AI, describe what you see in details, if objects are detected, detect coordinate x and y on the different figures, tell me their figure, their coordinate in a 0-100 scale x, y, and their color. \n\n### Image Input:\n{{ $binary.data0 }}"
             },
             {
               "type": "HumanMessagePromptTemplate",
               "messageType": "imageBinary",
-              "binaryImageDataKey": "data"
+              "binaryImageDataKey": "data0"
             }
           ]
         }
       },
-      "id": "5cf3a158-5e3e-4681-af3f-a06227d98ff7",
-      "name": "Image Agent",
+      "id": "c57a5b2a-1a8d-4fd2-9d75-e65335213715",
+      "name": "Image Agent1",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.4,
-      "position": [500, 180],
+      "position": [
+        -780,
+        -760
+      ],
       "alwaysOutputData": false
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://localhost:5678/webhook/chat-agent",
+        "model": "llama3.2-vision:latest",
+        "options": {
+          "format": "json"
+        }
+      },
+      "id": "5ffdb5bb-f35d-4285-a3ca-5e0c97fe3c1f",
+      "name": "Image Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -740,
+        -480
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ScoyOTvEmGxVsfpn",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "http://localhost:5680/visio-command/",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"message\": {\n    \"route\": \"action_agent\",\n    \"reply\": {{ $json.output }}\n  }\n}",
+        "jsonBody": "={{ $json.output }}",
         "options": {}
       },
-      "id": "25c69334-c48a-4c4e-8a17-27fc3550a1fb",
-      "name": "Send to Action Agent",
+      "id": "969a145f-c208-44e9-bde0-9e50aa7d7fe4",
+      "name": "HTTP Request2",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        980,
-        600
+        160,
+        -880
       ]
     },
     {
@@ -87,63 +240,63 @@
         "responseBody": "={{ $json.output }}",
         "options": {}
       },
-      "id": "7c94df84-5b11-4edf-9030-e132567fecc8",
-      "name": "Respond to Webhook",
+      "id": "9dcb519f-9180-497b-aa6e-da778701d716",
+      "name": "Respond to Webhook1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        980,
-        340
+        160,
+        -660
       ]
     },
     {
       "parameters": {
-        "url": "=https://images.pexels.com/photos/1267338/pexels-photo-1267338.jpeg?auto=compress&cs=tinysrgb&w=600",
-        "options": {}
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"command\": \"CreateShape\",\n  \"parameters\": {\n    \"shapes\": [\n      {\n        \"shapeType\": \"rectangle\",\n        \"position\": {\"x\": 0, \"y\": 0},\n        \"size\": {\"width\": 10, \"height\": 10},\n        \"color\": \"red\"\n      }\n    ]\n  }\n}\n"
       },
-      "id": "1abcf929-9d18-4cc0-a9b7-3877adcf2463",
-      "name": "Get Image",
-      "type": "n8n-nodes-base.httpRequest",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
       "position": [
-        320,
-        340
+        -520,
+        -500
       ],
-      "typeVersion": 4.2
-    },
-    {
-      "parameters": {
-        "options": {
-          "allowFileUploads": true,
-          "allowedFilesMimeTypes": "*"
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        80,
-        340
-      ],
-      "id": "f2597b26-1b98-4266-963e-4342ce4428f7",
-      "name": "When chat message received",
-      "webhookId": "814a71cf-ee3f-4631-b9af-38d94773f5b6"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Standardize binary data field name to 'data'\nconst item = $input.first();\n\nif (item.binary) {\n    // If from chat (data0)\n    if (item.binary.data0) {\n        return {\n            binary: {\n                data: item.binary.data0\n            }\n        };\n    }\n    // If from webhook (image)\n    else if (item.binary.image) {\n        return {\n            binary: {\n                data: item.binary.image\n            }\n        };\n    }\n}\n\n// If no binary data found, return empty\nreturn {\n    binary: {\n        data: null\n    }\n};"
-      },
-      "id": "standardize-data",
-      "name": "Standardize Data",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [380, 180]
+      "id": "1b626709-522e-40b5-b40a-288c1dc5b428",
+      "name": "Structured Output Parser4"
     }
   ],
   "connections": {
-    "Image Chat Model": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Image Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Agent2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Chat Model2": {
       "ai_languageModel": [
         [
           {
-            "node": "Image Agent",
+            "node": "Image Agent2",
             "type": "ai_languageModel",
             "index": 0
           }
@@ -154,68 +307,79 @@
       "main": [
         [
           {
-            "node": "Get Image",
+            "node": "Image Agent2",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Image Agent": {
+    "Ollama Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Image Agent2",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Agent1": {
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "HTTP Request2",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Send to Action Agent",
+            "node": "Respond to Webhook1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Image": {
-      "main": [
+    "Image Chat Model1": {
+      "ai_languageModel": [
         [
           {
-            "node": "Image Agent",
-            "type": "main",
+            "node": "Image Agent1",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "When chat message received": {
-      "main": [
+    "Structured Output Parser4": {
+      "ai_outputParser": [
         [
           {
-            "node": "Get Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge2": {
-      "main": [
-        [
-          {
-            "node": "Standardize Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Standardize Data": {
-      "main": [
-        [
-          {
-            "node": "Image Agent",
-            "type": "main",
+            "node": "Image Agent1",
+            "type": "ai_outputParser",
             "index": 0
           }
         ]

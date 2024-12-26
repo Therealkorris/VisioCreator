@@ -1,4 +1,3 @@
-
 ## 1. Introduction
 ***Visio AI-Assistant Plugin: Overview and Capabilities***
 
@@ -8,38 +7,38 @@ This document provides a comprehensive overview of the Visio AI-Assistant Plugin
 
 ### 2.1. AI-Powered Chat Interface
 
-*   **Natural Language Interaction:** Communicate with the AI using everyday language. No need to remember complex commands or menus.
-*   **Custom Task Pane:** A dedicated "AI Chat Pane" is integrated into the Visio interface, providing a seamless chat experience.
-*   **Chat History:**  The chat pane displays a history of your interactions with the AI, allowing you to easily track your progress.
-*   **Model Selection:** Choose from a list of available AI models to find the one that best suits your needs.
-*   **Status Panel:** Monitor the execution of your commands with a dedicated panel, displaying success or failure notifications for each action.
-*   **Image Upload and Processing:** Upload images directly into the chat and let the AI process them, performing actions based on the image content.
+*   **Natural Language Interaction:** Communicate with the AI using everyday language to create and modify diagrams.
+*   **Custom Task Pane:** A dedicated "AI Chat Pane" integrated into the Visio interface.
+*   **Chat History:** View and track your conversation history with the AI.
+*   **Model Selection:** Choose from available Ollama AI models.
+*   **Status Panel:** Monitor command execution with success/failure notifications.
+*   **Image Upload:** Upload images for AI processing and diagram creation.
 
 ### 2.2. Real-time Diagram Editing
 
-*   **Instant Feedback:** See your changes reflected on the Visio canvas immediately as the AI processes your commands.
-*   **Automated Actions:** The AI can perform a wide range of actions, including:
-    *   **Adding Shapes:** Create new shapes based on your descriptions (e.g., "add a red circle", "create a square").
-    *   **Connecting Shapes:** Automatically connect shapes with appropriate connectors.
-    *   **Styling Shapes:** Modify the appearance of shapes, including color, line style, and fill.
-    *   **Adding Text:** Add text labels to shapes.
-    *   **Grouping and Ungrouping:**  Combine shapes into groups or separate grouped shapes.
-    *   **Aligning and Distributing:**  Organize shapes neatly using alignment and distribution commands.
-    *   **Retrieving Shape Properties:** Get information about shapes, such as their position, size, color, and text.
-    *   **Retrieving Page Size:** Get the dimensions of the current Visio page.
-*   **Visual Confirmation:** The status panel provides clear visual feedback on the success or failure of each command.
+*   **Shape Management:**
+    *   **Adding Shapes:** Create shapes with specific types, positions, sizes, and colors.
+    *   **Connecting Shapes:** Create straight or curved connectors between shapes.
+    *   **Text Labels:** Add and modify text within shapes.
+    *   **Styling:** Customize shape appearance with colors, line styles, and fill patterns.
+    *   **Grouping:** Combine multiple shapes or ungroup existing shape groups.
+    *   **Alignment:** Align shapes horizontally or vertically.
+    *   **Distribution:** Distribute shapes evenly across space.
+*   **Information Retrieval:**
+    *   **Shape Properties:** Get details about shape position, size, and styling.
+    *   **Page Dimensions:** Retrieve current page size information.
 
 ### 2.3. Intelligent Automation
 
-*   **Library Management:** The plugin can access and utilize shapes from your Visio stencils.
-*   **Shape Catalog:** The available shapes are organized into a catalog, making it easy for the AI to understand your requests.
-*   **AI-Driven Actions:** The AI interprets your natural language commands and translates them into specific actions within Visio.
+*   **Stencil Integration:** Access and utilize shapes from installed Visio stencils.
+*   **Shape Catalog:** Organized catalog of available shapes for AI reference.
+*   **Command Processing:** Automatic translation of natural language to Visio actions.
 
-### 2.4. Seamless Integration
+### 2.4. System Architecture
 
-*   **Visio Add-in:** The plugin is built as a Visio COM Add-in, ensuring deep integration with the Visio application.
-*   **n8n Workflow:** The plugin communicates with a powerful n8n workflow that handles the AI processing.
-*   **Ollama Server:**  The n8n workflow interacts with a local Ollama server, which hosts the AI language models.
+*   **Visio Add-in:** COM Add-in with deep Visio integration.
+*   **n8n Workflow:** Handles AI processing and command generation.
+*   **Ollama Integration:** Local AI model hosting and processing.
 
 ## 3. How It Works
 
@@ -61,7 +60,7 @@ This document provides a comprehensive overview of the Visio AI-Assistant Plugin
 
 1. **Prerequisites:** Ensure you have Visio, Visual Studio (with .NET and Office development workloads), n8n, and Ollama installed and running.
 2. **Install the Plugin:** Build the Visio plugin solution in Visual Studio and run it. This will install the plugin into Visio.
-3. **Import n8n Workflow:** Import the `OngoingAgent.json` workflow into your n8n instance and activate it.
+3. **Import n8n Workflow:** Import the `Working__Agent_multi_creation.json`, `Image_agent.json`,`Get_Stensils.json`,`Visio_connection_Ollama.json`, workflow into your n8n instance and activate it.
 4. **Connect:** In the plugin's Ribbon tab, click "Connect" to establish communication with the AI server (via n8n).
 5. **Select a Model:** Choose an AI model from the dropdown menu in the "AI Chat Pane."
 6. **Start Chatting:** Type your commands into the chat input box and press Enter or click "Send."
