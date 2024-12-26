@@ -862,7 +862,8 @@ namespace VisioPlugin
             var affectedShapesBox = new ListBox
             {
                 Height = 100,
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                SelectionMode = SelectionMode.MultiExtended  // Allow multiple selection
             };
 
             if (details.AffectedShapes?.Any() == true)
@@ -871,8 +872,55 @@ namespace VisioPlugin
                 foreach (var shape in details.AffectedShapes)
                 {
                     Debug.WriteLine($"[ShowCommandDetails] Adding to ListBox: {shape}");
-                    affectedShapesBox.Items.Add(shape.ToString());
+                    affectedShapesBox.Items.Add(shape);
                 }
+
+                // Handle shape selection changes
+                affectedShapesBox.SelectedIndexChanged += (sender, e) =>
+                {
+                    try
+                    {
+                        var visioApp = Globals.ThisAddIn.Application;
+                        var activePage = visioApp.ActivePage;
+
+                        // Clear existing selection
+                        visioApp.ActiveWindow.Selection.DeselectAll();
+
+                        // Get all selected shapes
+                        if (affectedShapesBox.SelectedItems.Count > 0)
+                        {
+                            foreach (ShapeInfo selectedShape in affectedShapesBox.SelectedItems)
+                            {
+                                try
+                                {
+                                    Debug.WriteLine($"[ShowCommandDetails] Selecting shape with ID: {selectedShape.ShapeId}");
+                                    var shape = activePage.Shapes.ItemFromID[int.Parse(selectedShape.ShapeId)];
+                                    if (shape != null)
+                                    {
+                                        visioApp.ActiveWindow.Select(shape, (short)Visio.VisSelectArgs.visSelect);
+                                        Debug.WriteLine($"[ShowCommandDetails] Successfully selected shape: {selectedShape}");
+                                    }
+                                }
+                                catch (Exception shapeEx)
+                                {
+                                    Debug.WriteLine($"[ShowCommandDetails] Error selecting shape {selectedShape.ShapeId}: {shapeEx.Message}");
+                                }
+                            }
+
+                            // If any shapes were selected, adjust the view
+                            var selection = visioApp.ActiveWindow.Selection;
+                            if (selection.Count > 0)
+                            {
+                                visioApp.ActiveWindow.Zoom = -1; // Fit selection to window
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ShowCommandDetails] Error in shape selection: {ex.Message}");
+                        MessageBox.Show($"Error selecting shapes: {ex.Message}", "Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                };
             }
             else
             {

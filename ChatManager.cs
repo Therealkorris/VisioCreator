@@ -228,13 +228,19 @@ namespace VisioPlugin
                 var commandDetails = chatPane.GetCurrentCommand();
                 if (commandDetails == null)
                 {
-                    Debug.WriteLine("[ProcessAIResponse] No existing command found, this shouldn't happen!");
-                    return;
+                    Debug.WriteLine("[ProcessAIResponse] Creating new command");
+                    commandDetails = new CommandDetails
+                    {
+                        UserMessage = userMessage,
+                        Command = "Summary of created shapes",
+                        Status = "Processing"
+                    };
+                    await Task.Run(() => chatPane.UpdateCommandStatus(commandDetails));
                 }
 
                 // Extract chat message
                 string chatMessage = IsValidJson(aiResponse) 
-                    ? ExtractChatMessage(JObject.Parse(aiResponse)) 
+                    ? await Task.Run(() => ExtractChatMessage(JObject.Parse(aiResponse))) 
                     : aiResponse;
 
                 // Update command details
@@ -244,7 +250,10 @@ namespace VisioPlugin
                 appendToChatHistory($"AI: {chatMessage}");
 
                 // Update status
-                chatPane.UpdateCommandStatus(commandDetails);
+                await Task.Run(() => chatPane.UpdateCommandStatus(commandDetails));
+                
+                // Reset current command to allow new commands
+                chatPane.ResetCurrentCommand();
             }
             catch (Exception ex)
             {
@@ -254,7 +263,8 @@ namespace VisioPlugin
                 {
                     commandDetails.Status = "Failed";
                     commandDetails.AIResponse = ex.Message;
-                    chatPane.UpdateCommandStatus(commandDetails);
+                    await Task.Run(() => chatPane.UpdateCommandStatus(commandDetails));
+                    chatPane.ResetCurrentCommand();
                 }
             }
         }
