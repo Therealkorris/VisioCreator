@@ -13,7 +13,7 @@ namespace VisioPlugin
     {
         public string SelectedModel { get; set; } // Now with a setter!
         private readonly string apiEndpoint;
-        private readonly HttpClient httpClient;
+        private static readonly HttpClient httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
         private readonly LibraryManager libraryManager;
         private readonly Action<string> appendToChatHistory;
         private readonly VisioCommandProcessor commandProcessor;
@@ -23,7 +23,6 @@ namespace VisioPlugin
         {
             this.SelectedModel = model; // Initialize SelectedModel
             this.apiEndpoint = apiEndpoint;
-            this.httpClient = new HttpClient();
             this.libraryManager = libraryManager;
             this.appendToChatHistory = appendToChatHistory;
             this.commandProcessor = new VisioCommandProcessor(Globals.ThisAddIn.Application, libraryManager);

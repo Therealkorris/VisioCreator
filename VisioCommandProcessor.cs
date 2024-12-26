@@ -14,6 +14,7 @@ namespace VisioPlugin
     {
         private readonly Visio.Application visioApplication;
         private readonly LibraryManager libraryManager;
+        private static readonly HttpClient httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
 
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
@@ -382,20 +383,16 @@ namespace VisioPlugin
             string propertiesJson = libraryManager.GetShapeProperties(shapeName);
 
             // Send the properties back to the AI (via n8n)
-            // You'll need to set up an HTTP client to send the data back to your n8n webhook
-            using (var client = new HttpClient())
+            try
             {
-                try
-                {
-                    var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync("http://localhost:5678/chat-agent", content); // Replace with your n8n webhook URL
-                    response.EnsureSuccessStatusCode();
-                    Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] [Error] Failed to send properties to n8n: {ex.Message}");
-                }
+                var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync("http://localhost:5678/chat-agent", content); // Replace with your n8n webhook URL
+                response.EnsureSuccessStatusCode();
+                Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] [Error] Failed to send properties to n8n: {ex.Message}");
             }
         }
 
@@ -405,19 +402,16 @@ namespace VisioPlugin
             string pageSizeJson = libraryManager.GetPageSize();
 
             // Send the page size back to the AI (via n8n)
-            using (var client = new HttpClient())
+            try
             {
-                try
-                {
-                    var content = new StringContent(pageSizeJson, Encoding.UTF8, "application/json");
-                    var response = await client.PostAsync("http://localhost:5680/chat-agent", content); // Replace with your n8n webhook URL
-                    response.EnsureSuccessStatusCode();
-                    Debug.WriteLine($"[ExecuteGetPageSizeCommand] Sent page size to n8n.");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[ExecuteGetPageSizeCommand] [Error] Failed to send page size to n8n: {ex.Message}");
-                }
+                var content = new StringContent(pageSizeJson, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync("http://localhost:5680/chat-agent", content); // Replace with your n8n webhook URL
+                response.EnsureSuccessStatusCode();
+                Debug.WriteLine($"[ExecuteGetPageSizeCommand] Sent page size to n8n.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExecuteGetPageSizeCommand] [Error] Failed to send page size to n8n: {ex.Message}");
             }
         }
     }
