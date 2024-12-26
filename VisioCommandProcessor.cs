@@ -103,6 +103,11 @@ namespace VisioPlugin
                 {
                     await ExecuteGetPageSizeCommand(commandObject["parameters"] as JObject);
                 }
+                else if (commandType == "CreateTextBox")
+                {
+                    ExecuteCreateTextBoxCommand(commandObject["parameters"] as JObject);
+                }
+
                 else
                 {
                     Debug.WriteLine($"[ProcessCommand] [Error] Unsupported command type: {commandType}");
@@ -311,6 +316,74 @@ namespace VisioPlugin
             libraryManager.SetShapeStyle(shapeName, lineStyle, fillPattern);
             await Task.CompletedTask;
         }
+
+        private void ExecuteCreateTextBoxCommand(JObject parameters)
+        {
+            string content = parameters["content"]?.ToString();
+            JObject position = parameters["position"] as JObject;
+            double xPercent = position?["x"]?.Value<double>() ?? 0;
+            double yPercent = position?["y"]?.Value<double>() ?? 0;
+            double fontSize = parameters["fontSize"]?.Value<double>() ?? 12;
+            string color = parameters["color"]?.ToString() ?? "black";
+
+            if (string.IsNullOrEmpty(content) || position == null)
+            {
+                Debug.WriteLine("[ExecuteCreateTextBoxCommand] [Error] Missing content or position.");
+                return;
+            }
+
+            var activePage = visioApplication.ActivePage;
+            if (activePage == null)
+            {
+                Debug.WriteLine("[ExecuteCreateTextBoxCommand] [Error] No active page found.");
+                return;
+            }
+
+            try
+            {
+                // Create a tiny rectangle to host the text
+                double smallWidth = 0.01; // Very small width
+                double smallHeight = 0.01; // Very small height
+
+                double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+                double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+
+                // Calculate coordinates in Visio units
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = ((100 - yPercent) / 100.0) * pageHeight; // Visio Y-axis is inverted
+
+                // Draw a small rectangle
+                var textShape = activePage.DrawRectangle(visioX - smallWidth / 2, visioY - smallHeight / 2, visioX + smallWidth / 2, visioY + smallHeight / 2);
+
+                // Add text to the rectangle
+                textShape.Text = content;
+
+                // Set font size and color
+                textShape.CellsU["Char.Size"].FormulaU = fontSize.ToString();
+                textShape.CellsU["Char.Color"].FormulaU = $"RGB({ConvertColorToRGB(color)})";
+
+                Debug.WriteLine($"[ExecuteCreateTextBoxCommand] Added text box: '{content}' at ({visioX}, {visioY}).");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExecuteCreateTextBoxCommand] [Error] Failed to create text box: {ex.Message}");
+            }
+        }
+
+        // Helper method to convert color names to RGB values
+        private int ConvertColorToRGB(string colorName)
+        {
+            return colorName.ToLower() switch
+            {
+                "black" => 0,
+                "red" => 255,
+                "green" => 65280,
+                "blue" => 16711680,
+                _ => 0 // Default to black
+            };
+        }
+
+
 
         private async Task ExecuteGroupShapesCommand(JObject parameters)
         {

@@ -10,7 +10,9 @@ using System.Net.Http;
 using System.Text;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Net;
+using System.Collections.Concurrent;
 
 namespace VisioPlugin
 {
@@ -32,6 +34,9 @@ namespace VisioPlugin
         private VisioCommandProcessor commandProcessor;
         private HttpListener listener;
         private VisioChatManager visioChatManager;
+        private ConcurrentDictionary<string, HttpListenerContext> activeConnections = new ConcurrentDictionary<string, HttpListenerContext>();
+        private const int VISIO_PORT = 5680;
+        private const int N8N_PORT = 5678;
 
         protected override Microsoft.Office.Core.IRibbonExtensibility CreateRibbonExtensibilityObject()
         {
@@ -58,7 +63,7 @@ namespace VisioPlugin
                 visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, AppendToChatHistory, aiChatPane);
 
                 Debug.WriteLine("Starting webhook listener...");
-                _ = StartWebhookListener(5680);
+                _ = StartWebhookListener(VISIO_PORT);
             }
             catch (Exception ex)
             {
@@ -93,7 +98,7 @@ namespace VisioPlugin
                 var jsonString = JsonConvert.SerializeObject(shapesCatalog);
                 var content = new StringContent(jsonString, Encoding.UTF8, "application/json");
 
-                string n8nWebhookUrl = "http://localhost:5678/webhook/shape_catalog";
+                string n8nWebhookUrl = $"http://localhost:{N8N_PORT}/webhook/shape_catalog";
 
                 var response = await httpClient.PostAsync(n8nWebhookUrl, content);
                 response.EnsureSuccessStatusCode();
@@ -109,45 +114,130 @@ namespace VisioPlugin
         private async Task StartWebhookListener(int port)
         {
             listener = new HttpListener();
-            listener.Prefixes.Add($"http://localhost:{port}/visio-command/");
-            listener.Prefixes.Add($"http://localhost:{port}/list-shapes/");
-            listener.Prefixes.Add($"http://localhost:{port}/image-agent/"); // Changed path
+            
+            // Add all necessary prefixes
+            string[] endpoints = {
+                "visio-command",
+                "list-shapes",
+                "image-agent",
+                "chat-agent"
+            };
+
+            foreach (var endpoint in endpoints)
+            {
+                var prefix = $"http://localhost:{port}/{endpoint}/";
+                listener.Prefixes.Add(prefix);
+                Debug.WriteLine($"Added listener prefix: {prefix}");
+            }
+
             try
             {
                 listener.Start();
-                Debug.WriteLine($"Webhook Listening for Visio commands on port {port}");
+                Debug.WriteLine($"Webhook Listening on port {port}");
+                
                 while (listener.IsListening)
                 {
-                    HttpListenerContext context = await listener.GetContextAsync();
-                    string requestPath = context.Request.Url.LocalPath;
-                    if (requestPath == "/list-shapes/")
+                    try 
                     {
-                        await HandleListShapesRequest(context);
-                    }
-                    else if (requestPath == "/image-agent/")
-                    {
-                        string jsonResponse = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
-                        Debug.WriteLine($"[Image-Agent] Received: {jsonResponse}");
-                        AppendToChatHistory($"AI: {jsonResponse}");
+                        HttpListenerContext context = await listener.GetContextAsync();
+                        string requestPath = context.Request.Url.LocalPath;
+                        string requestId = Guid.NewGuid().ToString();
 
-                        // Optional: Process the response in a custom way if needed
-                    }
-                    else
-                    {
-                        string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
-                        await ProcessWebhookCommand(jsonCommand);
-                    }
+                        Debug.WriteLine($"Received request on path: {requestPath}");
 
-                    HttpListenerResponse response = context.Response;
-                    byte[] buffer = Encoding.UTF8.GetBytes("Request processed.");
-                    response.ContentLength64 = buffer.Length;
-                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
-                    response.OutputStream.Close();
+                        // Store the context for later use
+                        activeConnections[requestId] = context;
+
+                        if (requestPath == "/list-shapes/")
+                        {
+                            await HandleListShapesRequest(context);
+                            CompleteRequest(requestId);
+                        }
+                        else if (requestPath == "/image-agent/")
+                        {
+                            string jsonResponse = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                            Debug.WriteLine($"[Image-Agent] Received: {jsonResponse}");
+                            AppendToChatHistory($"AI: {jsonResponse}");
+                            CompleteRequest(requestId);
+                        }
+                        else if (requestPath == "/chat-agent/")
+                        {
+                            string jsonString = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                            Debug.WriteLine($"[Chat-Agent] Received JSON: {jsonString}");
+                            string userMessage = "Summary of created shapes"; // Default message for status
+                            
+                            try 
+                            {
+                                // Try to extract plain text from the JSON structure
+                                string plainText = ExtractPlainText(jsonString);
+                                Debug.WriteLine($"[Chat-Agent] Extracted plain text: {plainText}");
+                                
+                                // Format the text to remove duplicates and improve readability
+                                string[] lines = plainText.Split(new[] { '\n', '.' }, StringSplitOptions.RemoveEmptyEntries);
+                                var uniqueLines = new HashSet<string>(lines.Select(l => l.Trim()));
+                                string formattedText = string.Join("\n", uniqueLines.Where(l => !string.IsNullOrWhiteSpace(l)));
+                                
+                                AppendToChatHistory($"AI: {formattedText}");
+                                
+                                // Update command status
+                                if (aiChatPane != null && !aiChatPane.IsDisposed)
+                                {
+                                    aiChatPane.UpdateCommandStatus(userMessage, "Success");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                // If parsing fails, try to clean up the raw string
+                                Debug.WriteLine($"[Chat-Agent] Failed to parse JSON: {ex.Message}");
+                                string cleanText = CleanupJsonText(jsonString);
+                                AppendToChatHistory($"AI: {cleanText}");
+                                
+                                // Update command status even if there was an error
+                                if (aiChatPane != null && !aiChatPane.IsDisposed)
+                                {
+                                    aiChatPane.UpdateCommandStatus(userMessage, "Failed");
+                                }
+                            }
+                            
+                            CompleteRequest(requestId);
+                        }
+                        else if (requestPath == "/visio-command/")
+                        {
+                            string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                            Debug.WriteLine($"[Visio-Command] Received command: {jsonCommand}");
+                            await ProcessWebhookCommand(jsonCommand);
+                            await Task.Delay(200); // Increased delay to ensure command processing
+                            CompleteRequest(requestId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error processing request: {ex.Message}");
+                        continue; // Continue listening even if one request fails
+                    }
                 }
             }
             catch (HttpListenerException ex)
             {
                 Debug.WriteLine($"[Error] Failed to start listener on port {port}: {ex.Message}");
+            }
+        }
+
+        private void CompleteRequest(string requestId)
+        {
+            if (activeConnections.TryRemove(requestId, out HttpListenerContext context))
+            {
+                try
+                {
+                    byte[] buffer = Encoding.UTF8.GetBytes("Request processed.");
+                    context.Response.ContentLength64 = buffer.Length;
+                    context.Response.OutputStream.Write(buffer, 0, buffer.Length);
+                    context.Response.Close();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Error] Failed to complete request {requestId}: {ex.Message}");
+                }
             }
         }
 
@@ -424,6 +514,99 @@ namespace VisioPlugin
             }
 
             public IntPtr Handle { get; }
+        }
+
+        private string ExtractPlainText(string jsonString)
+        {
+            try
+            {
+                // First try to parse as a simple JSON object with a text/message property
+                var simpleObj = JsonConvert.DeserializeObject<dynamic>(jsonString);
+                
+                // Check for simple message or text property
+                if (simpleObj.message != null) return simpleObj.message.ToString();
+                if (simpleObj.text != null) return simpleObj.text.ToString();
+
+                // If it's a more complex structure, try to find the first non-empty string value
+                string plainText = FindFirstStringValue(simpleObj);
+                if (!string.IsNullOrEmpty(plainText)) return plainText;
+
+                // If we can't find a clear text value, convert the entire object to string
+                // and clean it up
+                string fullText = simpleObj.ToString();
+                return CleanupJsonText(fullText);
+            }
+            catch
+            {
+                // If parsing fails, try to clean up the raw string
+                return CleanupJsonText(jsonString);
+            }
+        }
+
+        private string FindFirstStringValue(dynamic jsonObj)
+        {
+            if (jsonObj == null) return string.Empty;
+
+            // If it's a simple string value
+            if (jsonObj.Type == JTokenType.String)
+                return jsonObj.Value;
+
+            // If it's an object, search through its properties
+            if (jsonObj.Type == JTokenType.Object)
+            {
+                foreach (var prop in jsonObj)
+                {
+                    string value = FindFirstStringValue(prop.Value);
+                    if (!string.IsNullOrEmpty(value))
+                        return value;
+                }
+            }
+
+            // If it's an array, search through its elements
+            if (jsonObj.Type == JTokenType.Array)
+            {
+                foreach (var item in jsonObj)
+                {
+                    string value = FindFirstStringValue(item);
+                    if (!string.IsNullOrEmpty(value))
+                        return value;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private string CleanupJsonText(string text)
+        {
+            // First remove all JSON artifacts
+            string cleaned = text
+                .Replace("\"", "")
+                .Replace("{", "")
+                .Replace("}", "")
+                .Replace("[", "")
+                .Replace("]", "")
+                .Replace("\\", "")
+                .Replace(",", " ")
+                .Replace(":", " ");
+
+            // Split into lines and remove duplicates
+            string[] lines = cleaned.Split(new[] { '\n', '.' }, StringSplitOptions.RemoveEmptyEntries);
+            var uniqueLines = new HashSet<string>(
+                lines.Select(l => l.Trim())
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .Where(l => !l.StartsWith("n"))  // Remove numbered lines (n1, n2, etc.)
+            );
+
+            // Join unique lines with proper formatting
+            string result = string.Join("\n", uniqueLines);
+
+            // Clean up any remaining multiple spaces
+            while (result.Contains("  "))
+            {
+                result = result.Replace("  ", " ");
+            }
+
+            return result.Trim();
         }
 
         #region VSTO generated code
