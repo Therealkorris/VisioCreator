@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
@@ -15,18 +16,24 @@ namespace VisioPlugin
         private readonly Visio.Application visioApplication;
         private readonly LibraryManager libraryManager;
         private static readonly HttpClient httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
+        private List<VisioPlugin.ShapeInfo> currentCommandShapes;
 
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
             visioApplication = visioApp ?? throw new ArgumentNullException(nameof(visioApp));
             this.libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
+            currentCommandShapes = new List<VisioPlugin.ShapeInfo>();
         }
 
-        public void ProcessCommand(string jsonCommand)
+        public List<VisioPlugin.ShapeInfo> ProcessCommand(string jsonCommand)
         {
+            Debug.WriteLine($"[ProcessCommand] Starting command: {jsonCommand}");
+            currentCommandShapes = new List<ShapeInfo>();
+
             try
             {
-                Debug.WriteLine($"[ProcessCommand] Received command: {jsonCommand}");
+                Debug.WriteLine($"[ProcessCommand] Clearing currentCommandShapes list");
+                currentCommandShapes.Clear();
                 JObject commandObject = JsonConvert.DeserializeObject<JObject>(jsonCommand);
 
                 string commandType = commandObject["command"]?.ToString();
@@ -34,7 +41,7 @@ namespace VisioPlugin
                 if (string.IsNullOrEmpty(commandType))
                 {
                     Debug.WriteLine($"[ProcessCommand] [Error] Unknown or missing command type.");
-                    return;
+                    return currentCommandShapes;
                 }
 
                 if (commandType.Equals("CreateShapes", StringComparison.OrdinalIgnoreCase))
@@ -45,6 +52,7 @@ namespace VisioPlugin
                 // Handle different command types
                 if (commandType == "CreateShape")
                 {
+                    Debug.WriteLine($"[ProcessCommand] Processing CreateShape command");
                     if (commandObject["parameters"]?["shapes"] is JArray shapesArray)
                     {
                         foreach (JObject shapeObject in shapesArray)
@@ -101,10 +109,20 @@ namespace VisioPlugin
                 {
                     Debug.WriteLine($"[ProcessCommand] [Error] Unsupported command type: {commandType}");
                 }
+
+                Debug.WriteLine($"[ProcessCommand] Command completed successfully. Total affected shapes: {currentCommandShapes.Count}");
+                var result = new List<ShapeInfo>(currentCommandShapes);
+                Debug.WriteLine($"[ProcessCommand] Returning {result.Count} shapes");
+                foreach (var shape in result)
+                {
+                    Debug.WriteLine($"[ProcessCommand] Returning shape: {shape}");
+                }
+                return result;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ProcessCommand] [Error] Failed to process command: {ex.Message}");
+                Debug.WriteLine($"[ProcessCommand] Error processing command: {ex.Message}");
+                return currentCommandShapes;
             }
         }
 
@@ -187,6 +205,17 @@ namespace VisioPlugin
             if (shape != null)
             {
                 Debug.WriteLine($"[CreateSingleShape] Created shape of type {shapeType} with ID: {shape.ID16}");
+                
+                // Track the created shape
+                var shapeInfo = new VisioPlugin.ShapeInfo 
+                { 
+                    ShapeId = shape.ID16.ToString(),
+                    ShapeType = shapeType,
+                    ShapeColor = color
+                };
+                currentCommandShapes.Add(shapeInfo);
+                Debug.WriteLine($"[CreateSingleShape] Added shape to tracking: {shapeInfo}");
+
                 if (!string.IsNullOrEmpty(color))
                 {
                     libraryManager.SetShapeColor(shape, color);

@@ -1,12 +1,14 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Net.Http;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
@@ -468,41 +470,20 @@ namespace VisioPlugin
             }
         }
 
-        public List<ShapeInfo> ListAllShapes()
+        public List<VisioPlugin.ShapeInfo> ListAllShapes()
         {
-            var shapes = new List<ShapeInfo>();
+            var shapes = new List<VisioPlugin.ShapeInfo>();
+            var activePage = visioApplication?.ActivePage;
+            if (activePage == null) return shapes;
 
-            try
+            foreach (Visio.Shape shape in activePage.Shapes)
             {
-                var activePage = visioApplication.ActivePage;
-                if (activePage == null)
+                shapes.Add(new VisioPlugin.ShapeInfo
                 {
-                    Debug.WriteLine("[ListAllShapes] [Error] No active page found in Visio.");
-                    return shapes;
-                }
-
-                foreach (Visio.Shape shape in activePage.Shapes)
-                {
-                    var shapeInfo = new ShapeInfo
-                    {
-                        Name = shape.Name,
-                        Type = shape.Master?.Name ?? "No Master",
-                        Position = new Position
-                        {
-                            X = shape.CellsU["PinX"].ResultIU,
-                            Y = shape.CellsU["PinY"].ResultIU
-                        },
-                        Color = shape.CellsU["FillForegnd"].FormulaU
-                    };
-
-                    shapes.Add(shapeInfo);
-                }
-
-                Debug.WriteLine($"[ListAllShapes] Retrieved {shapes.Count} shapes.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ListAllShapes] [Error] Error listing shapes: {ex.Message}");
+                    ShapeId = shape.ID16.ToString(),
+                    ShapeType = shape.Name,
+                    ShapeColor = shape.CellsU["FillForegnd"].ResultStr[""]
+                });
             }
 
             return shapes;
@@ -517,7 +498,7 @@ namespace VisioPlugin
         public ShapeCategory(string name)
         {
             Name = name;
-            shapes = new Dictionary<string, Visio.Master>(StringComparer.OrdinalIgnoreCase);
+            shapes = new Dictionary<string, Visio.Master>();
         }
 
         public void AddShape(string name, Visio.Master master)
@@ -532,17 +513,8 @@ namespace VisioPlugin
 
         public Visio.Master GetShape(string name)
         {
-            shapes.TryGetValue(name, out Visio.Master master);
-            return master;
+            return shapes.TryGetValue(name, out Visio.Master master) ? master : null;
         }
-    }
-
-    public class ShapeInfo
-    {
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public Position Position { get; set; }
-        public string Color { get; set; }
     }
 
     public class Position

@@ -286,7 +286,38 @@ namespace VisioPlugin
 
                 if (commandProcessor != null)
                 {
-                    await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand));
+                    var affectedShapes = await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand));
+                    Debug.WriteLine($"[ProcessWebhookCommand] Command processed. Received {affectedShapes?.Count ?? 0} shapes from processor");
+                    
+                    if (affectedShapes != null && affectedShapes.Any())
+                    {
+                        Debug.WriteLine("[ProcessWebhookCommand] Shapes received:");
+                        foreach (var shape in affectedShapes)
+                        {
+                            Debug.WriteLine($"[ProcessWebhookCommand] Shape: {shape}");
+                        }
+
+                        // Check if we can access AIChatPane
+                        if (aiChatPane != null && !aiChatPane.IsDisposed)
+                        {
+                            var currentCommand = aiChatPane.GetCurrentCommand();
+                            Debug.WriteLine($"[ProcessWebhookCommand] Current command found: {(currentCommand != null ? currentCommand.Id : "null")}");
+                            if (currentCommand != null)
+                            {
+                                currentCommand.AffectedShapes = new List<ShapeInfo>(affectedShapes);
+                                Debug.WriteLine($"[ProcessWebhookCommand] Added {affectedShapes.Count} shapes to command");
+                                aiChatPane.UpdateCommandStatus(currentCommand);
+                            }
+                            else
+                            {
+                                Debug.WriteLine("[ProcessWebhookCommand] No current command found in AIChatPane");
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[ProcessWebhookCommand] AIChatPane is null or disposed");
+                        }
+                    }
                     Debug.WriteLine("[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.");
                 }
                 else

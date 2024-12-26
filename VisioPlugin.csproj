@@ -248,47 +248,25 @@
   <ItemGroup>
     <Compile Include="AIChatPane.cs" />
     <Compile Include="ChatManager.cs" />
-    <Compile Include="VisioCommandProcessor.cs" />
     <Compile Include="LibraryManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <None Include="app.config" />
-    <None Include="Get_Stensils.json" />
-    <None Include="Image_Agent.json" />
-    <None Include="Instructions.md" />
-    <None Include="packages.config" />
-    <None Include="Properties\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
-    <Compile Include="Properties\Settings.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Settings.settings</DependentUpon>
-    </Compile>
     <Compile Include="RibbonExtension.cs" />
+    <Compile Include="ShapeInfo.cs" />
     <Compile Include="ThisAddIn.cs">
       <SubType>Code</SubType>
     </Compile>
-    <None Include="ThisAddIn.Designer.xml">
-      <DependentUpon>ThisAddIn.cs</DependentUpon>
-    </None>
     <Compile Include="ThisAddIn.Designer.cs">
-      <DependentUpon>ThisAddIn.Designer.xml</DependentUpon>
+      <DependentUpon>ThisAddIn.cs</DependentUpon>
     </Compile>
+    <Compile Include="VisioCommandProcessor.cs" />
     <AppDesigner Include="Properties\" />
-    <None Include="VisioPlugin_TemporaryKey.pfx" />
-    <None Include="Visio_connection_Ollama.json" />
-    <None Include="Working_Agent_multi_creation.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ThisAddIn.Designer.xml">
+      <DependentUpon>ThisAddIn.cs</DependentUpon>
+    </Content>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

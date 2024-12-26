@@ -85,68 +85,50 @@ namespace VisioPlugin
             }
         }
 
-        private async Task ProcessWebhookCommand(string aiResponse, string userMessage)
+        private async Task ProcessWebhookCommand(string commandId, string command)
         {
-            Debug.WriteLine("[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.");
-            CommandDetails commandDetails = null;
-            
+            Debug.WriteLine($"[ProcessWebhookCommand] Processing command: {commandId}");
+            var commandDetails = new CommandDetails
+            {
+                Id = commandId,
+                Timestamp = DateTime.Now,
+                Command = command,
+                Status = "Processing",
+                AffectedShapes = new List<ShapeInfo>()
+            };
+
             try
             {
-                // Get the current command before processing
-                commandDetails = chatPane.GetCurrentCommand();
-                if (commandDetails == null)
-                {
-                    Debug.WriteLine("[ProcessWebhookCommand] No active command found.");
-                    return;
-                }
+                Debug.WriteLine($"[ProcessWebhookCommand] Updating initial command status");
+                chatPane.UpdateCommandStatus(commandDetails);
 
-                // Process the Visio command if it's valid JSON
-                if (IsValidJson(aiResponse))
+                Debug.WriteLine($"[ProcessWebhookCommand] Processing Visio command");
+                var affectedShapes = await Task.Run(() => commandProcessor.ProcessCommand(command));
+                
+                Debug.WriteLine($"[ProcessWebhookCommand] Retrieved {affectedShapes?.Count ?? 0} affected shapes from Visio processor");
+                if (affectedShapes != null && affectedShapes.Any())
                 {
-                    Debug.WriteLine("[ProcessWebhookCommand] Processing Visio command...");
-                    await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
-                }
-
-                // Extract chat message from AI response
-                string chatMessage;
-                if (IsValidJson(aiResponse))
-                {
-                    var responseObject = JObject.Parse(aiResponse);
-                    chatMessage = ExtractChatMessage(responseObject);
+                    commandDetails.AffectedShapes = new List<ShapeInfo>(affectedShapes);
+                    Debug.WriteLine($"[ProcessWebhookCommand] Added {affectedShapes.Count} shapes to command details");
+                    foreach (var shape in affectedShapes)
+                    {
+                        Debug.WriteLine($"[ProcessWebhookCommand] Affected shape: {shape}");
+                    }
                 }
                 else
                 {
-                    chatMessage = aiResponse;
+                    Debug.WriteLine("[ProcessWebhookCommand] No shapes were affected by the command");
                 }
 
-                // Update command details
                 commandDetails.Status = "Success";
-                commandDetails.AIResponse = chatMessage;
-                commandDetails.VisioCommand = aiResponse;
-
-                // Add the AI response to chat history
-                appendToChatHistory($"AI: {chatMessage}");
-
-                // Update the command status
+                Debug.WriteLine($"[ProcessWebhookCommand] Updating final command status with {commandDetails.AffectedShapes?.Count ?? 0} affected shapes");
                 chatPane.UpdateCommandStatus(commandDetails);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ProcessWebhookCommand] Error: {ex.Message}");
-                if (commandDetails != null)
-                {
-                    commandDetails.Status = "Failed";
-                    commandDetails.AIResponse = $"Error: {ex.Message}";
-                    chatPane.UpdateCommandStatus(commandDetails);
-                }
-                throw;
-            }
-            finally
-            {
-                if (commandDetails != null)
-                {
-                    chatPane.ResetCurrentCommand();
-                }
+                commandDetails.Status = "Error: " + ex.Message;
+                chatPane.UpdateCommandStatus(commandDetails);
             }
         }
 
@@ -248,13 +230,6 @@ namespace VisioPlugin
                 {
                     Debug.WriteLine("[ProcessAIResponse] No existing command found, this shouldn't happen!");
                     return;
-                }
-
-                // Process Visio command if valid JSON
-                if (IsValidJson(aiResponse))
-                {
-                    Debug.WriteLine("[ProcessAIResponse] Processing Visio command...");
-                    await Task.Run(() => commandProcessor.ProcessCommand(aiResponse));
                 }
 
                 // Extract chat message

@@ -14,15 +14,17 @@ using Drawing = System.Drawing;
 
 namespace VisioPlugin
 {
+    // Using fully qualified name for ShapeInfo
     public class CommandDetails
     {
         public string Id { get; set; }
         public DateTime Timestamp { get; set; }
-        public string Command { get; set; }  // Display name for the command (e.g., "Create Shapes")
+        public string Command { get; set; }
         public string UserMessage { get; set; }
         public string AIResponse { get; set; }
-        public string VisioCommand { get; set; }  // The actual command JSON sent to Visio
+        public string VisioCommand { get; set; }
         public string Status { get; set; }
+        public List<VisioPlugin.ShapeInfo> AffectedShapes { get; set; }
 
         public CommandDetails()
         {
@@ -33,6 +35,7 @@ namespace VisioPlugin
             AIResponse = "";
             VisioCommand = "";
             Status = "";
+            AffectedShapes = new List<VisioPlugin.ShapeInfo>();
         }
 
         public override string ToString()
@@ -630,31 +633,56 @@ namespace VisioPlugin
 
             Debug.WriteLine($"[UpdateCommandStatus] Updating command: {details.Id}");
             Debug.WriteLine($"[UpdateCommandStatus] Status: {details.Status}");
+            Debug.WriteLine($"[UpdateCommandStatus] Affected shapes count: {details.AffectedShapes?.Count ?? 0}");
+
+            // Create a deep copy of the command details
+            var detailsCopy = new CommandDetails
+            {
+                Id = details.Id,
+                Timestamp = details.Timestamp,
+                Command = details.Command,
+                UserMessage = details.UserMessage,
+                AIResponse = details.AIResponse,
+                VisioCommand = details.VisioCommand,
+                Status = details.Status
+            };
+
+            // Make a deep copy of affected shapes
+            if (details.AffectedShapes != null)
+            {
+                detailsCopy.AffectedShapes = details.AffectedShapes.Select(s => new ShapeInfo
+                {
+                    ShapeId = s.ShapeId,
+                    ShapeType = s.ShapeType,
+                    ShapeColor = s.ShapeColor
+                }).ToList();
+                Debug.WriteLine($"[UpdateCommandStatus] Copied {detailsCopy.AffectedShapes.Count} shapes to command history");
+            }
 
             // Store command in history
-            commandHistory[details.Id] = details;
+            commandHistory[detailsCopy.Id] = detailsCopy;
 
             // Update list view
             ListViewItem existingItem = null;
             foreach (ListViewItem item in commandStatusListView.Items)
             {
-                if (item.Tag?.ToString() == details.Id)
+                if (item.Tag?.ToString() == detailsCopy.Id)
                 {
                     existingItem = item;
                     break;
                 }
             }
 
-            string displayText = details.Command;
+            string displayText = detailsCopy.Command;
 
             if (existingItem != null)
             {
                 existingItem.SubItems[0].Text = displayText;
-                existingItem.SubItems[1].Text = details.Status;
+                existingItem.SubItems[1].Text = detailsCopy.Status;
             }
             else
             {
-                var item = new ListViewItem(new[] { displayText, details.Status }) { Tag = details.Id };
+                var item = new ListViewItem(new[] { displayText, detailsCopy.Status }) { Tag = detailsCopy.Id };
                 commandStatusListView.Items.Insert(0, item);
                 item.EnsureVisible();
             }
@@ -766,10 +794,20 @@ namespace VisioPlugin
                 return;
             }
 
+            Debug.WriteLine($"[ShowCommandDetails] Showing details for command: {commandId}");
+            Debug.WriteLine($"[ShowCommandDetails] Affected shapes count: {details.AffectedShapes?.Count ?? 0}");
+            if (details.AffectedShapes?.Any() == true)
+            {
+                foreach (var shape in details.AffectedShapes)
+                {
+                    Debug.WriteLine($"[ShowCommandDetails] Shape to display: {shape}");
+                }
+            }
+
             var dialog = new Form
             {
                 Text = $"Command Details - {details.Command}",
-                Size = new Drawing.Size(600, 400),
+                Size = new Drawing.Size(600, 500),
                 StartPosition = FormStartPosition.CenterParent,
                 MinimizeBox = false,
                 MaximizeBox = false,
@@ -780,7 +818,7 @@ namespace VisioPlugin
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 5,
+                RowCount = 6,
                 Padding = new Padding(10),
                 CellBorderStyle = TableLayoutPanelCellBorderStyle.None
             };
@@ -803,7 +841,7 @@ namespace VisioPlugin
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
-                Height = 80,
+                Height = 60,
                 Dock = DockStyle.Fill,
                 Text = details.UserMessage ?? ""
             };
@@ -814,10 +852,33 @@ namespace VisioPlugin
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
-                Height = 80,
+                Height = 60,
                 Dock = DockStyle.Fill,
                 Text = details.AIResponse ?? ""
             };
+
+            // Add affected shapes section
+            var affectedShapesLabel = new Label { Text = "Affected Shapes:", Font = new Drawing.Font(Font.FontFamily, 9, Drawing.FontStyle.Bold), Dock = DockStyle.Fill };
+            var affectedShapesBox = new ListBox
+            {
+                Height = 100,
+                Dock = DockStyle.Fill
+            };
+
+            if (details.AffectedShapes?.Any() == true)
+            {
+                Debug.WriteLine($"[ShowCommandDetails] Adding {details.AffectedShapes.Count} shapes to ListBox");
+                foreach (var shape in details.AffectedShapes)
+                {
+                    Debug.WriteLine($"[ShowCommandDetails] Adding to ListBox: {shape}");
+                    affectedShapesBox.Items.Add(shape.ToString());
+                }
+            }
+            else
+            {
+                Debug.WriteLine("[ShowCommandDetails] No shapes to display, adding 'No shapes affected' message");
+                affectedShapesBox.Items.Add("No shapes affected");
+            }
 
             // Set up the layout
             mainPanel.Controls.Add(timestampLabel, 0, 0);
@@ -832,6 +893,10 @@ namespace VisioPlugin
             mainPanel.Controls.Add(aiResponseLabel, 0, 4);
             mainPanel.SetColumnSpan(aiResponseBox, 2);
             mainPanel.Controls.Add(aiResponseBox, 0, 5);
+
+            mainPanel.Controls.Add(affectedShapesLabel, 0, 6);
+            mainPanel.SetColumnSpan(affectedShapesBox, 2);
+            mainPanel.Controls.Add(affectedShapesBox, 0, 7);
 
             dialog.Controls.Add(mainPanel);
             dialog.ShowDialog();
