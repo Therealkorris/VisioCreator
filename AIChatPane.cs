@@ -22,7 +22,6 @@ namespace VisioPlugin
         public string UserMessage { get; set; }
         public string AIResponse { get; set; }
         public string VisioCommand { get; set; }  // The actual command JSON sent to Visio
-        public List<string> AffectedShapeIds { get; set; }
         public string Status { get; set; }
 
         public CommandDetails()
@@ -33,13 +32,12 @@ namespace VisioPlugin
             UserMessage = "";
             AIResponse = "";
             VisioCommand = "";
-            AffectedShapeIds = new List<string>();
             Status = "";
         }
 
         public override string ToString()
         {
-            return $"{Command} at {Timestamp:HH:mm:ss} - Shapes: {AffectedShapeIds?.Count ?? 0}";
+            return $"{Command} at {Timestamp:HH:mm:ss}";
         }
     }
 
@@ -632,7 +630,6 @@ namespace VisioPlugin
 
             Debug.WriteLine($"[UpdateCommandStatus] Updating command: {details.Id}");
             Debug.WriteLine($"[UpdateCommandStatus] Status: {details.Status}");
-            Debug.WriteLine($"[UpdateCommandStatus] Affected Shapes: {string.Join(", ", details.AffectedShapeIds ?? new List<string>())}");
 
             // Store command in history
             commandHistory[details.Id] = details;
@@ -648,14 +645,16 @@ namespace VisioPlugin
                 }
             }
 
+            string displayText = details.Command;
+
             if (existingItem != null)
             {
-                existingItem.SubItems[0].Text = details.Command;
+                existingItem.SubItems[0].Text = displayText;
                 existingItem.SubItems[1].Text = details.Status;
             }
             else
             {
-                var item = new ListViewItem(new[] { details.Command, details.Status }) { Tag = details.Id };
+                var item = new ListViewItem(new[] { displayText, details.Status }) { Tag = details.Id };
                 commandStatusListView.Items.Insert(0, item);
                 item.EnsureVisible();
             }
@@ -770,7 +769,7 @@ namespace VisioPlugin
             var dialog = new Form
             {
                 Text = $"Command Details - {details.Command}",
-                Size = new Drawing.Size(600, 600),
+                Size = new Drawing.Size(600, 400),
                 StartPosition = FormStartPosition.CenterParent,
                 MinimizeBox = false,
                 MaximizeBox = false,
@@ -781,7 +780,7 @@ namespace VisioPlugin
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 8,
+                RowCount = 5,
                 Padding = new Padding(10),
                 CellBorderStyle = TableLayoutPanelCellBorderStyle.None
             };
@@ -820,36 +819,6 @@ namespace VisioPlugin
                 Text = details.AIResponse ?? ""
             };
 
-            // Add affected shapes section
-            var affectedShapesLabel = new Label { Text = "Affected Shapes (Double-click to highlight):", Font = new Drawing.Font(Font.FontFamily, 9, Drawing.FontStyle.Bold), Dock = DockStyle.Fill };
-            var affectedShapesList = new ListBox
-            {
-                Height = 120,
-                Dock = DockStyle.Fill,
-                SelectionMode = SelectionMode.One
-            };
-
-            if (details.AffectedShapeIds?.Any() == true)
-            {
-                foreach (var shapeId in details.AffectedShapeIds)
-                {
-                    affectedShapesList.Items.Add($"Shape ID: {shapeId}");
-                }
-                affectedShapesList.DoubleClick += (s, e) =>
-                {
-                    if (affectedShapesList.SelectedItem != null)
-                    {
-                        string selectedText = affectedShapesList.SelectedItem.ToString();
-                        string shapeId = selectedText.Replace("Shape ID: ", "");
-                        HighlightShape(shapeId);
-                    }
-                };
-            }
-            else
-            {
-                affectedShapesList.Items.Add("No shapes affected");
-            }
-
             // Set up the layout
             mainPanel.Controls.Add(timestampLabel, 0, 0);
             mainPanel.Controls.Add(timestampValue, 1, 0);
@@ -863,43 +832,9 @@ namespace VisioPlugin
             mainPanel.Controls.Add(aiResponseLabel, 0, 4);
             mainPanel.SetColumnSpan(aiResponseBox, 2);
             mainPanel.Controls.Add(aiResponseBox, 0, 5);
-            
-            mainPanel.Controls.Add(affectedShapesLabel, 0, 6);
-            mainPanel.SetColumnSpan(affectedShapesList, 2);
-            mainPanel.Controls.Add(affectedShapesList, 0, 7);
 
             dialog.Controls.Add(mainPanel);
             dialog.ShowDialog();
-        }
-
-        private void HighlightShape(string shapeId)
-        {
-            try
-            {
-                var application = Globals.ThisAddIn.Application;
-                if (application?.ActivePage != null)
-                {
-                    var page = application.ActivePage;
-                    var window = application.ActiveWindow;
-                    
-                    // Clear any existing selection
-                    window.Selection.DeselectAll();
-
-                    // Try to find and select the shape
-                    if (ushort.TryParse(shapeId, out ushort id))
-                    {
-                        var shape = page.Shapes.ItemFromID[id];
-                        if (shape != null)
-                        {
-                            window.Select(shape, (short)Visio.VisSelectArgs.visSelect);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error highlighting shape: {ex.Message}");
-            }
         }
 
         public CommandDetails GetCurrentCommand()

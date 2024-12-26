@@ -1,12 +1,11 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 using Visio = Microsoft.Office.Interop.Visio;
 
 namespace VisioPlugin
@@ -16,7 +15,6 @@ namespace VisioPlugin
         private readonly Visio.Application visioApplication;
         private readonly LibraryManager libraryManager;
         private static readonly HttpClient httpClient = new HttpClient() { Timeout = TimeSpan.FromMinutes(30) };
-        private List<Visio.Shape> lastAffectedShapes = new List<Visio.Shape>();
 
         public VisioCommandProcessor(Visio.Application visioApp, LibraryManager libraryManager)
         {
@@ -24,17 +22,7 @@ namespace VisioPlugin
             this.libraryManager = libraryManager ?? throw new ArgumentNullException(nameof(libraryManager));
         }
 
-        public IEnumerable<Visio.Shape> GetLastAffectedShapes()
-        {
-            Debug.WriteLine($"[GetLastAffectedShapes] Returning {lastAffectedShapes.Count} shapes:");
-            foreach (var shape in lastAffectedShapes)
-            {
-                Debug.WriteLine($"[GetLastAffectedShapes] Shape ID: {shape.ID16}");
-            }
-            return new List<Visio.Shape>(lastAffectedShapes);
-        }
-
-        public async Task ProcessCommand(string jsonCommand)
+        public void ProcessCommand(string jsonCommand)
         {
             try
             {
@@ -43,53 +31,30 @@ namespace VisioPlugin
 
                 string commandType = commandObject["command"]?.ToString();
 
-                // Handle empty or invalid commands
                 if (string.IsNullOrEmpty(commandType))
                 {
                     Debug.WriteLine($"[ProcessCommand] [Error] Unknown or missing command type.");
                     return;
                 }
 
-                // Map command variations to the correct command type
                 if (commandType.Equals("CreateShapes", StringComparison.OrdinalIgnoreCase))
                 {
-                    commandType = "CreateShape"; // Correct the command type
+                    commandType = "CreateShape";
                 }
-
-                // Clear the affected shapes list before processing new command
-                lastAffectedShapes = new List<Visio.Shape>();
-                Debug.WriteLine("[ProcessCommand] Cleared affected shapes list.");
 
                 // Handle different command types
                 if (commandType == "CreateShape")
                 {
-                    // Check for the shapes array (multiple shapes)
                     if (commandObject["parameters"]?["shapes"] is JArray shapesArray)
                     {
                         foreach (JObject shapeObject in shapesArray)
                         {
-                            var shape = ExecuteCreateShapeCommand(shapeObject);
-                            if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
-                            {
-                                lastAffectedShapes.Add(shape);
-                                Debug.WriteLine($"[ProcessCommand] Added shape to affected shapes. ID: {shape.ID16}");
-                            }
+                            ExecuteCreateShapeCommand(shapeObject);
                         }
                     }
-                    // Handle case where parameters are directly in 'parameters' object (single shape)
                     else if (commandObject["parameters"] is JObject shapeParameters)
                     {
-                        var shape = ExecuteCreateShapeCommand(shapeParameters);
-                        if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
-                        {
-                            lastAffectedShapes.Add(shape);
-                            Debug.WriteLine($"[ProcessCommand] Added single shape to affected shapes. ID: {shape.ID16}");
-                        }
-                    }
-                    else
-                    {
-                        Debug.WriteLine("[ProcessCommand] [Error] 'parameters' is missing or has an invalid format.");
-                        return;
+                        ExecuteCreateShapeCommand(shapeParameters);
                     }
                 }
                 else if (commandType == "ConnectShapes")
@@ -136,32 +101,19 @@ namespace VisioPlugin
                 {
                     Debug.WriteLine($"[ProcessCommand] [Error] Unsupported command type: {commandType}");
                 }
-
-                // Debug output for affected shapes
-                Debug.WriteLine($"[ProcessCommand] Final number of affected shapes: {lastAffectedShapes.Count}");
-                foreach (var shape in lastAffectedShapes.Distinct())
-                {
-                    Debug.WriteLine($"[ProcessCommand] Final affected shape ID: {shape.ID16}");
-                }
-            }
-            catch (JsonReaderException jEx)
-            {
-                Debug.WriteLine($"[ProcessCommand] [Error] Invalid JSON format: {jEx.Message}");
-                lastAffectedShapes.Clear();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ProcessCommand] [Error] Failed to process command: {ex.Message}");
-                lastAffectedShapes.Clear();
             }
         }
 
-        private Visio.Shape ExecuteCreateShapeCommand(JObject shapeParameters)
+        private void ExecuteCreateShapeCommand(JObject shapeParameters)
         {
             if (shapeParameters == null)
             {
                 Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] Shape parameters are missing.");
-                return null;
+                return;
             }
 
             // Get the active page from the Visio application
@@ -169,7 +121,7 @@ namespace VisioPlugin
             if (activePage == null)
             {
                 Debug.WriteLine("[ExecuteCreateShapeCommand] [Error] No active page found.");
-                return null;
+                return;
             }
 
             // Get the page dimensions
@@ -179,39 +131,25 @@ namespace VisioPlugin
             // Check if the 'shapes' array exists
             if (shapeParameters["shapes"] is JArray shapesArray)
             {
-                Visio.Shape lastShape = null;
                 foreach (JObject shapeObject in shapesArray)
                 {
-                    var shape = CreateSingleShape(shapeObject, activePage, pageWidth, pageHeight);
-                    if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
-                    {
-                        lastAffectedShapes.Add(shape);
-                        lastShape = shape;
-                        Debug.WriteLine($"[ExecuteCreateShapeCommand] Added shape to affected shapes. ID: {shape.ID16}");
-                    }
+                    CreateSingleShape(shapeObject, activePage, pageWidth, pageHeight);
                 }
-                return lastShape;
             }
             // Handle single shape creation
             else
             {
-                var shape = CreateSingleShape(shapeParameters, activePage, pageWidth, pageHeight);
-                if (shape != null && !lastAffectedShapes.Any(s => s.ID16 == shape.ID16))
-                {
-                    lastAffectedShapes.Add(shape);
-                    Debug.WriteLine($"[ExecuteCreateShapeCommand] Added single shape to affected shapes. ID: {shape.ID16}");
-                }
-                return shape;
+                CreateSingleShape(shapeParameters, activePage, pageWidth, pageHeight);
             }
         }
 
-        private Visio.Shape CreateSingleShape(JObject shapeObject, Visio.Page activePage, double pageWidth, double pageHeight)
+        private void CreateSingleShape(JObject shapeObject, Visio.Page activePage, double pageWidth, double pageHeight)
         {
             string shapeType = shapeObject["type"]?.ToString() ?? shapeObject["shapeType"]?.ToString();
             if (string.IsNullOrEmpty(shapeType))
             {
                 Debug.WriteLine("[CreateSingleShape] [Error] shapeType is missing or empty.");
-                return null;
+                return;
             }
 
             JObject positionObject = shapeObject["position"] as JObject;
@@ -243,7 +181,7 @@ namespace VisioPlugin
 
             string color = shapeObject["color"]?.ToString();
 
-            // Get the created shape directly from AddShapeToDocument
+            // Create the shape
             var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
 
             if (shape != null)
@@ -258,26 +196,6 @@ namespace VisioPlugin
             {
                 Debug.WriteLine("[CreateSingleShape] Failed to create shape.");
             }
-
-            return shape;
-        }
-
-        private string GetLastAddedShapeName()
-        {
-            try
-            {
-                var activePage = visioApplication.ActivePage;
-                if (activePage != null && activePage.Shapes.Count > 0)
-                {
-                    return activePage.Shapes[activePage.Shapes.Count].Name;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[GetLastAddedShapeName] Error: {ex.Message}");
-            }
-
-            return null;
         }
 
         private void ExecuteConnectShapesCommand(JObject parameters)
@@ -292,22 +210,7 @@ namespace VisioPlugin
                 return;
             }
 
-            var activePage = visioApplication.ActivePage;
-            if (activePage != null)
-            {
-                var shape1 = activePage.Shapes.ItemU[shape1Name];
-                var shape2 = activePage.Shapes.ItemU[shape2Name];
-                if (shape1 != null && shape2 != null)
-                {
-                    var connectorShape = libraryManager.ConnectShapes(shape1Name, shape2Name, connectorType);
-                    if (connectorShape != null)
-                    {
-                        lastAffectedShapes.Add(shape1);
-                        lastAffectedShapes.Add(shape2);
-                        lastAffectedShapes.Add(connectorShape);
-                    }
-                }
-            }
+            libraryManager.ConnectShapes(shape1Name, shape2Name, connectorType);
         }
 
         private void ExecuteAddTextToShapeCommand(JObject parameters)
@@ -321,11 +224,7 @@ namespace VisioPlugin
                 return;
             }
 
-            var shape = libraryManager.AddTextToShape(shapeName, text);
-            if (shape != null)
-            {
-                lastAffectedShapes.Add(shape);
-            }
+            libraryManager.AddTextToShape(shapeName, text);
         }
 
         private void ExecuteSetShapeStyleCommand(JObject parameters)
@@ -340,10 +239,99 @@ namespace VisioPlugin
                 return;
             }
 
-            var shape = libraryManager.SetShapeStyle(shapeName, lineStyle, fillPattern);
-            if (shape != null)
+            libraryManager.SetShapeStyle(shapeName, lineStyle, fillPattern);
+        }
+
+        private void ExecuteGroupShapesCommand(JObject parameters)
+        {
+            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
+
+            if (shapeNames == null || shapeNames.Length == 0)
             {
-                lastAffectedShapes.Add(shape);
+                Debug.WriteLine("[ExecuteGroupShapesCommand] [Error] shapeNames is missing or empty.");
+                return;
+            }
+
+            libraryManager.GroupShapes(shapeNames);
+        }
+
+        private void ExecuteUngroupShapesCommand(JObject parameters)
+        {
+            string shapeName = parameters?["shapeName"]?.ToString();
+
+            if (string.IsNullOrEmpty(shapeName))
+            {
+                Debug.WriteLine("[ExecuteUngroupShapesCommand] [Error] shapeName is missing.");
+                return;
+            }
+
+            libraryManager.UngroupShapes(shapeName);
+        }
+
+        private void ExecuteAlignShapesCommand(JObject parameters)
+        {
+            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
+            string alignmentType = parameters?["alignmentType"]?.ToString();
+
+            if (shapeNames == null || shapeNames.Length == 0 || string.IsNullOrEmpty(alignmentType))
+            {
+                Debug.WriteLine("[ExecuteAlignShapesCommand] [Error] shapeNames or alignmentType is missing.");
+                return;
+            }
+
+            libraryManager.AlignShapes(shapeNames, alignmentType);
+        }
+
+        private void ExecuteDistributeShapesCommand(JObject parameters)
+        {
+            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
+            string distributionType = parameters?["distributionType"]?.ToString();
+
+            if (shapeNames == null || shapeNames.Length == 0 || string.IsNullOrEmpty(distributionType))
+            {
+                Debug.WriteLine("[ExecuteDistributeShapesCommand] [Error] shapeNames or distributionType is missing.");
+                return;
+            }
+
+            libraryManager.DistributeShapes(shapeNames, distributionType);
+        }
+
+        private void ExecuteGetShapePropertiesCommand(JObject parameters)
+        {
+            string shapeName = parameters?["shapeName"]?.ToString();
+            if (string.IsNullOrEmpty(shapeName))
+            {
+                Debug.WriteLine("[ExecuteGetShapePropertiesCommand] [Error] shapeName is missing.");
+                return;
+            }
+
+            string propertiesJson = libraryManager.GetShapeProperties(shapeName);
+            try
+            {
+                var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
+                var response = httpClient.PostAsync("http://localhost:5678/chat-agent", content).Result;
+                response.EnsureSuccessStatusCode();
+                Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] [Error] Failed to send properties to n8n: {ex.Message}");
+            }
+        }
+
+        private void ExecuteGetPageSizeCommand(JObject parameters)
+        {
+            string pageSizeJson = libraryManager.GetPageSize();
+            try
+            {
+                var content = new StringContent(pageSizeJson, Encoding.UTF8, "application/json");
+                var response = httpClient.PostAsync("http://localhost:5680/chat-agent", content).Result;
+                response.EnsureSuccessStatusCode();
+                Debug.WriteLine($"[ExecuteGetPageSizeCommand] Sent page size to n8n.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExecuteGetPageSizeCommand] [Error] Failed to send page size to n8n: {ex.Message}");
             }
         }
 
@@ -371,29 +359,19 @@ namespace VisioPlugin
 
             try
             {
-                // Create a tiny rectangle to host the text
-                double smallWidth = 0.01; // Very small width
-                double smallHeight = 0.01; // Very small height
+                double smallWidth = 0.01;
+                double smallHeight = 0.01;
 
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                // Calculate coordinates in Visio units
                 double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = ((100 - yPercent) / 100.0) * pageHeight; // Visio Y-axis is inverted
+                double visioY = ((100 - yPercent) / 100.0) * pageHeight;
 
-                // Draw a small rectangle
                 var textShape = activePage.DrawRectangle(visioX - smallWidth / 2, visioY - smallHeight / 2, visioX + smallWidth / 2, visioY + smallHeight / 2);
-
-                // Add text to the rectangle
                 textShape.Text = content;
-
-                // Set font size and color
                 textShape.CellsU["Char.Size"].FormulaU = fontSize.ToString();
                 textShape.CellsU["Char.Color"].FormulaU = $"RGB({ConvertColorToRGB(color)})";
-
-                // Track the affected shape
-                lastAffectedShapes.Add(textShape);
 
                 Debug.WriteLine($"[ExecuteCreateTextBoxCommand] Added text box: '{content}' at ({visioX}, {visioY}).");
             }
@@ -403,7 +381,6 @@ namespace VisioPlugin
             }
         }
 
-        // Helper method to convert color names to RGB values
         private int ConvertColorToRGB(string colorName)
         {
             return colorName.ToLower() switch
@@ -414,121 +391,6 @@ namespace VisioPlugin
                 "blue" => 16711680,
                 _ => 0 // Default to black
             };
-        }
-
-        private void ExecuteGroupShapesCommand(JObject parameters)
-        {
-            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
-
-            if (shapeNames == null || shapeNames.Length == 0)
-            {
-                Debug.WriteLine("[ExecuteGroupShapesCommand] [Error] shapeNames is missing or empty.");
-                return;
-            }
-
-            var groupedShape = libraryManager.GroupShapes(shapeNames);
-            if (groupedShape != null)
-            {
-                lastAffectedShapes.Add(groupedShape);
-            }
-        }
-
-        private void ExecuteUngroupShapesCommand(JObject parameters)
-        {
-            string shapeName = parameters?["shapeName"]?.ToString();
-
-            if (string.IsNullOrEmpty(shapeName))
-            {
-                Debug.WriteLine("[ExecuteUngroupShapesCommand] [Error] shapeName is missing.");
-                return;
-            }
-
-            var ungroupedShapes = libraryManager.UngroupShapes(shapeName);
-            if (ungroupedShapes.Any())
-            {
-                lastAffectedShapes.AddRange(ungroupedShapes);
-            }
-        }
-
-        private void ExecuteAlignShapesCommand(JObject parameters)
-        {
-            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
-            string alignmentType = parameters?["alignmentType"]?.ToString();
-
-            if (shapeNames == null || shapeNames.Length == 0 || string.IsNullOrEmpty(alignmentType))
-            {
-                Debug.WriteLine("[ExecuteAlignShapesCommand] [Error] shapeNames or alignmentType is missing.");
-                return;
-            }
-
-            var alignedShapes = libraryManager.AlignShapes(shapeNames, alignmentType);
-            if (alignedShapes.Any())
-            {
-                lastAffectedShapes.AddRange(alignedShapes);
-            }
-        }
-
-        private void ExecuteDistributeShapesCommand(JObject parameters)
-        {
-            var shapeNames = parameters?["shapeNames"]?.ToObject<string[]>();
-            string distributionType = parameters?["distributionType"]?.ToString();
-
-            if (shapeNames == null || shapeNames.Length == 0 || string.IsNullOrEmpty(distributionType))
-            {
-                Debug.WriteLine("[ExecuteDistributeShapesCommand] [Error] shapeNames or distributionType is missing.");
-                return;
-            }
-
-            var distributedShapes = libraryManager.DistributeShapes(shapeNames, distributionType);
-            if (distributedShapes.Any())
-            {
-                lastAffectedShapes.AddRange(distributedShapes);
-            }
-        }
-
-        private void ExecuteGetShapePropertiesCommand(JObject parameters)
-        {
-            string shapeName = parameters?["shapeName"]?.ToString();
-            if (string.IsNullOrEmpty(shapeName))
-            {
-                Debug.WriteLine("[ExecuteGetShapePropertiesCommand] [Error] shapeName is missing.");
-                return;
-            }
-
-            // Get the shape properties
-            string propertiesJson = libraryManager.GetShapeProperties(shapeName);
-
-            // Send the properties back to the AI (via n8n)
-            try
-            {
-                var content = new StringContent(propertiesJson, Encoding.UTF8, "application/json");
-                var response = httpClient.PostAsync("http://localhost:5678/chat-agent", content).Result; // Replace with your n8n webhook URL
-                response.EnsureSuccessStatusCode();
-                Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] Sent properties for shape '{shapeName}' to n8n.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ExecuteGetShapePropertiesCommand] [Error] Failed to send properties to n8n: {ex.Message}");
-            }
-        }
-
-        private void ExecuteGetPageSizeCommand(JObject parameters)
-        {
-            // Get the page size
-            string pageSizeJson = libraryManager.GetPageSize();
-
-            // Send the page size back to the AI (via n8n)
-            try
-            {
-                var content = new StringContent(pageSizeJson, Encoding.UTF8, "application/json");
-                var response = httpClient.PostAsync("http://localhost:5680/chat-agent", content).Result; // Replace with your n8n webhook URL
-                response.EnsureSuccessStatusCode();
-                Debug.WriteLine($"[ExecuteGetPageSizeCommand] Sent page size to n8n.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ExecuteGetPageSizeCommand] [Error] Failed to send page size to n8n: {ex.Message}");
-            }
         }
     }
 }
