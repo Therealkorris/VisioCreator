@@ -816,23 +816,30 @@ namespace VisioPlugin
 
             Debug.WriteLine($"[ShowCommandDetails] Showing details for command: {commandId}");
             Debug.WriteLine($"[ShowCommandDetails] Affected shapes count: {details.AffectedShapes?.Count ?? 0}");
-            if (details.AffectedShapes?.Any() == true)
-            {
-                foreach (var shape in details.AffectedShapes)
-                {
-                    Debug.WriteLine($"[ShowCommandDetails] Shape to display: {shape}");
-                }
-            }
 
             var dialog = new Form
             {
                 Text = $"Command Details - {details.Command}",
-                Size = new Drawing.Size(600, 500),
-                StartPosition = FormStartPosition.CenterParent,
-                MinimizeBox = false,
+                Size = new Drawing.Size(600, 600),
+                StartPosition = FormStartPosition.CenterScreen,
+                MinimizeBox = true,
                 MaximizeBox = false,
-                FormBorderStyle = FormBorderStyle.FixedDialog
+                FormBorderStyle = FormBorderStyle.SizableToolWindow,
+                ShowInTaskbar = false,
+                Owner = this
             };
+
+            // Clear any existing selections in Visio before showing the dialog
+            try
+            {
+                var visioApp = Globals.ThisAddIn.Application;
+                visioApp.ActiveWindow.Selection.DeselectAll();
+                Debug.WriteLine("[ShowCommandDetails] Cleared existing Visio selections");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ShowCommandDetails] Error clearing selections: {ex.Message}");
+            }
 
             var mainPanel = new TableLayoutPanel
             {
@@ -854,7 +861,7 @@ namespace VisioPlugin
             var statusValue = new Label { Text = details.Status, Font = new Drawing.Font(Font.FontFamily, 9), Dock = DockStyle.Fill };
             statusValue.ForeColor = details.Status.ToLower() == "success" ? Drawing.Color.Green : Drawing.Color.Red;
 
-            // Add message sections
+            // Add message sections with improved formatting
             var userMessageLabel = new Label { Text = "User Message:", Font = new Drawing.Font(Font.FontFamily, 9, Drawing.FontStyle.Bold), Dock = DockStyle.Fill };
             var userMessageBox = new TextBox
             {
@@ -863,27 +870,30 @@ namespace VisioPlugin
                 ScrollBars = ScrollBars.Vertical,
                 Height = 60,
                 Dock = DockStyle.Fill,
-                Text = details.UserMessage ?? ""
+                Text = details.UserMessage ?? "",
+                BackColor = Drawing.Color.White
             };
 
             var aiResponseLabel = new Label { Text = "AI Response:", Font = new Drawing.Font(Font.FontFamily, 9, Drawing.FontStyle.Bold), Dock = DockStyle.Fill };
-            var aiResponseBox = new TextBox
+            var aiResponseBox = new RichTextBox  // Changed to RichTextBox for better formatting
             {
-                Multiline = true,
                 ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                Height = 60,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
+                Height = 120,  // Increased height
                 Dock = DockStyle.Fill,
-                Text = details.AIResponse ?? ""
+                BackColor = Drawing.Color.White,
+                Font = new Drawing.Font("Segoe UI", 9)
             };
+            aiResponseBox.Text = details.AIResponse ?? "";
 
-            // Add affected shapes section
+            // Add affected shapes section with improved selection handling
             var affectedShapesLabel = new Label { Text = "Affected Shapes:", Font = new Drawing.Font(Font.FontFamily, 9, Drawing.FontStyle.Bold), Dock = DockStyle.Fill };
             var affectedShapesBox = new ListBox
             {
-                Height = 100,
+                Height = 150,  // Increased height
                 Dock = DockStyle.Fill,
-                SelectionMode = SelectionMode.MultiExtended  // Allow multiple selection
+                SelectionMode = SelectionMode.MultiExtended,
+                BackColor = Drawing.Color.White
             };
 
             if (details.AffectedShapes?.Any() == true)
@@ -891,60 +901,23 @@ namespace VisioPlugin
                 Debug.WriteLine($"[ShowCommandDetails] Adding {details.AffectedShapes.Count} shapes to ListBox");
                 foreach (var shape in details.AffectedShapes)
                 {
-                    Debug.WriteLine($"[ShowCommandDetails] Adding to ListBox: {shape}");
                     affectedShapesBox.Items.Add(shape);
                 }
 
-                // Handle shape selection changes
+                // Handle shape selection changes with improved selection behavior
                 affectedShapesBox.SelectedIndexChanged += (sender, e) =>
                 {
-                    try
+                    if (InvokeRequired)
                     {
-                        var visioApp = Globals.ThisAddIn.Application;
-                        var activePage = visioApp.ActivePage;
-
-                        // Clear existing selection
-                        visioApp.ActiveWindow.Selection.DeselectAll();
-
-                        // Get all selected shapes
-                        if (affectedShapesBox.SelectedItems.Count > 0)
-                        {
-                            foreach (ShapeInfo selectedShape in affectedShapesBox.SelectedItems)
-                            {
-                                try
-                                {
-                                    Debug.WriteLine($"[ShowCommandDetails] Selecting shape with ID: {selectedShape.ShapeId}");
-                                    var shape = activePage.Shapes.ItemFromID[int.Parse(selectedShape.ShapeId)];
-                                    if (shape != null)
-                                    {
-                                        visioApp.ActiveWindow.Select(shape, (short)Visio.VisSelectArgs.visSelect);
-                                        Debug.WriteLine($"[ShowCommandDetails] Successfully selected shape: {selectedShape}");
-                                    }
-                                }
-                                catch (Exception shapeEx)
-                                {
-                                    Debug.WriteLine($"[ShowCommandDetails] Error selecting shape {selectedShape.ShapeId}: {shapeEx.Message}");
-                                }
-                            }
-
-                            // If any shapes were selected, adjust the view
-                            var selection = visioApp.ActiveWindow.Selection;
-                            if (selection.Count > 0)
-                            {
-                                visioApp.ActiveWindow.Zoom = -1; // Fit selection to window
-                            }
-                        }
+                        Invoke(new Action(() => HandleShapeSelection(affectedShapesBox)));
+                        return;
                     }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[ShowCommandDetails] Error in shape selection: {ex.Message}");
-                        MessageBox.Show($"Error selecting shapes: {ex.Message}", "Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+
+                    HandleShapeSelection(affectedShapesBox);
                 };
             }
             else
             {
-                Debug.WriteLine("[ShowCommandDetails] No shapes to display, adding 'No shapes affected' message");
                 affectedShapesBox.Items.Add("No shapes affected");
             }
 
@@ -967,7 +940,9 @@ namespace VisioPlugin
             mainPanel.Controls.Add(affectedShapesBox, 0, 7);
 
             dialog.Controls.Add(mainPanel);
-            dialog.ShowDialog();
+            
+            // Show the dialog non-modally
+            dialog.Show();
         }
 
         public CommandDetails GetCurrentCommand()
@@ -1027,6 +1002,49 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"[ExtractChatMessage] Error extracting message: {ex.Message}");
                 return "";
+            }
+        }
+
+        // Add this new method to handle shape selection
+        private void HandleShapeSelection(ListBox affectedShapesBox)
+        {
+            try
+            {
+                var visioApp = Globals.ThisAddIn.Application;
+                var activePage = visioApp.ActivePage;
+                var activeWindow = visioApp.ActiveWindow;
+
+                // Create a new selection
+                var selection = activeWindow.Selection;
+                selection.DeselectAll();
+
+                // Create a new selection set for the currently selected items
+                var newSelection = activePage.CreateSelection(Visio.VisSelectionTypes.visSelTypeEmpty);
+
+                foreach (ShapeInfo selectedShape in affectedShapesBox.SelectedItems)
+                {
+                    if (int.TryParse(selectedShape.ShapeId, out int shapeId))
+                    {
+                        var shape = activePage.Shapes.ItemFromID[shapeId];
+                        if (shape != null)
+                        {
+                            newSelection.Select(shape, (short)Visio.VisSelectArgs.visSelect);
+                            Debug.WriteLine($"[HandleShapeSelection] Adding to selection: {selectedShape.ShapeId} ({selectedShape.ShapeType})");
+                        }
+                    }
+                }
+
+                // Apply the new selection to the window
+                if (newSelection.Count > 0)
+                {
+                    activeWindow.Selection = newSelection;
+                    activeWindow.Zoom = -1;
+                    Debug.WriteLine($"[HandleShapeSelection] Final selection count: {newSelection.Count}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[HandleShapeSelection] Error in shape selection: {ex.Message}");
             }
         }
 
