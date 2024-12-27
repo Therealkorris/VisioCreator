@@ -231,8 +231,9 @@ namespace VisioPlugin
                     Debug.WriteLine("[ProcessAIResponse] Creating new command");
                     commandDetails = new CommandDetails
                     {
+                        Id = Guid.NewGuid().ToString("N"),
                         UserMessage = userMessage,
-                        Command = "Summary of created shapes",
+                        Command = userMessage.Length > 50 ? userMessage.Substring(0, 47) + "..." : userMessage,
                         Status = "Processing"
                     };
                     await Task.Run(() => chatPane.UpdateCommandStatus(commandDetails));

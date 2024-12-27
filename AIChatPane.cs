@@ -378,22 +378,21 @@ namespace VisioPlugin
             // Clear the chat input first
             chatInput.Clear();
 
-            // Only create a new command if there isn't one already being processed
-            if (currentCommand == null)
+            // Always create a new command for each action
+            currentCommand = new CommandDetails
             {
-                currentCommand = new CommandDetails
-                {
-                    UserMessage = userMessage,
-                    Command = "Summary of created shapes",
-                    Status = "Processing"
-                };
+                Id = Guid.NewGuid().ToString("N"),
+                UserMessage = userMessage,
+                Command = userMessage.Length > 50 ? userMessage.Substring(0, 47) + "..." : userMessage,
+                Status = "Processing",
+                Timestamp = DateTime.Now
+            };
 
-                Debug.WriteLine($"[SendButton_Click] Created new command with ID: {currentCommand.Id}");
-                Debug.WriteLine($"[SendButton_Click] User Message: {userMessage}");
+            Debug.WriteLine($"[SendButton_Click] Created new command with ID: {currentCommand.Id}");
+            Debug.WriteLine($"[SendButton_Click] User Message: {userMessage}");
 
-                // Add initial status entry
-                UpdateCommandStatus(currentCommand);
-            }
+            // Add initial status entry
+            UpdateCommandStatus(currentCommand);
 
             // Show the user's message in chat history
             AppendToChatHistory($"You: {userMessage}");
@@ -435,7 +434,7 @@ namespace VisioPlugin
                     currentCommand.Status = "Failed";
                     currentCommand.AIResponse = $"Error: {ex.Message}";
                     UpdateCommandStatus(currentCommand);
-                    currentCommand = null;
+                    ResetCurrentCommand();
                 }
             }
         }
@@ -662,7 +661,7 @@ namespace VisioPlugin
             // Store command in history
             commandHistory[detailsCopy.Id] = detailsCopy;
 
-            // Update list view
+            // Find existing item or create new one
             ListViewItem existingItem = null;
             foreach (ListViewItem item in commandStatusListView.Items)
             {
@@ -682,6 +681,7 @@ namespace VisioPlugin
             }
             else
             {
+                // Create new item and insert at the top
                 var item = new ListViewItem(new[] { displayText, detailsCopy.Status }) { Tag = detailsCopy.Id };
                 commandStatusListView.Items.Insert(0, item);
                 item.EnsureVisible();
