@@ -268,8 +268,8 @@ namespace VisioPlugin
 
             // Set up status list columns
             commandStatusListView.Columns.Clear();
-            commandStatusListView.Columns.Add("Command", (int)(commandStatusListView.Width * 0.7));
-            commandStatusListView.Columns.Add("Status", (int)(commandStatusListView.Width * 0.3));
+            commandStatusListView.Columns.Add("Command", (int)(commandStatusListView.Width * 0.6));
+            commandStatusListView.Columns.Add("Status", (int)(commandStatusListView.Width * 0.4));
             commandStatusListView.AllowColumnReorder = false;
             commandStatusListView.Resize += (sender, e) => ResizeListViewColumns();
             commandStatusListView.ColumnWidthChanged += (sender, e) => AdjustOtherColumnWidth(e.ColumnIndex);
@@ -726,8 +726,11 @@ namespace VisioPlugin
             if (commandStatusListView.Columns.Count == 2)
             {
                 int totalWidth = commandStatusListView.ClientSize.Width;
-                commandStatusListView.Columns[0].Width = (int)(totalWidth * 0.7);
-                commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.3);
+                commandStatusListView.Columns[0].Width = (int)(totalWidth * 0.6);
+                commandStatusListView.Columns[1].Width = (int)(totalWidth * 0.4);
+
+                // Add some padding to the Status column text
+                commandStatusListView.Columns[1].Text = "  Status  ";
             }
         }
 
@@ -739,7 +742,24 @@ namespace VisioPlugin
             int changedColumnWidth = commandStatusListView.Columns[changedColumnIndex].Width;
             int otherColumnIndex = 1 - changedColumnIndex;
 
-            commandStatusListView.Columns[otherColumnIndex].Width = totalWidth - changedColumnWidth;
+            // Ensure minimum widths
+            int minCommandWidth = (int)(totalWidth * 0.4);  // Minimum 40% for Command
+            int minStatusWidth = (int)(totalWidth * 0.3);   // Minimum 30% for Status
+
+            if (changedColumnIndex == 0 && changedColumnWidth < minCommandWidth)
+            {
+                commandStatusListView.Columns[0].Width = minCommandWidth;
+                commandStatusListView.Columns[1].Width = totalWidth - minCommandWidth;
+            }
+            else if (changedColumnIndex == 1 && changedColumnWidth < minStatusWidth)
+            {
+                commandStatusListView.Columns[1].Width = minStatusWidth;
+                commandStatusListView.Columns[0].Width = totalWidth - minStatusWidth;
+            }
+            else
+            {
+                commandStatusListView.Columns[otherColumnIndex].Width = totalWidth - changedColumnWidth;
+            }
         }
 
         // Continue with the same JSON validation method

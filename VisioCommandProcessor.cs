@@ -178,29 +178,17 @@ namespace VisioPlugin
             double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
             double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
 
-            // Ensure percentages are within bounds
-            xPercent = Math.Max(0, Math.Min(100, xPercent));
-            yPercent = Math.Max(0, Math.Min(100, yPercent));
-            widthPercent = Math.Max(0, Math.Min(100, widthPercent));
-            heightPercent = Math.Max(0, Math.Min(100, heightPercent));
-
-            // Adjust position to keep shape within canvas
-            double shapeWidth = (widthPercent / 100.0) * pageWidth;
-            double shapeHeight = (heightPercent / 100.0) * pageHeight;
-            double x = (xPercent / 100.0) * pageWidth - shapeWidth / 2;
-            double y = (yPercent / 100.0) * pageHeight - shapeHeight / 2;
-
-            x = Math.Max(0, Math.Min(pageWidth - shapeWidth, x));
-            y = Math.Max(0, Math.Min(pageHeight - shapeHeight, y));
-
-            // Convert adjusted position back to percentage
-            double adjustedXPercent = (x / pageWidth) * 100;
-            double adjustedYPercent = (y / pageHeight) * 100;
-
             string color = shapeObject["color"]?.ToString();
 
-            // Create the shape
-            var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, adjustedXPercent, adjustedYPercent, widthPercent, heightPercent);
+            // Scale coordinates to match Visio's coordinate system
+            // Visio uses inches internally, so we need to scale our percentages appropriately
+            double scaledX = xPercent;
+            double scaledY = yPercent;
+            double scaledWidth = widthPercent;
+            double scaledHeight = heightPercent;
+
+            // Create the shape using scaled coordinates
+            var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, scaledX, scaledY, scaledWidth, scaledHeight);
 
             if (shape != null)
             {

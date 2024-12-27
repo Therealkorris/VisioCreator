@@ -144,7 +144,7 @@ namespace VisioPlugin
                     return null;
                 }
 
-                // Retrieve page dimensions from Visio
+                // Get the page dimensions in Visio internal units (inches)
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
@@ -155,25 +155,35 @@ namespace VisioPlugin
                     return null;
                 }
 
-                // Calculate scaled coordinates and size
-                double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = ((100 - yPercent) / 100.0) * pageHeight;  // Invert Y-axis
-
+                // Convert percentages to Visio units
+                // Note: Visio uses inches internally
                 double shapeWidth = (widthPercent / 100.0) * pageWidth;
                 double shapeHeight = (heightPercent / 100.0) * pageHeight;
 
-                Debug.WriteLine($"[AddShapeToDocument] Scaled Position - X: {visioX}, Y: {visioY}, Width: {shapeWidth}, Height: {shapeHeight} based on page size: Width={pageWidth}, Height={pageHeight}");
+                // Calculate position in Visio units
+                // Adjust for Visio's coordinate system (origin at bottom-left)
+                double xPos = (xPercent / 100.0) * pageWidth;
+                double yPos = pageHeight - ((yPercent / 100.0) * pageHeight);
 
-                // Drop shape at calculated coordinates
-                var shape = activePage.Drop(master, visioX, visioY);
-                shape.Cells["PinX"].ResultIU = visioX;
-                shape.Cells["PinY"].ResultIU = visioY;
+                Debug.WriteLine($"[AddShapeToDocument] Page dimensions (inches) - Width: {pageWidth}, Height: {pageHeight}");
+                Debug.WriteLine($"[AddShapeToDocument] Position (inches) - X: {xPos}, Y: {yPos}");
+                Debug.WriteLine($"[AddShapeToDocument] Size (inches) - Width: {shapeWidth}, Height: {shapeHeight}");
 
-                // Set shape dimensions explicitly
+                // Create the shape at the calculated position
+                var shape = activePage.Drop(master, xPos, yPos);
+
+                // Set the shape's size
                 shape.Cells["Width"].ResultIU = shapeWidth;
                 shape.Cells["Height"].ResultIU = shapeHeight;
 
-                Debug.WriteLine($"[AddShapeToDocument] Shape placed at (PinX={shape.Cells["PinX"].ResultIU}, PinY={shape.Cells["PinY"].ResultIU}) with final size Width={shape.Cells["Width"].ResultIU}, Height={shape.Cells["Height"].ResultIU}");
+                // Ensure the shape is centered on the target position
+                shape.Cells["PinX"].ResultIU = xPos;
+                shape.Cells["PinY"].ResultIU = yPos;
+
+                // Lock aspect ratio for consistent shape appearance
+                shape.Cells["LockAspect"].Formula = "1";
+
+                Debug.WriteLine($"[AddShapeToDocument] Final position (inches) - PinX: {shape.Cells["PinX"].ResultIU}, PinY: {shape.Cells["PinY"].ResultIU}");
 
                 return shape;
             }
