@@ -376,25 +376,50 @@ namespace VisioPlugin
 
             try
             {
-                double smallWidth = 0.01;
-                double smallHeight = 0.01;
-
+                // Get page dimensions
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
+                // Convert percentages to Visio units (inches)
                 double visioX = (xPercent / 100.0) * pageWidth;
-                double visioY = ((100 - yPercent) / 100.0) * pageHeight;
+                double visioY = pageHeight - ((yPercent / 100.0) * pageHeight); // Adjust for Visio's coordinate system
 
-                var textShape = activePage.DrawRectangle(visioX - smallWidth / 2, visioY - smallHeight / 2, visioX + smallWidth / 2, visioY + smallHeight / 2);
+                // Insert text using Visio's native text insertion
+                var textShape = activePage.Drop(
+                    activePage.Application.Documents["VISIO.EXE"].Masters.ItemU["Text Block"],
+                    visioX,
+                    visioY
+                );
+
+                // Set the text content
                 textShape.Text = content;
-                textShape.CellsU["Char.Size"].FormulaU = fontSize.ToString();
+
+                // Set font size and color
+                textShape.CellsU["Char.Size"].FormulaU = $"{fontSize} pt";
                 textShape.CellsU["Char.Color"].FormulaU = $"RGB({ConvertColorToRGB(color)})";
 
-                Debug.WriteLine($"[ExecuteCreateTextBoxCommand] Added text box: '{content}' at ({visioX}, {visioY}).");
+                // Center text alignment
+                textShape.CellsU["VerticalAlign"].FormulaU = "1";  // Middle
+                textShape.CellsU["TextAlignHorz"].FormulaU = "1"; // Center
+
+                // Make sure there's no fill or line
+                textShape.CellsU["LinePattern"].FormulaU = "0";
+                textShape.CellsU["FillPattern"].FormulaU = "0";
+
+                Debug.WriteLine($"[ExecuteCreateTextBoxCommand] Created text with content: '{content}' at ({visioX}, {visioY})");
+
+                // Track the created shape
+                var shapeInfo = new VisioPlugin.ShapeInfo
+                {
+                    ShapeId = textShape.ID16.ToString(),
+                    ShapeType = "Text",
+                    Text = content
+                };
+                currentCommandShapes.Add(shapeInfo);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ExecuteCreateTextBoxCommand] [Error] Failed to create text box: {ex.Message}");
+                Debug.WriteLine($"[ExecuteCreateTextBoxCommand] [Error] Failed to create text: {ex.Message}");
             }
         }
 

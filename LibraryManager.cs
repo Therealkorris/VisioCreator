@@ -486,14 +486,162 @@ namespace VisioPlugin
             var activePage = visioApplication?.ActivePage;
             if (activePage == null) return shapes;
 
+            // First pass: Collect all shapes and their basic information
             foreach (Visio.Shape shape in activePage.Shapes)
             {
-                shapes.Add(new VisioPlugin.ShapeInfo
+                var shapeInfo = new VisioPlugin.ShapeInfo
                 {
                     ShapeId = shape.ID16.ToString(),
                     ShapeType = shape.Name,
-                    ShapeColor = shape.CellsU["FillForegnd"].ResultStr[""]
-                });
+                    ShapeColor = shape.CellsU["FillForegnd"].ResultStr[""],
+                    Text = shape.Text,
+                    PosX = shape.CellsU["PinX"].ResultIU,
+                    PosY = shape.CellsU["PinY"].ResultIU,
+                    Width = shape.CellsU["Width"].ResultIU,
+                    Height = shape.CellsU["Height"].ResultIU,
+                    Angle = shape.CellsU["Angle"].ResultIU,
+                    ZOrder = shape.Index
+                };
+
+                // Check if it's a connector
+                bool isConnector = shape.CellExists["BeginX", 0] != 0 && shape.CellExists["EndX", 0] != 0;
+                shapeInfo.IsConnector = isConnector;
+
+                if (isConnector)
+                {
+                    shapeInfo.BeginX = shape.CellsU["BeginX"].ResultIU;
+                    shapeInfo.BeginY = shape.CellsU["BeginY"].ResultIU;
+                    shapeInfo.EndX = shape.CellsU["EndX"].ResultIU;
+                    shapeInfo.EndY = shape.CellsU["EndY"].ResultIU;
+                    
+                    // Get connector type and styling
+                    try
+                    {
+                        string routeStyle = shape.CellsU["ShapeRouteStyle"].ResultStr[""];
+                        // Map the route style to meaningful values
+                        shapeInfo.ConnectorType = routeStyle switch
+                        {
+                            "0" => "Default",
+                            "1" => "Straight",
+                            "2" => "Curved",
+                            "3" => "Right Angle",
+                            "4" => "Curved Right Angle",
+                            _ => routeStyle
+                        };
+
+                        // Get line pattern and weight
+                        shapeInfo.ConnectorPattern = shape.CellsU["LinePattern"].ResultStr[""];
+                        shapeInfo.ConnectorWeight = shape.CellsU["LineWeight"].ResultIU;
+                        shapeInfo.ConnectorRounding = shape.CellsU["Rounding"].ResultStr[""];
+
+                        // Get routing points only if the shape has a geometry section
+                        if (shape.SectionExists[(short)Visio.VisSectionIndices.visSectionFirstComponent, 0] != 0)
+                        {
+                            var geomSection = shape.Section[(short)Visio.VisSectionIndices.visSectionFirstComponent];
+                            for (short row = 0; row < geomSection.Count; row++)
+                            {
+                                try
+                                {
+                                    // Get X and Y coordinates directly without trying to access row names
+                                    double x = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionFirstComponent, row, (short)Visio.VisCellIndices.visX].ResultIU;
+                                    double y = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionFirstComponent, row, (short)Visio.VisCellIndices.visY].ResultIU;
+                                    
+                                    shapeInfo.RoutingPoints.Add(new VisioPlugin.Point(x, y));
+                                    Debug.WriteLine($"Added routing point: ({x}, {y})");
+
+                                    // Try to get control points if they exist
+                                    try
+                                    {
+                                        double control1X = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionFirstComponent, row, (short)Visio.VisCellIndices.visControl1X].ResultIU;
+                                        double control1Y = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionFirstComponent, row, (short)Visio.VisCellIndices.visControl1Y].ResultIU;
+                                        shapeInfo.ControlPoints.Add(new VisioPlugin.ControlPoint(control1X, control1Y, "Control1"));
+                                    }
+                                    catch
+                                    {
+                                        // Control points don't exist for this vertex - this is normal
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"Error processing geometry point at row {row}: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error getting connector styling: {ex.Message}");
+                        shapeInfo.ConnectorType = "Default";
+                    }
+
+                    // Get connected shapes
+                    try
+                    {
+                        // Examine each connection to determine source and target
+                        foreach (Visio.Connect connect in shape.Connects)
+                        {
+                            // The FromCell will tell us if this is a begin or end point
+                            string cellName = connect.FromCell.Name.ToLower();
+                            
+                            // The ToSheet is the shape we're connected to
+                            Visio.Shape connectedShape = connect.ToSheet;
+                            
+                            if (cellName.Contains("beginx") || cellName.Contains("beginy"))
+                            {
+                                shapeInfo.SourceShapeId = connectedShape.ID16.ToString();
+                                Debug.WriteLine($"Found source shape: {shapeInfo.SourceShapeId} via {cellName}");
+                            }
+                            else if (cellName.Contains("endx") || cellName.Contains("endy"))
+                            {
+                                shapeInfo.TargetShapeId = connectedShape.ID16.ToString();
+                                Debug.WriteLine($"Found target shape: {shapeInfo.TargetShapeId} via {cellName}");
+                            }
+                        }
+
+                        Debug.WriteLine($"Connector {shape.ID16} - Source: {shapeInfo.SourceShapeId}, Target: {shapeInfo.TargetShapeId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error getting connector endpoints: {ex.Message}");
+                    }
+                }
+
+                // Get custom properties only if the shape has a properties section
+                try
+                {
+                    if (shape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] != 0)
+                    {
+                        var propSection = shape.Section[(short)Visio.VisSectionIndices.visSectionProp];
+                        var rowCount = propSection.Count;
+
+                        for (short row = 0; row < rowCount; row++)
+                        {
+                            string propName = shape.CellsSRC[
+                                (short)Visio.VisSectionIndices.visSectionProp,
+                                row,
+                                (short)Visio.VisCellIndices.visCustPropsLabel
+                            ].ResultStr[""];
+
+                            string propValue = shape.CellsSRC[
+                                (short)Visio.VisSectionIndices.visSectionProp,
+                                row,
+                                (short)Visio.VisCellIndices.visCustPropsValue
+                            ].ResultStr[""];
+                            
+                            if (!string.IsNullOrEmpty(propName))
+                            {
+                                shapeInfo.CustomProperties[propName] = propValue;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error getting custom properties for shape {shape.Name}: {ex.Message}");
+                }
+
+                shapes.Add(shapeInfo);
+                Debug.WriteLine($"Added shape: {shapeInfo}");
             }
 
             return shapes;

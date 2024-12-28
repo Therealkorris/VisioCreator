@@ -171,7 +171,7 @@ This document provides a comprehensive overview of the Visio AI-Assistant Plugin
 
 1. **Prerequisites:** Ensure you have Visio, Visual Studio (with .NET and Office development workloads), n8n, and Ollama installed and running.
 2. **Install the Plugin:** Build the Visio plugin solution in Visual Studio and run it. This will install the plugin into Visio.
-3. **Import n8n Workflow:** Import the `OngoingAgent.json` workflow into your n8n instance and activate it.
+3. **Import n8n Workflow:** Import the `Working_Agent_multi_creation.json` workflow into your n8n instance and activate it.
 4. **Connect:** In the plugin's Ribbon tab, click "Connect" to establish communication with the AI server (via n8n).
 5. **Select a Model:** Choose an AI model from the dropdown menu in the "AI Chat Pane."
 6. **Start Chatting:** Type your commands into the chat input box and press Enter or click "Send."
