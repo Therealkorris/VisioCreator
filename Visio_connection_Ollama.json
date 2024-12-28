@@ -1,120 +1,435 @@
 {
-    "nodes": [
-      {
-        "parameters": {
-          "url": "http://127.0.0.1:11434/v1/models",
-          "sendBody": true,
-          "bodyParameters": {
-            "parameters": [
-              {}
-            ]
-          },
-          "options": {}
-        },
-        "id": "3c437576-7935-4457-b9de-f0e5d520f0c8",
-        "name": "HTTP Request",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          780,
-          580
-        ]
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/shape_catalog",
+        "options": {}
       },
-      {
-        "parameters": {
-          "jsCode": "// Extract the models from the HTTP request response (assuming they are inside \"data\")\nconst models = $input.first().json.data.map(model => model.id);\n\n// Return the models in a structured response\nreturn [\n  {\n    json: {\n      status: 'Success',\n      availableModels: models\n    }\n  }\n];\n"
-        },
-        "id": "e06e30ed-6e65-4eaf-a0ed-6e0619f0a50f",
-        "name": "Code",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          980,
-          580
-        ]
+      "id": "d91881cd-8b95-40df-a7df-91c152d848aa",
+      "name": "Shape Catalog Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        640,
+        660
+      ],
+      "webhookId": "6b06eac6-0691-45eb-942f-62c66efbd250"
+    },
+    {
+      "parameters": {
+        "functionCode": "const categories = $json.body;  // Access the body with stencil files and shapes\n\nconst shapeEntries = [];\n\nfor (const stencilFile in categories) {\n    const shapes = categories[stencilFile];\n    shapes.forEach(shape => {\n        shapeEntries.push({\n            json: {\n                library: stencilFile, // Library name\n                shape: shape         // Shape name\n            }\n        });\n    });\n}\n\nreturn shapeEntries;\n"
       },
-      {
-        "parameters": {
-          "respondWith": "json",
-          "responseBody": "={{ $json.availableModels }}",
-          "options": {}
-        },
-        "id": "e6da1456-ab5e-45b6-8c0b-fa4e9ccc6757",
-        "name": "Respond to Webhook",
-        "type": "n8n-nodes-base.respondToWebhook",
-        "typeVersion": 1.1,
-        "position": [
-          1200,
-          580
-        ]
-      },
-      {
-        "parameters": {
-          "content": "## Connection and Ollama\n** Connects via Webhook, and connects to API\n** List models back to AIChatPane",
-          "height": 300,
-          "width": 956
-        },
-        "id": "53ac8f95-c143-4c5d-b6fe-a81ad361b616",
-        "name": "Sticky Note",
-        "type": "n8n-nodes-base.stickyNote",
-        "typeVersion": 1,
-        "position": [
-          460,
-          460
-        ]
-      },
-      {
-        "parameters": {
-          "httpMethod": "POST",
-          "path": "/connection_model_list",
-          "responseMode": "responseNode",
-          "options": {}
-        },
-        "id": "ff2c634d-ca57-4838-b3b3-251d84cb8cd6",
-        "name": "API_Connection_model_visio",
-        "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2,
-        "position": [
-          540,
-          580
-        ],
-        "webhookId": "0b982041-1f25-44b1-947c-d68c5e827e57"
-      }
-    ],
-    "connections": {
-      "HTTP Request": {
-        "main": [
-          [
+      "id": "a434f84e-749e-4757-93b1-a84235e849d7",
+      "name": "Process Categories",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        880,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "stencils",
+        "fieldsUi": {
+          "fieldValues": [
             {
-              "node": "Code",
-              "type": "main",
-              "index": 0
+              "fieldId": "library",
+              "fieldValue": "={{$json[\"library\"]}}"
+            },
+            {
+              "fieldId": "shape",
+              "fieldValue": "={{$json[\"shape\"]}}"
             }
           ]
-        ]
+        }
       },
-      "Code": {
-        "main": [
-          [
-            {
-              "node": "Respond to Webhook",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "API_Connection_model_visio": {
-        "main": [
-          [
-            {
-              "node": "HTTP Request",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        660
+      ],
+      "id": "48ad9344-fa39-4c96-9fd2-1dbf3febeb6c",
+      "name": "Supabase_categories",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
       }
     },
-    "pinData": {}
-  }
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/ShapeData",
+        "options": {}
+      },
+      "id": "ca26656e-7607-4fd1-a5d4-eebffd48cdb4",
+      "name": "ShapeData_API1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        180,
+        60
+      ],
+      "webhookId": "shape-data-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log the entire input to debug the structure\nconsole.log($input.first().json);\n\n// Attempt to access shapes data from different sources\nconst inputData = $input.first().json.body || $input.first().json; // Supports both webhook and chat\n\n// Ensure the structure exists\nif (!inputData || !inputData.shapes) {\n  throw new Error('Shapes data is missing or not properly formatted');\n}\n\n// Debugging shapes structure\nconsole.log(inputData.shapes);\n\n// Access shapes array directly\nconst shapes = inputData.shapes.shapes || inputData.shapes; // Adjust based on structure\nif (!shapes) {\n  throw new Error('Shapes array is missing or not properly formatted');\n}\n\n// Map keys to exact Supabase table column names\nconst transformKeysForSupabase = (obj) => {\n  const keyMap = {\n    ShapeId: \"shape_id\",\n    ShapeType: \"shape_type\",\n    ShapeColor: \"shape_color\",\n    Text: \"text\",\n    PosX: \"pos_x\",\n    PosY: \"pos_y\",\n    Width: \"width\",\n    Height: \"height\",\n    Angle: \"angle\",\n    ZOrder: \"z_order\",\n    CustomProperties: \"custom_properties\",\n    IsConnector: \"is_connector\",\n    ConnectorType: \"connector_type\",\n    SourceShapeId: \"source_shape_id\",\n    TargetShapeId: \"target_shape_id\",\n    BeginX: \"begin_x\",\n    BeginY: \"begin_y\",\n    EndX: \"end_x\",\n    EndY: \"end_y\",\n    RoutingPoints: \"routing_points\",\n    ConnectorPattern: \"connector_pattern\",\n    ConnectorWeight: \"connector_weight\",\n    ConnectorRounding: \"connector_rounding\",\n    ControlPoints: \"control_points\",\n  };\n\n  const newObj = {};\n  for (const key in obj) {\n    if (obj.hasOwnProperty(key)) {\n      const newKey = keyMap[key] || key.toLowerCase();\n      newObj[newKey] = obj[key];\n    }\n  }\n  return newObj;\n};\n\n// Split and transform shapes into individual items\nreturn shapes.map(shape => ({ json: transformKeysForSupabase(shape) }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        200
+      ],
+      "name": "Split Shapes",
+      "id": "6e006c56-5aec-4e04-95c8-de3eabe2689e"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "shapes",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        560,
+        0
+      ],
+      "name": "Supabase_get_update",
+      "id": "ddedf93f-6a79-4268-8e8e-5779edb899bd",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "shape_id",
+              "field2": "shape_id"
+            }
+          ]
+        },
+        "options": {
+          "multipleMatches": "first"
+        }
+      },
+      "type": "n8n-nodes-base.compareDatasets",
+      "typeVersion": 2.3,
+      "position": [
+        860,
+        100
+      ],
+      "id": "4722861c-02e7-4063-9b3b-5185335918ea",
+      "name": "Compare Datasets"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "shapes",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "shape_id",
+              "condition": "eq",
+              "keyValue": "={{ $json['shape_id'] }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        -40
+      ],
+      "name": "Delete Shape",
+      "id": "ebb6f9bb-ec4e-4ef9-96c7-b8460f1c1125",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const updatedData = {};\n  \n  // Iterate through all keys in the 'different' object\n  if (item.json.different) {\n    Object.keys(item.json.different).forEach(key => {\n      const inputB = item.json.different[key]?.inputB;\n      if (inputB !== undefined && inputB !== null) {\n        updatedData[key] = inputB; // Use the value from Input B for updates\n      }\n    });\n  }\n\n  if (Object.keys(updatedData).length === 0) {\n    return null; // Skip if no updates\n  }\n\n  return {\n    json: {\n      ...item.json.keys, // Include identifying keys (like shape_id)\n      ...updatedData, // Include the updated fields\n    },\n  };\n}).filter(item => item !== null); // Filter out null items\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        120
+      ],
+      "id": "9506b24f-e545-4e68-a681-29e818878345",
+      "name": "Clean_compare",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "tableId": "shapes",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json['id'] }}"
+            },
+            {
+              "fieldId": "shape_id",
+              "fieldValue": "={{ $json['shape_id'] }}"
+            },
+            {
+              "fieldId": "shape_type",
+              "fieldValue": "={{ $json['shape_type'] }}"
+            },
+            {
+              "fieldId": "shape_color",
+              "fieldValue": "={{ $json['shape_color'] }}"
+            },
+            {
+              "fieldId": "text",
+              "fieldValue": "={{ $json['text'] }}"
+            },
+            {
+              "fieldId": "pos_x",
+              "fieldValue": "={{ $json['pos_x'] }}"
+            },
+            {
+              "fieldId": "pos_y",
+              "fieldValue": "={{ $json['pos_y'] }}"
+            },
+            {
+              "fieldId": "width",
+              "fieldValue": "={{ $json['width'] }}"
+            },
+            {
+              "fieldId": "height",
+              "fieldValue": "={{ $json['height'] }}"
+            },
+            {
+              "fieldId": "angle",
+              "fieldValue": "={{ $json['angle'] }}"
+            },
+            {
+              "fieldId": "z_order",
+              "fieldValue": "={{ $json['z_order'] }}"
+            },
+            {
+              "fieldId": "custom_properties",
+              "fieldValue": "={{ $json['custom_properties'] }}"
+            },
+            {
+              "fieldId": "is_connector",
+              "fieldValue": "={{ $json['is_connector'] }}"
+            },
+            {
+              "fieldId": "connector_type",
+              "fieldValue": "={{ $json['connector_type'] }}"
+            },
+            {
+              "fieldId": "source_shape_id",
+              "fieldValue": "={{ $json['source_shape_id'] }}"
+            },
+            {
+              "fieldId": "target_shape_id",
+              "fieldValue": "={{ $json['target_shape_id'] }}"
+            },
+            {
+              "fieldId": "begin_x",
+              "fieldValue": "={{ $json['begin_x'] }}"
+            },
+            {
+              "fieldId": "begin_y",
+              "fieldValue": "={{ $json['begin_y'] }}"
+            },
+            {
+              "fieldId": "end_x",
+              "fieldValue": "={{ $json['end_x'] }}"
+            },
+            {
+              "fieldId": "end_y",
+              "fieldValue": "={{ $json['end_y'] }}"
+            },
+            {
+              "fieldId": "routing_points",
+              "fieldValue": "={{ $json['routing_points'] }}"
+            },
+            {
+              "fieldId": "connector_pattern",
+              "fieldValue": "={{ $json['connector_pattern'] }}"
+            },
+            {
+              "fieldId": "connector_weight",
+              "fieldValue": "={{ $json['connector_weight'] }}"
+            },
+            {
+              "fieldId": "connector_rounding",
+              "fieldValue": "={{ $json['connector_rounding'] }}"
+            },
+            {
+              "fieldId": "control_points",
+              "fieldValue": "={{ $json['control_points'] }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        280
+      ],
+      "name": "Supabase_Insert_Shape2",
+      "id": "49692086-fc22-44fd-86c9-1e41eaef596f",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "shapes",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "shape_id",
+              "condition": "eq",
+              "keyValue": "={{ $json['shape_id'] }}"
+            }
+          ]
+        },
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        120
+      ],
+      "name": "Update or Insert Shape",
+      "id": "21fd1a73-a2e7-4705-ba90-6160d2649061",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Shape Catalog Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Categories": {
+      "main": [
+        [
+          {
+            "node": "Supabase_categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShapeData_API1": {
+      "main": [
+        [
+          {
+            "node": "Split Shapes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase_get_update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Shapes": {
+      "main": [
+        [
+          {
+            "node": "Compare Datasets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Supabase_get_update": {
+      "main": [
+        [
+          {
+            "node": "Compare Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Datasets": {
+      "main": [
+        [
+          {
+            "node": "Delete Shape",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Clean_compare",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase_Insert_Shape2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean_compare": {
+      "main": [
+        [
+          {
+            "node": "Update or Insert Shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}

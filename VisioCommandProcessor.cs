@@ -384,27 +384,43 @@ namespace VisioPlugin
                 double visioX = (xPercent / 100.0) * pageWidth;
                 double visioY = pageHeight - ((yPercent / 100.0) * pageHeight); // Adjust for Visio's coordinate system
 
-                // Insert text using Visio's native text insertion
-                var textShape = activePage.Drop(
-                    activePage.Application.Documents["VISIO.EXE"].Masters.ItemU["Text Block"],
-                    visioX,
-                    visioY
+                // Calculate initial size based on text length and font size
+                double initialWidth = Math.Max(0.5, content.Length * fontSize * 0.08);
+                double initialHeight = fontSize * 0.15;
+
+                // Create a shape for text
+                var textShape = activePage.DrawRectangle(
+                    visioX - (initialWidth / 2),
+                    visioY - (initialHeight / 2),
+                    visioX + (initialWidth / 2),
+                    visioY + (initialHeight / 2)
                 );
 
-                // Set the text content
+                // Set text properties
                 textShape.Text = content;
 
-                // Set font size and color
+                // Set font size and color using CellsU instead of CharProps
                 textShape.CellsU["Char.Size"].FormulaU = $"{fontSize} pt";
                 textShape.CellsU["Char.Color"].FormulaU = $"RGB({ConvertColorToRGB(color)})";
 
-                // Center text alignment
-                textShape.CellsU["VerticalAlign"].FormulaU = "1";  // Middle
-                textShape.CellsU["TextAlignHorz"].FormulaU = "1"; // Center
-
-                // Make sure there's no fill or line
+                // Remove shape border and fill
                 textShape.CellsU["LinePattern"].FormulaU = "0";
                 textShape.CellsU["FillPattern"].FormulaU = "0";
+
+                // Set text alignment
+                textShape.CellsU["VerticalAlign"].FormulaU = "1"; // Middle
+                textShape.CellsU["HAlign"].FormulaU = "1"; // Center
+
+                // Allow text to resize shape
+                textShape.CellsU["LockTextEdit"].FormulaU = "0";
+                textShape.CellsU["LockWidth"].FormulaU = "0";
+                textShape.CellsU["LockHeight"].FormulaU = "0";
+
+                // Set text block properties
+                textShape.CellsU["TxtWidth"].FormulaU = "Width*1";
+                textShape.CellsU["TxtHeight"].FormulaU = "Height*1";
+                textShape.CellsU["TxtPinX"].FormulaU = "Width*0.5";
+                textShape.CellsU["TxtPinY"].FormulaU = "Height*0.5";
 
                 Debug.WriteLine($"[ExecuteCreateTextBoxCommand] Created text with content: '{content}' at ({visioX}, {visioY})");
 
@@ -420,6 +436,7 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ExecuteCreateTextBoxCommand] [Error] Failed to create text: {ex.Message}");
+                throw; // Rethrow to ensure the error is properly reported
             }
         }
 
