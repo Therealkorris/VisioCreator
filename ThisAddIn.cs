@@ -25,7 +25,46 @@ namespace VisioPlugin
         private System.Windows.Forms.Control uiControl;
         internal string CurrentCategory { get; set; }
 
-        public string apiEndpoint = "http://localhost:5678/webhook";
+        private string _apiEndpoint = "http://localhost:5678/webhook";
+        public string apiEndpoint
+        {
+            get => _apiEndpoint;
+            set
+            {
+                try
+                {
+                    // Ensure proper URL format
+                    string formattedUrl = value;
+                    if (!formattedUrl.StartsWith("http://") && !formattedUrl.StartsWith("https://"))
+                    {
+                        formattedUrl = "http://" + formattedUrl;
+                    }
+
+                    if (Uri.TryCreate(formattedUrl, UriKind.Absolute, out Uri uri))
+                    {
+                        _apiEndpoint = formattedUrl;
+                        ApiConfig.UpdateFromApiEndpoint(formattedUrl);
+                        Debug.WriteLine($"[ThisAddIn] API Endpoint updated to: {formattedUrl}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[ThisAddIn] Invalid API Endpoint format: {value}");
+                        MessageBox.Show("Please enter a valid URL (e.g., http://localhost:5678/webhook)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ThisAddIn] Error updating API Endpoint: {ex.Message}");
+                    MessageBox.Show($"Error updating API Endpoint: {ex.Message}");
+                }
+            }
+        }
+
+        public string GetAPIEndpointText(Office.IRibbonControl control)
+        {
+            return _apiEndpoint;
+        }
+
         public bool isConnected = false;
         private string[] availableModels = new string[0];
         private HttpClient httpClient = new HttpClient();
@@ -47,6 +86,9 @@ namespace VisioPlugin
         {
             try
             {
+                // Set default API configuration
+                ApiConfig.UpdateFromApiEndpoint("http://localhost:5678/webhook");
+                
                 Debug.WriteLine("Initializing Visio application...");
                 visioApplication = (Visio.Application)Application;
 
@@ -60,7 +102,7 @@ namespace VisioPlugin
                 commandProcessor = new VisioCommandProcessor(visioApplication, libraryManager);
 
                 Debug.WriteLine("Initializing VisioChatManager...");
-                visioChatManager = new VisioChatManager(selectedModel, apiEndpoint, availableModels, libraryManager, AppendToChatHistory, aiChatPane);
+                visioChatManager = new VisioChatManager(selectedModel, ApiConfig.GetWebhookUrl(), availableModels, libraryManager, AppendToChatHistory, aiChatPane);
 
                 Debug.WriteLine("Starting webhook listener...");
                 _ = StartWebhookListener(VISIO_PORT);
@@ -98,12 +140,12 @@ namespace VisioPlugin
                 var jsonString = JsonConvert.SerializeObject(shapesCatalog);
                 var content = new StringContent(jsonString, Encoding.UTF8, "application/json");
 
-                string n8nWebhookUrl = $"http://localhost:{N8N_PORT}/webhook/shape_catalog";
+                string n8nWebhookUrl = ApiConfig.GetWebhookUrl("shape_catalog");
 
                 var response = await httpClient.PostAsync(n8nWebhookUrl, content);
                 response.EnsureSuccessStatusCode();
 
-                Debug.WriteLine("[SendShapesToN8nAsync] Shape catalog sent successfully to /webhook/shape_catalog.");
+                Debug.WriteLine("[SendShapesToN8nAsync] Shape catalog sent successfully.");
             }
             catch (Exception ex)
             {
@@ -120,12 +162,17 @@ namespace VisioPlugin
                 "visio-command",
                 "list-shapes",
                 "image-agent",
-                "chat-agent"
+                "chat-agent",
+                "ShapeData"
             };
+
+            // Always use VISIO_PORT (5680) for the listener
+            Debug.WriteLine($"[StartWebhookListener] Using Visio port: {VISIO_PORT}");
 
             foreach (var endpoint in endpoints)
             {
-                var prefix = $"http://localhost:{port}/{endpoint}/";
+                // Use direct paths for all endpoints
+                var prefix = $"http://localhost:{VISIO_PORT}/{endpoint}/";
                 listener.Prefixes.Add(prefix);
                 Debug.WriteLine($"Added listener prefix: {prefix}");
             }
@@ -133,7 +180,7 @@ namespace VisioPlugin
             try
             {
                 listener.Start();
-                Debug.WriteLine($"Webhook Listening on port {port}");
+                Debug.WriteLine($"Webhook Listening on port {VISIO_PORT}");
                 
                 while (listener.IsListening)
                 {
@@ -214,11 +261,62 @@ namespace VisioPlugin
                         }
                         else if (requestPath == "/visio-command/")
                         {
-                            string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
-                            Debug.WriteLine($"[Visio-Command] Received command: {jsonCommand}");
-                            await ProcessWebhookCommand(jsonCommand);
-                            await Task.Delay(200); // Increased delay to ensure command processing
-                            CompleteRequest(requestId);
+                            try
+                            {
+                                string jsonCommand = await new System.IO.StreamReader(context.Request.InputStream).ReadToEndAsync();
+                                Debug.WriteLine($"[Visio-Command] Received command: {jsonCommand}");
+                                
+                                try
+                                {
+                                    await ProcessWebhookCommand(jsonCommand);
+                                    await Task.Delay(200); // Increased delay to ensure command processing
+                                    
+                                    // Send success response
+                                    var response = new { status = "success", message = "Command processed successfully" };
+                                    var jsonResponse = JsonConvert.SerializeObject(response);
+                                    var buffer = Encoding.UTF8.GetBytes(jsonResponse);
+                                    
+                                    context.Response.StatusCode = 200;
+                                    context.Response.ContentType = "application/json";
+                                    context.Response.ContentLength64 = buffer.Length;
+                                    await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                                }
+                                catch (Exception ex)
+                                {
+                                    // Send error response
+                                    var response = new { status = "error", message = ex.Message };
+                                    var jsonResponse = JsonConvert.SerializeObject(response);
+                                    var buffer = Encoding.UTF8.GetBytes(jsonResponse);
+                                    
+                                    context.Response.StatusCode = 500;
+                                    context.Response.ContentType = "application/json";
+                                    context.Response.ContentLength64 = buffer.Length;
+                                    await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                                }
+                                finally
+                                {
+                                    context.Response.Close();
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Visio-Command] Error processing request: {ex.Message}");
+                                try
+                                {
+                                    var response = new { status = "error", message = "Internal server error" };
+                                    var jsonResponse = JsonConvert.SerializeObject(response);
+                                    var buffer = Encoding.UTF8.GetBytes(jsonResponse);
+                                    
+                                    context.Response.StatusCode = 500;
+                                    context.Response.ContentType = "application/json";
+                                    context.Response.ContentLength64 = buffer.Length;
+                                    await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                                }
+                                finally
+                                {
+                                    context.Response.Close();
+                                }
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -284,50 +382,65 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"[ProcessWebhookCommand] Received command: {jsonCommand}");
 
-                if (commandProcessor != null)
+                if (commandProcessor == null)
                 {
-                    var affectedShapes = await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand));
-                    Debug.WriteLine($"[ProcessWebhookCommand] Command processed. Received {affectedShapes?.Count ?? 0} shapes from processor");
-                    
-                    if (affectedShapes != null && affectedShapes.Any())
-                    {
-                        Debug.WriteLine("[ProcessWebhookCommand] Shapes received:");
-                        foreach (var shape in affectedShapes)
-                        {
-                            Debug.WriteLine($"[ProcessWebhookCommand] Shape: {shape}");
-                        }
+                    throw new InvalidOperationException("Command processor is not initialized.");
+                }
 
-                        // Check if we can access AIChatPane
-                        if (aiChatPane != null && !aiChatPane.IsDisposed)
+                var affectedShapes = await Task.Run(() => commandProcessor.ProcessCommand(jsonCommand));
+                Debug.WriteLine($"[ProcessWebhookCommand] Command processed. Received {affectedShapes?.Count ?? 0} shapes from processor");
+                
+                if (affectedShapes != null && affectedShapes.Any())
+                {
+                    Debug.WriteLine("[ProcessWebhookCommand] Shapes received:");
+                    foreach (var shape in affectedShapes)
+                    {
+                        Debug.WriteLine($"[ProcessWebhookCommand] Shape: {shape}");
+                    }
+
+                    // Check if we can access AIChatPane
+                    if (aiChatPane != null && !aiChatPane.IsDisposed)
+                    {
+                        var currentCommand = aiChatPane.GetCurrentCommand();
+                        Debug.WriteLine($"[ProcessWebhookCommand] Current command found: {(currentCommand != null ? currentCommand.Id : "null")}");
+                        if (currentCommand != null)
                         {
-                            var currentCommand = aiChatPane.GetCurrentCommand();
-                            Debug.WriteLine($"[ProcessWebhookCommand] Current command found: {(currentCommand != null ? currentCommand.Id : "null")}");
-                            if (currentCommand != null)
-                            {
-                                currentCommand.AffectedShapes = new List<ShapeInfo>(affectedShapes);
-                                Debug.WriteLine($"[ProcessWebhookCommand] Added {affectedShapes.Count} shapes to command");
-                                aiChatPane.UpdateCommandStatus(currentCommand);
-                            }
-                            else
-                            {
-                                Debug.WriteLine("[ProcessWebhookCommand] No current command found in AIChatPane");
-                            }
-                        }
-                        else
-                        {
-                            Debug.WriteLine("[ProcessWebhookCommand] AIChatPane is null or disposed");
+                            currentCommand.AffectedShapes = new List<ShapeInfo>(affectedShapes);
+                            currentCommand.Status = "Success";
+                            Debug.WriteLine($"[ProcessWebhookCommand] Added {affectedShapes.Count} shapes to command");
+                            aiChatPane.UpdateCommandStatus(currentCommand);
                         }
                     }
-                    Debug.WriteLine("[ProcessWebhookCommand] Command forwarded to VisioCommandProcessor.");
                 }
                 else
                 {
-                    Debug.WriteLine("[ProcessWebhookCommand] [Error] CommandProcessor is not initialized.");
+                    Debug.WriteLine("[ProcessWebhookCommand] No shapes were affected by the command");
+                    if (aiChatPane != null && !aiChatPane.IsDisposed)
+                    {
+                        var currentCommand = aiChatPane.GetCurrentCommand();
+                        if (currentCommand != null)
+                        {
+                            currentCommand.Status = "Failed";
+                            currentCommand.AIResponse = "No shapes were created or modified.";
+                            aiChatPane.UpdateCommandStatus(currentCommand);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ProcessWebhookCommand] [Error] Failed to process webhook command: {ex.Message}");
+                if (aiChatPane != null && !aiChatPane.IsDisposed)
+                {
+                    var currentCommand = aiChatPane.GetCurrentCommand();
+                    if (currentCommand != null)
+                    {
+                        currentCommand.Status = "Failed";
+                        currentCommand.AIResponse = $"Error: {ex.Message}";
+                        aiChatPane.UpdateCommandStatus(currentCommand);
+                    }
+                }
+                throw; // Re-throw to ensure the error is properly reported to the webhook caller
             }
         }
 
@@ -469,7 +582,34 @@ namespace VisioPlugin
 
                 Debug.WriteLine("Raw API Response: " + responseContent);
 
-                var modelList = JsonConvert.DeserializeObject<List<string>>(responseContent);
+                List<string> modelList;
+                try
+                {
+                    // First try parsing as a direct array
+                    modelList = JsonConvert.DeserializeObject<List<string>>(responseContent);
+                }
+                catch
+                {
+                    try
+                    {
+                        // If that fails, try parsing as an object with a code property
+                        var responseObj = JsonConvert.DeserializeObject<JObject>(responseContent);
+                        if (responseObj["code"] != null && responseObj["code"].Type == JTokenType.Array)
+                        {
+                            modelList = responseObj["code"].ToObject<List<string>>();
+                        }
+                        else
+                        {
+                            throw new Exception("Unexpected response format");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error parsing response: {ex.Message}");
+                        MessageBox.Show("Error parsing model list from API response.");
+                        return;
+                    }
+                }
 
                 Debug.WriteLine("Deserialized ModelResponse: " + (modelList?.Count ?? 0) + " models found.");
 

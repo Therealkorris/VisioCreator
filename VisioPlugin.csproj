@@ -247,6 +247,7 @@
   -->
   <ItemGroup>
     <Compile Include="AIChatPane.cs" />
+    <Compile Include="ApiConfig.cs" />
     <Compile Include="ChatManager.cs" />
     <Compile Include="LibraryManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">

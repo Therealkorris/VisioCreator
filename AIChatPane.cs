@@ -68,6 +68,8 @@ namespace VisioPlugin
         // Track the current command being processed
         private CommandDetails currentCommand = null;
 
+        private Button sendShapeDataButton;
+
         public AIChatPane(string model, string apiEndpoint, string[] models, LibraryManager libraryManager)
         {
             // Set initial form size first
@@ -165,6 +167,7 @@ namespace VisioPlugin
                 Dock = DockStyle.Bottom,
                 Height = 150,
                 Padding = new Padding(5),
+                AutoSize = false  // Add this to prevent auto-sizing
             };
 
             // Chat input TextBox
@@ -187,9 +190,11 @@ namespace VisioPlugin
                 FlowDirection = FlowDirection.LeftToRight,
                 Padding = new Padding(5),
                 Margin = new Padding(5),
+                AutoSize = false,  // Change to false
+                WrapContents = true  // Add this to ensure buttons wrap if needed
             };
 
-            // Initialize buttons
+            // Initialize buttons with consistent styling
             clearButton = new Button
             {
                 Text = "Clear",
@@ -197,6 +202,7 @@ namespace VisioPlugin
                 Height = 40,
                 FlatStyle = FlatStyle.Flat,
                 Margin = new Padding(5),
+                BackColor = System.Drawing.Color.White  // Add background color
             };
             clearButton.Click += ClearButton_Click;
 
@@ -207,6 +213,7 @@ namespace VisioPlugin
                 Height = 40,
                 FlatStyle = FlatStyle.Flat,
                 Margin = new Padding(5),
+                BackColor = System.Drawing.Color.White
             };
             uploadImageButton.Click += UploadImageButton_Click;
 
@@ -217,8 +224,20 @@ namespace VisioPlugin
                 Height = 40,
                 FlatStyle = FlatStyle.Flat,
                 Margin = new Padding(5),
+                BackColor = System.Drawing.Color.White
             };
             sendButton.Click += SendButton_Click;
+
+            sendShapeDataButton = new Button
+            {
+                Text = "Send Canvas Data",
+                Width = 120,
+                Height = 40,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5),
+                BackColor = System.Drawing.Color.LightBlue
+            };
+            sendShapeDataButton.Click += SendShapeDataButton_Click;
 
             toggleStatusButton = new Button
             {
@@ -227,6 +246,7 @@ namespace VisioPlugin
                 Height = 40,
                 FlatStyle = FlatStyle.Flat,
                 Margin = new Padding(5),
+                BackColor = System.Drawing.Color.White
             };
             toggleStatusButton.Click += ToggleStatusButton_Click;
 
@@ -316,11 +336,20 @@ namespace VisioPlugin
             };
 
             // Add buttons to button panel
-            buttonPanel.Controls.AddRange(new Control[] { clearButton, uploadImageButton, sendButton, toggleStatusButton });
+            buttonPanel.Controls.Clear();
+            buttonPanel.Controls.AddRange(new Control[] { 
+                clearButton, 
+                uploadImageButton, 
+                sendButton, 
+                sendShapeDataButton,
+                toggleStatusButton 
+            });
+
+            // Add the button panel to the bottom panel
+            bottomPanel.Controls.Add(buttonPanel);
 
             // Add controls to bottom panel
             bottomPanel.Controls.Add(chatInput);
-            bottomPanel.Controls.Add(buttonPanel);
 
             // Add controls to chat panel
             chatPanel.Controls.Add(chatHistory);
@@ -1045,6 +1074,41 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[HandleShapeSelection] Error in shape selection: {ex.Message}");
+            }
+        }
+
+        private async void SendShapeDataButton_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                AppendToChatHistory("Collecting canvas data...");
+                var shapes = libraryManager.ListAllShapes();
+                var pageSize = libraryManager.GetPageSize();
+
+                var canvasData = new
+                {
+                    shapes = shapes,
+                    pageInfo = JsonConvert.DeserializeObject(pageSize)
+                };
+
+                using (var client = new HttpClient())
+                {
+                    var jsonString = JsonConvert.SerializeObject(canvasData, Formatting.Indented);
+                    var content = new StringContent(jsonString, Encoding.UTF8, "application/json");
+
+                    Debug.WriteLine($"[SendShapeData] Sending canvas data: {jsonString}");
+                    var response = await client.PostAsync(ApiConfig.GetWebhookUrl("ShapeData"), content);
+                    response.EnsureSuccessStatusCode();
+
+                    AppendToChatHistory("Canvas data sent successfully!");
+                    Debug.WriteLine("[SendShapeData] Canvas data sent successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Error sending canvas data: {ex.Message}";
+                AppendToChatHistory(errorMessage);
+                Debug.WriteLine($"[SendShapeData] {errorMessage}");
             }
         }
 

@@ -49,19 +49,32 @@ namespace VisioPlugin
                     "application/json"
                 );
 
-                var response = await httpClient.PostAsync($"{apiEndpoint}/chat-agent", jsonContent);
-                response.EnsureSuccessStatusCode();
+                string chatEndpoint = ApiConfig.GetWebhookUrl("chat-agent");
+                Debug.WriteLine($"[SendMessage] Sending message to endpoint: {chatEndpoint}");
+                Debug.WriteLine($"[SendMessage] Payload: {await jsonContent.ReadAsStringAsync()}");
+                
+                var response = await httpClient.PostAsync(chatEndpoint, jsonContent);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"[SendMessage] Response Status: {response.StatusCode}");
+                Debug.WriteLine($"[SendMessage] Response Content: {responseContent}");
 
-                var responseString = await response.Content.ReadAsStringAsync();
-                Debug.WriteLine($"[Debug] Full AI Response (raw): {responseString}");
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorMessage = $"Server returned {response.StatusCode}: {responseContent}";
+                    Debug.WriteLine($"[SendMessage] Error: {errorMessage}");
+                    throw new HttpRequestException(errorMessage);
+                }
+
+                Debug.WriteLine($"[Debug] Full AI Response (raw): {responseContent}");
 
                 // Process the command and wait for it to complete
-                await ProcessAIResponse(responseString, userMessage);
+                await ProcessAIResponse(responseContent, userMessage);
             }
             catch (HttpRequestException ex)
             {
+                Debug.WriteLine($"[SendMessage] HTTP Error: {ex.Message}");
+                Debug.WriteLine($"[SendMessage] Stack Trace: {ex.StackTrace}");
                 appendToChatHistory("Error sending message (HttpRequestException): " + ex.Message);
-                Debug.WriteLine($"[Error] Sending message failed: {ex.Message}");
                 chatPane.UpdateCommandStatus(new CommandDetails
                 {
                     Command = "Error",
@@ -72,8 +85,9 @@ namespace VisioPlugin
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"[SendMessage] General Error: {ex.Message}");
+                Debug.WriteLine($"[SendMessage] Stack Trace: {ex.StackTrace}");
                 appendToChatHistory("Error: " + ex.Message);
-                Debug.WriteLine($"[Error] Sending message: {ex.Message}");
                 var commandDetails = chatPane.GetCurrentCommand();
                 if (commandDetails != null)
                 {
@@ -160,10 +174,11 @@ namespace VisioPlugin
                         multipartFormContent.Add(messageContent, "message");
                     }
 
-                    Debug.WriteLine($"[SendImageToN8n] Sending image: {Path.GetFileName(imagePath)} with model {SelectedModel} and message: {userMessage} to {apiEndpoint}/image-agent");
+                    string imageEndpoint = ApiConfig.GetWebhookUrl("image-agent");
+                    Debug.WriteLine($"[SendImageToN8n] Sending image: {Path.GetFileName(imagePath)} with model {SelectedModel} and message: {userMessage} to {imageEndpoint}");
 
                     // Send the POST request to the /image-agent endpoint
-                    var response = await httpClient.PostAsync($"{apiEndpoint}/image-agent", multipartFormContent);
+                    var response = await httpClient.PostAsync(imageEndpoint, multipartFormContent);
                     response.EnsureSuccessStatusCode();
 
                     // Read the response content
@@ -176,7 +191,8 @@ namespace VisioPlugin
             }
             catch (HttpRequestException ex)
             {
-                Debug.WriteLine($"[SendImageToN8n] HttpRequestException: {ex.Message}");
+                Debug.WriteLine($"[SendImageToN8n] HTTP Error: {ex.Message}");
+                Debug.WriteLine($"[SendImageToN8n] Stack Trace: {ex.StackTrace}");
                 appendToChatHistory($"Error sending image: {ex.Message}");
                 chatPane.UpdateCommandStatus(new CommandDetails
                 {
@@ -188,7 +204,8 @@ namespace VisioPlugin
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SendImageToN8n] Exception: {ex.Message}");
+                Debug.WriteLine($"[SendImageToN8n] General Error: {ex.Message}");
+                Debug.WriteLine($"[SendImageToN8n] Stack Trace: {ex.StackTrace}");
                 appendToChatHistory($"Error sending image: {ex.Message}");
                 chatPane.UpdateCommandStatus(new CommandDetails
                 {
@@ -239,10 +256,70 @@ namespace VisioPlugin
                     await Task.Run(() => chatPane.UpdateCommandStatus(commandDetails));
                 }
 
-                // Extract chat message
-                string chatMessage = IsValidJson(aiResponse) 
-                    ? await Task.Run(() => ExtractChatMessage(JObject.Parse(aiResponse))) 
-                    : aiResponse;
+                // Extract chat message and process Visio command if present
+                string chatMessage;
+                if (IsValidJson(aiResponse))
+                {
+                    var responseObj = JObject.Parse(aiResponse);
+                    
+                    // Check if this is a Visio command
+                    if (responseObj["command"] != null)
+                    {
+                        Debug.WriteLine("[ProcessAIResponse] Processing Visio command");
+                        // Create a new command object with the correct port
+                        var visioCommand = new JObject();
+                        foreach (var prop in responseObj.Properties())
+                        {
+                            if (prop.Name == "command")
+                            {
+                                visioCommand[prop.Name] = prop.Value;
+                            }
+                            else if (prop.Name == "parameters")
+                            {
+                                visioCommand[prop.Name] = prop.Value;
+                            }
+                        }
+
+                        // Send the command to the Visio webhook
+                        var visioWebhookUrl = ApiConfig.GetVisioWebhookUrl("visio-command");
+                        Debug.WriteLine($"[ProcessAIResponse] Sending command to Visio webhook: {visioWebhookUrl}");
+                        Debug.WriteLine($"[ProcessAIResponse] Command payload: {visioCommand}");
+                        
+                        var jsonContent = new StringContent(
+                            visioCommand.ToString(),
+                            Encoding.UTF8,
+                            "application/json"
+                        );
+
+                        try
+                        {
+                            var response = await httpClient.PostAsync(visioWebhookUrl, jsonContent);
+                            var responseContent = await response.Content.ReadAsStringAsync();
+                            Debug.WriteLine($"[ProcessAIResponse] Visio webhook response status: {response.StatusCode}");
+                            Debug.WriteLine($"[ProcessAIResponse] Visio webhook response: {responseContent}");
+                            
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                throw new HttpRequestException($"Visio webhook returned {response.StatusCode}: {responseContent}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[ProcessAIResponse] Error sending command to Visio webhook: {ex.Message}");
+                            throw;
+                        }
+                        
+                        chatMessage = "Processing Visio command...";
+                    }
+                    else
+                    {
+                        chatMessage = await Task.Run(() => ExtractChatMessage(responseObj));
+                    }
+                }
+                else
+                {
+                    chatMessage = aiResponse;
+                }
 
                 // Update command details
                 commandDetails.Status = "Success";

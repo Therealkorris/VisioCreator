@@ -33,7 +33,12 @@ namespace VisioPlugin
                       <button id='AddTestShapeButton' label='Add Test Shape' onAction='OnAddTestShapeClick' />
                     </group>
                     <group id='AIInteractionGroup' label='AI Interaction'>
-                      <editBox id='APIEndpointTextBox' label='API Endpoint' onChange='OnAPIEndpointChange' sizeString='http://localhost:11434/v1' />
+                      <editBox id='APIEndpointTextBox' 
+                              label='API Endpoint' 
+                              onChange='OnAPIEndpointChange'
+                              getText='GetAPIEndpointText'
+                              sizeString='http://localhost:5678/webhook-test-extra-padding'
+                              maxLength='255' />
                       <dropDown id='ModelSelectionDropDown' label='Select Model' 
                                 getItemCount='GetModelCount' 
                                 getItemLabel='GetModelLabel' 
@@ -148,6 +153,17 @@ namespace VisioPlugin
         public string GetConnectionStatus(Office.IRibbonControl control)
         {
             return addIn.isConnected ? "Connected" : "Not Connected";
+        }
+
+        public void OnModelSelectionChange(Office.IRibbonControl control, string selectedId, int selectedIndex)
+        {
+            Debug.WriteLine($"[OnModelSelectionChange] Selected model: {selectedId}, index: {selectedIndex}");
+            // No need to handle this as model selection is managed in AIChatPane
+        }
+
+        public string GetAPIEndpointText(Office.IRibbonControl control)
+        {
+            return addIn.GetAPIEndpointText(control);
         }
     }
 }
