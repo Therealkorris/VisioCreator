@@ -3,66 +3,6 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "/shape_catalog",
-        "options": {}
-      },
-      "id": "d91881cd-8b95-40df-a7df-91c152d848aa",
-      "name": "Shape Catalog Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        640,
-        660
-      ],
-      "webhookId": "6b06eac6-0691-45eb-942f-62c66efbd250"
-    },
-    {
-      "parameters": {
-        "functionCode": "const categories = $json.body;  // Access the body with stencil files and shapes\n\nconst shapeEntries = [];\n\nfor (const stencilFile in categories) {\n    const shapes = categories[stencilFile];\n    shapes.forEach(shape => {\n        shapeEntries.push({\n            json: {\n                library: stencilFile, // Library name\n                shape: shape         // Shape name\n            }\n        });\n    });\n}\n\nreturn shapeEntries;\n"
-      },
-      "id": "a434f84e-749e-4757-93b1-a84235e849d7",
-      "name": "Process Categories",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        880,
-        660
-      ]
-    },
-    {
-      "parameters": {
-        "tableId": "stencils",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "library",
-              "fieldValue": "={{$json[\"library\"]}}"
-            },
-            {
-              "fieldId": "shape",
-              "fieldValue": "={{$json[\"shape\"]}}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        1120,
-        660
-      ],
-      "id": "48ad9344-fa39-4c96-9fd2-1dbf3febeb6c",
-      "name": "Supabase_categories",
-      "credentials": {
-        "supabaseApi": {
-          "id": "V9PVkZMtKdUuNtZX",
-          "name": "Supabase account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
         "path": "/ShapeData",
         "options": {}
       },
@@ -330,31 +270,216 @@
           "name": "Supabase account"
         }
       }
+    },
+    {
+      "parameters": {
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "library",
+              "field2": "library"
+            },
+            {
+              "field1": "shape",
+              "field2": "shape"
+            }
+          ]
+        },
+        "options": {
+          "multipleMatches": "first"
+        }
+      },
+      "type": "n8n-nodes-base.compareDatasets",
+      "typeVersion": 2.3,
+      "position": [
+        900,
+        700
+      ],
+      "name": "Compare Catalog",
+      "id": "5eaa5523-f5c7-437c-8900-263822be6666"
+    },
+    {
+      "parameters": {
+        "tableId": "stencils",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "library",
+              "fieldValue": "={{$json['library']}}"
+            },
+            {
+              "fieldId": "shape",
+              "fieldValue": "={{$json['shape']}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        920
+      ],
+      "name": "Insert Catalog Entry",
+      "id": "f7967e2a-ccf8-4715-b4a2-aee5ee418db1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/shape_catalog",
+        "options": {}
+      },
+      "id": "e63fd407-8c38-4f03-9934-6dd6b0fdc5ac",
+      "name": "Shape Catalog Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        720
+      ],
+      "webhookId": "6b06eac6-0691-45eb-942f-62c66efbd250"
+    },
+    {
+      "parameters": {
+        "functionCode": "const categories = $json.body;  // Access the body with stencil files and shapes\n\nconst shapeEntries = [];\n\nfor (const stencilFile in categories) {\n    const shapes = categories[stencilFile];\n    shapes.forEach(shape => {\n        shapeEntries.push({\n            json: {\n                library: stencilFile, // Library name\n                shape: shape         // Shape name\n            }\n        });\n    });\n}\n\nreturn shapeEntries;\n"
+      },
+      "id": "565b77f0-e267-46e4-b597-b79ead09ad07",
+      "name": "Process Categories1",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        620,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "stencils",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "library",
+              "condition": "eq",
+              "keyValue": "={{$json['library']}}"
+            },
+            {
+              "keyName": "shape",
+              "condition": "eq",
+              "keyValue": "={{$json['shape']}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        560
+      ],
+      "name": "Delete Shape1",
+      "id": "4d728f3a-af9c-4809-b99d-c469beb24cdb",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const updatedData = {};\n\n  // Iterate through all keys in the 'different' object\n  if (item.json.different && typeof item.json.different === 'object') {\n    Object.keys(item.json.different).forEach(key => {\n      const inputB = item.json.different[key]?.inputB;\n      if (inputB !== undefined && inputB !== null) {\n        updatedData[key] = inputB; // Use the value from Input B for updates\n      }\n    });\n  }\n\n  // If no updates are available, return the keys object only\n  if (Object.keys(updatedData).length === 0) {\n    return {\n      json: {\n        ...item.json.keys, // Include identifying keys\n      },\n    };\n  }\n\n  // Return the combined object with 'keys' and updated data\n  return {\n    json: {\n      ...item.json.keys, // Include identifying keys\n      ...updatedData,    // Include updated fields\n    },\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        740
+      ],
+      "id": "0c392dae-fe2d-4030-9142-74bc5e7424b3",
+      "name": "Clean_compare2",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "stencils",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "library",
+              "condition": "eq",
+              "keyValue": "={{$json['library']}}"
+            },
+            {
+              "keyName": "shape",
+              "condition": "eq",
+              "keyValue": "={{$json['shape']}}"
+            }
+          ]
+        },
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        740
+      ],
+      "name": "Update Catalog Entry1",
+      "id": "93fcff61-1f99-4a2a-8187-b07f7d8be678",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return $input.all().map(item => {\n  return {\n    json: {\n      library: item.json.library,\n      shape: item.json.shape,\n    },\n  };\n});\n"
+      },
+      "id": "fa59e5f5-d2d5-450a-a1ac-29815bb03366",
+      "name": "Process Categories2",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        680,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "stencils",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        600
+      ],
+      "name": "Fetch Catalog Data",
+      "id": "3df8dbae-04b6-497c-be06-a400ac40b706",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
     }
   ],
   "connections": {
-    "Shape Catalog Webhook": {
-      "main": [
-        [
-          {
-            "node": "Process Categories",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Process Categories": {
-      "main": [
-        [
-          {
-            "node": "Supabase_categories",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "ShapeData_API1": {
       "main": [
         [
@@ -424,6 +549,92 @@
         [
           {
             "node": "Update or Insert Shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Catalog": {
+      "main": [
+        [
+          {
+            "node": "Delete Shape1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Clean_compare2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Catalog Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Catalog Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Process Categories1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Catalog Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Categories1": {
+      "main": [
+        [
+          {
+            "node": "Compare Catalog",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Clean_compare2": {
+      "main": [
+        [
+          {
+            "node": "Update Catalog Entry1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Categories2": {
+      "main": [
+        [
+          {
+            "node": "Compare Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Catalog Data": {
+      "main": [
+        [
+          {
+            "node": "Process Categories2",
             "type": "main",
             "index": 0
           }
