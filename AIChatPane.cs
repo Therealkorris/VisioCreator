@@ -1085,9 +1085,12 @@ namespace VisioPlugin
                 var shapes = libraryManager.ListAllShapes();
                 var pageSize = libraryManager.GetPageSize();
 
+                // Convert shapes to API format (using percentages)
+                var shapesApiFormat = shapes.Select(s => s.ToApiFormat()).ToList();
+
                 var canvasData = new
                 {
-                    shapes = shapes,
+                    shapes = shapesApiFormat,
                     pageInfo = JsonConvert.DeserializeObject(pageSize)
                 };
 

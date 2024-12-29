@@ -34,80 +34,27 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"[ProcessCommand] Clearing currentCommandShapes list");
                 currentCommandShapes.Clear();
-                JObject commandObject = JsonConvert.DeserializeObject<JObject>(jsonCommand);
 
-                string commandType = commandObject["command"]?.ToString();
-
-                if (string.IsNullOrEmpty(commandType))
+                // Try parsing as array first
+                JToken parsedCommand = JToken.Parse(jsonCommand);
+                
+                if (parsedCommand is JArray commandArray)
                 {
-                    Debug.WriteLine($"[ProcessCommand] [Error] Unknown or missing command type.");
-                    return currentCommandShapes;
-                }
-
-                if (commandType.Equals("CreateShapes", StringComparison.OrdinalIgnoreCase))
-                {
-                    commandType = "CreateShape";
-                }
-
-                // Handle different command types
-                if (commandType == "CreateShape")
-                {
-                    Debug.WriteLine($"[ProcessCommand] Processing CreateShape command");
-                    if (commandObject["parameters"]?["shapes"] is JArray shapesArray)
+                    Debug.WriteLine($"[ProcessCommand] Processing array of commands");
+                    foreach (JObject commandObject in commandArray)
                     {
-                        foreach (JObject shapeObject in shapesArray)
-                        {
-                            ExecuteCreateShapeCommand(shapeObject);
-                        }
-                    }
-                    else if (commandObject["parameters"] is JObject shapeParameters)
-                    {
-                        ExecuteCreateShapeCommand(shapeParameters);
+                        ProcessSingleCommand(commandObject);
                     }
                 }
-                else if (commandType == "ConnectShapes")
+                else if (parsedCommand is JObject singleCommand)
                 {
-                    ExecuteConnectShapesCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "AddTextToShape")
-                {
-                    ExecuteAddTextToShapeCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "SetShapeStyle")
-                {
-                    ExecuteSetShapeStyleCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "GroupShapes")
-                {
-                    ExecuteGroupShapesCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "UngroupShapes")
-                {
-                    ExecuteUngroupShapesCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "AlignShapes")
-                {
-                    ExecuteAlignShapesCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "DistributeShapes")
-                {
-                    ExecuteDistributeShapesCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "GetShapeProperties")
-                {
-                    ExecuteGetShapePropertiesCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "GetPageSize")
-                {
-                    ExecuteGetPageSizeCommand(commandObject["parameters"] as JObject);
-                }
-                else if (commandType == "CreateTextBox")
-                {
-                    ExecuteCreateTextBoxCommand(commandObject["parameters"] as JObject);
+                    Debug.WriteLine($"[ProcessCommand] Processing single command");
+                    ProcessSingleCommand(singleCommand);
                 }
                 else
                 {
-                    Debug.WriteLine($"[ProcessCommand] [Error] Unsupported command type: {commandType}");
+                    Debug.WriteLine($"[ProcessCommand] [Error] Invalid command format. Expected object or array.");
+                    return currentCommandShapes;
                 }
 
                 Debug.WriteLine($"[ProcessCommand] Command completed successfully. Total affected shapes: {currentCommandShapes.Count}");
@@ -123,6 +70,74 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"[ProcessCommand] Error processing command: {ex.Message}");
                 return currentCommandShapes;
+            }
+        }
+
+        private void ProcessSingleCommand(JObject commandObject)
+        {
+            string commandType = commandObject["command"]?.ToString();
+
+            if (string.IsNullOrEmpty(commandType))
+            {
+                Debug.WriteLine($"[ProcessSingleCommand] [Error] Unknown or missing command type.");
+                return;
+            }
+
+            if (commandType.Equals("CreateShapes", StringComparison.OrdinalIgnoreCase))
+            {
+                commandType = "CreateShape";
+            }
+
+            // Handle different command types
+            switch (commandType)
+            {
+                case "CreateShape":
+                    Debug.WriteLine($"[ProcessSingleCommand] Processing CreateShape command");
+                    if (commandObject["parameters"]?["shapes"] is JArray shapesArray)
+                    {
+                        foreach (JObject shapeObject in shapesArray)
+                        {
+                            ExecuteCreateShapeCommand(shapeObject);
+                        }
+                    }
+                    else if (commandObject["parameters"] is JObject shapeParameters)
+                    {
+                        ExecuteCreateShapeCommand(shapeParameters);
+                    }
+                    break;
+                case "ConnectShapes":
+                    ExecuteConnectShapesCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "AddTextToShape":
+                    ExecuteAddTextToShapeCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "SetShapeStyle":
+                    ExecuteSetShapeStyleCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "GroupShapes":
+                    ExecuteGroupShapesCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "UngroupShapes":
+                    ExecuteUngroupShapesCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "AlignShapes":
+                    ExecuteAlignShapesCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "DistributeShapes":
+                    ExecuteDistributeShapesCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "GetShapeProperties":
+                    ExecuteGetShapePropertiesCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "GetPageSize":
+                    ExecuteGetPageSizeCommand(commandObject["parameters"] as JObject);
+                    break;
+                case "CreateTextBox":
+                    ExecuteCreateTextBoxCommand(commandObject["parameters"] as JObject);
+                    break;
+                default:
+                    Debug.WriteLine($"[ProcessSingleCommand] [Error] Unsupported command type: {commandType}");
+                    break;
             }
         }
 
@@ -171,24 +186,21 @@ namespace VisioPlugin
             }
 
             JObject positionObject = shapeObject["position"] as JObject;
+            JObject sizeObject = shapeObject["size"] as JObject;
+            string color = shapeObject["color"]?.ToString();
+
+            // Get values as percentages (0-100)
             double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
             double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
-
-            JObject sizeObject = shapeObject["size"] as JObject;
             double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
             double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
 
-            string color = shapeObject["color"]?.ToString();
+            Debug.WriteLine($"[CreateSingleShape] Using percentage values:");
+            Debug.WriteLine($"[CreateSingleShape] Position - X: {xPercent}%, Y: {yPercent}%");
+            Debug.WriteLine($"[CreateSingleShape] Size - Width: {widthPercent}%, Height: {heightPercent}%");
 
-            // Scale coordinates to match Visio's coordinate system
-            // Visio uses inches internally, so we need to scale our percentages appropriately
-            double scaledX = xPercent;
-            double scaledY = yPercent;
-            double scaledWidth = widthPercent;
-            double scaledHeight = heightPercent;
-
-            // Create the shape using scaled coordinates
-            var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, scaledX, scaledY, scaledWidth, scaledHeight);
+            // Create the shape using percentage coordinates
+            var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, xPercent, yPercent, widthPercent, heightPercent);
 
             if (shape != null)
             {

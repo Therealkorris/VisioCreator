@@ -480,11 +480,41 @@ namespace VisioPlugin
             }
         }
 
+        public string GetShapeColor(Visio.Shape shape)
+        {
+            try
+            {
+                string rgbColor = shape.CellsU["FillForegnd"].ResultStr[""];
+                if (string.IsNullOrEmpty(rgbColor)) return "";
+
+                // Parse RGB values
+                var rgbMatch = System.Text.RegularExpressions.Regex.Match(rgbColor, @"RGB\((\d+);\s*(\d+);\s*(\d+)\)");
+                if (rgbMatch.Success)
+                {
+                    int r = int.Parse(rgbMatch.Groups[1].Value);
+                    int g = int.Parse(rgbMatch.Groups[2].Value);
+                    int b = int.Parse(rgbMatch.Groups[3].Value);
+                    return $"#{r:X2}{g:X2}{b:X2}";
+                }
+                return rgbColor;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting color for shape '{shape.Name}': {ex.Message}");
+                return "";
+            }
+        }
+
         public List<VisioPlugin.ShapeInfo> ListAllShapes()
         {
             var shapes = new List<VisioPlugin.ShapeInfo>();
             var activePage = visioApplication?.ActivePage;
             if (activePage == null) return shapes;
+
+            // Set page dimensions for percentage calculations
+            double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
+            double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
+            VisioPlugin.ShapeInfo.SetPageDimensions(pageWidth, pageHeight);
 
             // First pass: Collect all shapes and their basic information
             foreach (Visio.Shape shape in activePage.Shapes)
@@ -493,7 +523,7 @@ namespace VisioPlugin
                 {
                     ShapeId = shape.ID16.ToString(),
                     ShapeType = shape.Name,
-                    ShapeColor = shape.CellsU["FillForegnd"].ResultStr[""],
+                    ShapeColor = GetShapeColor(shape),
                     Text = shape.Text,
                     PosX = shape.CellsU["PinX"].ResultIU,
                     PosY = shape.CellsU["PinY"].ResultIU,

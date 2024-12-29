@@ -58,7 +58,11 @@ The Visio AI-Assistant Plugin is a sophisticated tool that bridges the gap betwe
     *   Sets up webhook listener for n8n communication.
     *   Manages Ollama model availability.
 
-6. **n8n Workflows:**
+6. **ShapeInfo.cs:**
+    *   Manages shape information and properties.
+    *   Provides shape details for AI reference.
+
+7. **n8n Workflows:**
     * **Working__Agent_multi_creation.json:**
         - Main workflow for processing chat messages and commands
         - Routes user input through Manager Agent and Action Agent
