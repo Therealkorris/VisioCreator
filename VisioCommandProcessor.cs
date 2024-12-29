@@ -178,52 +178,98 @@ namespace VisioPlugin
 
         private void CreateSingleShape(JObject shapeObject, Visio.Page activePage, double pageWidth, double pageHeight)
         {
-            string shapeType = shapeObject["type"]?.ToString() ?? shapeObject["shapeType"]?.ToString();
-            if (string.IsNullOrEmpty(shapeType))
+            try
             {
-                Debug.WriteLine("[CreateSingleShape] [Error] shapeType is missing or empty.");
-                return;
-            }
-
-            JObject positionObject = shapeObject["position"] as JObject;
-            JObject sizeObject = shapeObject["size"] as JObject;
-            string color = shapeObject["color"]?.ToString();
-
-            // Get values as percentages (0-100)
-            double xPercent = positionObject?["x"]?.Value<double>() ?? 0;
-            double yPercent = positionObject?["y"]?.Value<double>() ?? 0;
-            double widthPercent = sizeObject?["width"]?.Value<double>() ?? 10;
-            double heightPercent = sizeObject?["height"]?.Value<double>() ?? 10;
-
-            Debug.WriteLine($"[CreateSingleShape] Using percentage values:");
-            Debug.WriteLine($"[CreateSingleShape] Position - X: {xPercent}%, Y: {yPercent}%");
-            Debug.WriteLine($"[CreateSingleShape] Size - Width: {widthPercent}%, Height: {heightPercent}%");
-
-            // Create the shape using percentage coordinates
-            var shape = libraryManager.AddShapeToDocument(libraryManager.GetCategories().FirstOrDefault(), shapeType, xPercent, yPercent, widthPercent, heightPercent);
-
-            if (shape != null)
-            {
-                Debug.WriteLine($"[CreateSingleShape] Created shape of type {shapeType} with ID: {shape.ID16}");
-                
-                // Track the created shape
-                var shapeInfo = new VisioPlugin.ShapeInfo 
-                { 
-                    ShapeId = shape.ID16.ToString(),
-                    ShapeType = shapeType,
-                    ShapeColor = color
-                };
-                currentCommandShapes.Add(shapeInfo);
-                Debug.WriteLine($"[CreateSingleShape] Added shape to tracking: {shapeInfo}");
-
-                if (!string.IsNullOrEmpty(color))
+                // Extract all possible shape properties
+                var shapeInfo = new ShapeInfo
                 {
-                    libraryManager.SetShapeColor(shape, color);
+                    ShapeType = shapeObject["type"]?.ToString() ?? shapeObject["shapeType"]?.ToString(),
+                    ShapeId = shapeObject["shape_id"]?.ToString(),
+                    ShapeColor = shapeObject["color"]?.ToString() ?? shapeObject["shape_color"]?.ToString(),
+                    Text = shapeObject["text"]?.ToString(),
+                    PosX = shapeObject["pos_x"]?.Value<double>() ?? shapeObject["position"]?["x"]?.Value<double>() ?? 0,
+                    PosY = shapeObject["pos_y"]?.Value<double>() ?? shapeObject["position"]?["y"]?.Value<double>() ?? 0,
+                    Width = shapeObject["width"]?.Value<double>() ?? shapeObject["size"]?["width"]?.Value<double>() ?? 10,
+                    Height = shapeObject["height"]?.Value<double>() ?? shapeObject["size"]?["height"]?.Value<double>() ?? 10,
+                    Angle = shapeObject["angle"]?.Value<double>() ?? 0,
+                    ZOrder = shapeObject["z_order"]?.Value<int>() ?? 0,
+                    IsConnector = shapeObject["is_connector"]?.Value<bool>() ?? false,
+                    ConnectorType = shapeObject["connector_type"]?.ToString(),
+                    SourceShapeId = shapeObject["source_shape_id"]?.ToString(),
+                    TargetShapeId = shapeObject["target_shape_id"]?.ToString(),
+                    BeginX = shapeObject["begin_x"]?.Value<double>() ?? 0,
+                    BeginY = shapeObject["begin_y"]?.Value<double>() ?? 0,
+                    EndX = shapeObject["end_x"]?.Value<double>() ?? 0,
+                    EndY = shapeObject["end_y"]?.Value<double>() ?? 0,
+                    ConnectorPattern = shapeObject["connector_pattern"]?.ToString(),
+                    ConnectorWeight = shapeObject["connector_weight"]?.Value<double>() ?? 1.0,
+                    ConnectorRounding = shapeObject["connector_rounding"]?.ToString()
+                };
+
+                // Parse routing points if they exist
+                if (shapeObject["routing_points"] is JArray routingPoints)
+                {
+                    foreach (JObject point in routingPoints)
+                    {
+                        shapeInfo.RoutingPoints.Add(new Point(
+                            point["x"]?.Value<double>() ?? 0,
+                            point["y"]?.Value<double>() ?? 0
+                        ));
+                    }
+                }
+
+                // Parse control points if they exist
+                if (shapeObject["control_points"] is JArray controlPoints)
+                {
+                    foreach (JObject point in controlPoints)
+                    {
+                        shapeInfo.ControlPoints.Add(new ControlPoint(
+                            point["x"]?.Value<double>() ?? 0,
+                            point["y"]?.Value<double>() ?? 0,
+                            point["type"]?.ToString() ?? "Bezier",
+                            point["weight"]?.Value<double>()
+                        ));
+                    }
+                }
+
+                // Parse custom properties if they exist
+                if (shapeObject["custom_properties"] is JObject customProps)
+                {
+                    foreach (var prop in customProps.Properties())
+                    {
+                        shapeInfo.CustomProperties[prop.Name] = prop.Value.ToString();
+                    }
+                }
+
+                Debug.WriteLine($"[CreateSingleShape] Creating shape with properties:");
+                Debug.WriteLine($"Position - X: {shapeInfo.PosX}%, Y: {shapeInfo.PosY}%");
+                Debug.WriteLine($"Size - Width: {shapeInfo.Width}%, Height: {shapeInfo.Height}%");
+
+                // Create the shape using the libraryManager
+                var shape = libraryManager.AddShapeToDocument(
+                    libraryManager.GetCategories().FirstOrDefault(),
+                    shapeInfo.ShapeType,
+                    shapeInfo.PosX,
+                    shapeInfo.PosY,
+                    shapeInfo.Width,
+                    shapeInfo.Height,
+                    shapeInfo
+                );
+
+                if (shape != null)
+                {
+                    Debug.WriteLine($"[CreateSingleShape] Created shape of type {shapeInfo.ShapeType} with ID: {shape.ID16}");
+                    currentCommandShapes.Add(shapeInfo);
+                }
+                else
+                {
+                    Debug.WriteLine("[CreateSingleShape] Failed to create shape.");
                 }
             }
-            else
+            catch (Exception ex)
             {
-                Debug.WriteLine("[CreateSingleShape] Failed to create shape.");
+                Debug.WriteLine($"[CreateSingleShape] Error creating shape: {ex.Message}");
+                throw;
             }
         }
 

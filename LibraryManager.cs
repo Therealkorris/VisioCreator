@@ -131,66 +131,152 @@ namespace VisioPlugin
             return null;
         }
 
-        public Visio.Shape AddShapeToDocument(string categoryName, string shapeName, double xPercent, double yPercent, double widthPercent, double heightPercent)
+        public Visio.Shape AddShapeToDocument(string category, string shapeName, double xPercent, double yPercent, double widthPercent, double heightPercent, ShapeInfo shapeInfo = null)
         {
             try
             {
-                Debug.WriteLine($"[AddShapeToDocument] Adding shape: {shapeName} from category: {categoryName} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
-
                 var activePage = visioApplication?.ActivePage;
                 if (activePage == null)
                 {
-                    Debug.WriteLine("[AddShapeToDocument] [Error] No active page found in Visio application.");
+                    Debug.WriteLine("[AddShapeToDocument] No active page found.");
                     return null;
                 }
 
-                // Get the page dimensions in Visio internal units (inches)
+                // Get page dimensions
                 double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                 double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
 
-                var master = GetShape(categoryName, shapeName);
+                // Convert percentages to Visio units (inches)
+                double visioX = (xPercent / 100.0) * pageWidth;
+                double visioY = (yPercent / 100.0) * pageHeight;
+                double visioWidth = (widthPercent / 100.0) * pageWidth;
+                double visioHeight = (heightPercent / 100.0) * pageHeight;
+
+                // Get the master shape
+                var master = GetShape(category, shapeName);
                 if (master == null)
                 {
-                    Debug.WriteLine($"[AddShapeToDocument] [Error] Shape '{shapeName}' not found in category '{categoryName}'.");
+                    Debug.WriteLine($"[AddShapeToDocument] Master shape not found: {shapeName} in {category}");
                     return null;
                 }
 
-                // Convert percentages to Visio units
-                // Note: Visio uses inches internally
-                double shapeWidth = (widthPercent / 100.0) * pageWidth;
-                double shapeHeight = (heightPercent / 100.0) * pageHeight;
+                // Drop the shape at the specified position
+                var shape = activePage.Drop(master, visioX, visioY);
+                if (shape == null)
+                {
+                    Debug.WriteLine("[AddShapeToDocument] Failed to drop shape.");
+                    return null;
+                }
 
-                // Calculate position in Visio units
-                // Adjust for Visio's coordinate system (origin at bottom-left)
-                double xPos = (xPercent / 100.0) * pageWidth;
-                double yPos = pageHeight - ((yPercent / 100.0) * pageHeight);
+                // Set basic properties
+                shape.CellsU["Width"].ResultIU = visioWidth;
+                shape.CellsU["Height"].ResultIU = visioHeight;
+                shape.CellsU["PinX"].ResultIU = visioX;
+                shape.CellsU["PinY"].ResultIU = visioY;
 
-                Debug.WriteLine($"[AddShapeToDocument] Page dimensions (inches) - Width: {pageWidth}, Height: {pageHeight}");
-                Debug.WriteLine($"[AddShapeToDocument] Position (inches) - X: {xPos}, Y: {yPos}");
-                Debug.WriteLine($"[AddShapeToDocument] Size (inches) - Width: {shapeWidth}, Height: {shapeHeight}");
+                // Apply additional properties if ShapeInfo is provided
+                if (shapeInfo != null)
+                {
+                    // Set color
+                    if (!string.IsNullOrEmpty(shapeInfo.ShapeColor))
+                    {
+                        SetShapeColor(shape, shapeInfo.ShapeColor);
+                    }
 
-                // Create the shape at the calculated position
-                var shape = activePage.Drop(master, xPos, yPos);
+                    // Set text
+                    if (!string.IsNullOrEmpty(shapeInfo.Text))
+                    {
+                        shape.Text = shapeInfo.Text;
+                    }
 
-                // Set the shape's size
-                shape.Cells["Width"].ResultIU = shapeWidth;
-                shape.Cells["Height"].ResultIU = shapeHeight;
+                    // Set angle
+                    if (shapeInfo.Angle != 0)
+                    {
+                        shape.CellsU["Angle"].ResultIU = shapeInfo.Angle;
+                    }
 
-                // Ensure the shape is centered on the target position
-                shape.Cells["PinX"].ResultIU = xPos;
-                shape.Cells["PinY"].ResultIU = yPos;
+                    // Set z-order
+                    if (shapeInfo.ZOrder != 0)
+                    {
+                        shape.CellsU["ZOrderIndex"].Formula = shapeInfo.ZOrder.ToString();
+                    }
 
-                // Lock aspect ratio for consistent shape appearance
-                shape.Cells["LockAspect"].Formula = "1";
+                    // Handle connector properties if it's a connector
+                    if (shapeInfo.IsConnector)
+                    {
+                        // Set connector pattern
+                        if (!string.IsNullOrEmpty(shapeInfo.ConnectorPattern))
+                        {
+                            shape.CellsU["LinePattern"].Formula = shapeInfo.ConnectorPattern;
+                        }
 
-                Debug.WriteLine($"[AddShapeToDocument] Final position (inches) - PinX: {shape.Cells["PinX"].ResultIU}, PinY: {shape.Cells["PinY"].ResultIU}");
+                        // Set connector weight
+                        if (shapeInfo.ConnectorWeight > 0)
+                        {
+                            shape.CellsU["LineWeight"].ResultIU = shapeInfo.ConnectorWeight;
+                        }
+
+                        // Set connector rounding
+                        if (!string.IsNullOrEmpty(shapeInfo.ConnectorRounding))
+                        {
+                            shape.CellsU["Rounding"].Formula = shapeInfo.ConnectorRounding;
+                        }
+
+                        // Set begin and end points
+                        if (shapeInfo.BeginX != 0 || shapeInfo.BeginY != 0)
+                        {
+                            shape.CellsU["BeginX"].ResultIU = (shapeInfo.BeginX / 100.0) * pageWidth;
+                            shape.CellsU["BeginY"].ResultIU = (shapeInfo.BeginY / 100.0) * pageHeight;
+                        }
+                        if (shapeInfo.EndX != 0 || shapeInfo.EndY != 0)
+                        {
+                            shape.CellsU["EndX"].ResultIU = (shapeInfo.EndX / 100.0) * pageWidth;
+                            shape.CellsU["EndY"].ResultIU = (shapeInfo.EndY / 100.0) * pageHeight;
+                        }
+
+                        // Connect to source and target shapes if specified
+                        if (!string.IsNullOrEmpty(shapeInfo.SourceShapeId) && !string.IsNullOrEmpty(shapeInfo.TargetShapeId))
+                        {
+                            var sourceShape = activePage.Shapes.ItemFromID[int.Parse(shapeInfo.SourceShapeId)];
+                            var targetShape = activePage.Shapes.ItemFromID[int.Parse(shapeInfo.TargetShapeId)];
+                            if (sourceShape != null && targetShape != null)
+                            {
+                                shape.CellsU["BeginX"].GlueTo(sourceShape.CellsU["PinX"]);
+                                shape.CellsU["BeginY"].GlueTo(sourceShape.CellsU["PinY"]);
+                                shape.CellsU["EndX"].GlueTo(targetShape.CellsU["PinX"]);
+                                shape.CellsU["EndY"].GlueTo(targetShape.CellsU["PinY"]);
+                            }
+                        }
+                    }
+
+                    // Set custom properties
+                    foreach (var prop in shapeInfo.CustomProperties)
+                    {
+                        try
+                        {
+                            shape.AddNamedRow(
+                                (short)Visio.VisSectionIndices.visSectionProp, 
+                                prop.Key, 
+                                (short)Visio.VisRowTags.visTagDefault
+                            );
+                            shape.CellsSRC[
+                                (short)Visio.VisSectionIndices.visSectionProp, 
+                                (short)(shape.RowCount[(short)Visio.VisSectionIndices.visSectionProp] - 1), 
+                                (short)Visio.VisCellIndices.visCustPropsValue
+                            ].FormulaU = $"\"{prop.Value}\"";
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[AddShapeToDocument] Error setting custom property {prop.Key}: {ex.Message}");
+                        }
+                    }
+                }
 
                 return shape;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[AddShapeToDocument] [Error] Error adding shape '{shapeName}' from category '{categoryName}': {ex.Message}");
-                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+                Debug.WriteLine($"[AddShapeToDocument] Error: {ex.Message}");
                 return null;
             }
         }
