@@ -1,3 +1,4 @@
+
 ## 1. Introduction
 ***Visio AI-Assistant Plugin: Overview and Capabilities***
 
@@ -33,6 +34,9 @@ This document provides a comprehensive overview of the Visio AI-Assistant Plugin
 *   **Stencil Integration:** Access and utilize shapes from installed Visio stencils.
 *   **Shape Catalog:** Organized catalog of available shapes for AI reference.
 *   **Command Processing:** Automatic translation of natural language to Visio actions.
+*   **n8n Integration:** Workflows use structured schemas to ensure reliable extraction of shape properties and object sizes, avoiding traditional tools.
+*   **Database Integration:** The plugin interacts with a PostgreSQL database to store and retrieve shape and stencil data.
+*   **Automate by uploading images:** The plugin can upload images to the AI and use the image to create a diagram.
 
 ### 2.4. System Architecture
 
@@ -46,8 +50,8 @@ This document provides a comprehensive overview of the Visio AI-Assistant Plugin
 2. **Image Upload (Optional):** You can upload an image by clicking the "Upload" button or dragging and dropping it onto the chat history.
 3. **Send to n8n:** The plugin sends your message or image to the `chat-agent` endpoint of your local n8n workflow.
 4. **AI Processing (n8n):** The n8n workflow routes your request to the appropriate AI agent (either a chat model or an action agent).
-    *   **Specialized Tools:** The action agent utilizes tools (Color Tool, Shape Tool, Size Tool, Position Tool) to extract relevant parameters from your input (e.g., shape type, color, size, position).
-    *   **Command Generation:** The action agent constructs a JSON command based on your request and the extracted parameters.
+    *   **Schema Utilization:** The action agent leverages structured schemas to interpret the input (e.g., shape type, size, color, position). This ensures consistent extraction and avoids tool reliance.
+    *   **Command Generation:** A structured JSON command is created based on the extracted parameters.
 5. **Command Execution (Visio):** The n8n workflow sends the JSON command to the Visio plugin via a webhook listener (`/visio-command/`). The plugin then:
     *   **Interprets the Command:**  The `VisioCommandProcessor` parses the JSON command.
     *   **Executes the Action:** The `LibraryManager` performs the corresponding action in Visio (e.g., adding a shape, connecting shapes).
@@ -60,7 +64,65 @@ This document provides a comprehensive overview of the Visio AI-Assistant Plugin
 
 1. **Prerequisites:** Ensure you have Visio, Visual Studio (with .NET and Office development workloads), n8n, and Ollama installed and running.
 2. **Install the Plugin:** Build the Visio plugin solution in Visual Studio and run it. This will install the plugin into Visio.
-3. **Import n8n Workflow:** Import the `Working__Agent_multi_creation.json`, `Image_agent.json`,`Get_Stensils.json`,`Visio_connection_Ollama.json`, workflow into your n8n instance and activate it.
+3. **Import n8n Workflow:** Import the `Working__Agent_multi_creation.json`, `Image_agent.json`, `Databases.json`, `Visio_connection_Ollama.json`, workflow into 
 4. **Connect:** In the plugin's Ribbon tab, click "Connect" to establish communication with the AI server (via n8n).
 5. **Select a Model:** Choose an AI model from the dropdown menu in the "AI Chat Pane."
 6. **Start Chatting:** Type your commands into the chat input box and press Enter or click "Send."
+
+
+## 5. Database Table Descriptions
+*** Use the following SQL commands to create the tables in your PostgreSQL database. ***
+
+### **Stencil Table**
+```sql
+CREATE TABLE stencils (
+    id SERIAL PRIMARY KEY,
+    library TEXT NOT NULL,
+    shape TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **Shapes Table**
+```sql
+CREATE TABLE shapes (
+    id SERIAL PRIMARY KEY,
+    shape_id VARCHAR NOT NULL,
+    shape_type VARCHAR NOT NULL,
+    shape_color VARCHAR,
+    text TEXT,
+    pos_x FLOAT,
+    pos_y FLOAT,
+    width FLOAT,
+    height FLOAT,
+    angle INT DEFAULT 0,
+    z_order INT,
+    custom_properties JSONB,
+    connector_type VARCHAR,
+    source_shape_id VARCHAR,
+    target_shape_id VARCHAR,
+    begin_x FLOAT,
+    begin_y FLOAT,
+    end_x FLOAT,
+    end_y FLOAT,
+    routing_points JSONB,
+    connector_pattern VARCHAR,
+    connector_weight FLOAT,
+    connector_rounding VARCHAR,
+    control_points JSONB,
+    is_connector BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### **Page Info Table**
+```sql
+CREATE TABLE page_info (
+    id SERIAL PRIMARY KEY,
+    page_width NUMERIC,
+    page_height NUMERIC,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```

@@ -65,6 +65,7 @@ The Visio AI-Assistant Plugin is a sophisticated tool that bridges the gap betwe
         - Uses Ollama models for natural language processing
         - Implements JSON schema validation for commands
         - Handles command generation and execution via webhooks
+        - Leverages structured output for AI responses.
 
     * **Image_Agent.json:**
         - Processes image uploads and generates Visio commands
@@ -72,6 +73,7 @@ The Visio AI-Assistant Plugin is a sophisticated tool that bridges the gap betwe
         - Converts image content to structured shape commands
         - Implements auto-fixing output parser for reliable JSON generation
         - Supports both direct image processing and chat-with-image scenarios
+        - Outputs structured commands for seamless integration.
 
     * **Visio_connection_Ollama.json:**
         - Manages connection between Visio and Ollama
@@ -79,8 +81,9 @@ The Visio AI-Assistant Plugin is a sophisticated tool that bridges the gap betwe
         - Provides model information to AIChatPane
         - Handles API communication with Ollama server
 
-    * **Get_Stensils.json:**
+    * **Database.json:**
         - Processes Visio stencil catalog
-        - Stores shape information in PostgreSQL database
+        - Stores shape information in Supabase database
         - Maintains mapping between stencil files and shapes
         - Provides shape catalog data for AI reference
+        - Integrated with Supabase for catalog management.
