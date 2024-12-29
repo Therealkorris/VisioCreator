@@ -80,6 +80,7 @@ namespace VisioPlugin
             {
                 if (stencilDoc.Type == Visio.VisDocumentTypes.visTypeStencil)
                 {
+                    // Use the full stencil name as the category
                     string category = stencilDoc.Name;
                     if (!categories.ContainsKey(category))
                     {
@@ -111,10 +112,45 @@ namespace VisioPlugin
 
         public Visio.Master GetShape(string categoryName, string shapeName)
         {
+            Debug.WriteLine($"[GetShape] Looking for shape '{shapeName}' in category '{categoryName}'");
+            
+            // First try to get from loaded stencils
             if (categories.TryGetValue(categoryName, out ShapeCategory category))
             {
-                return category.GetShape(shapeName);
+                var shape = category.GetShape(shapeName);
+                if (shape != null)
+                {
+                    Debug.WriteLine($"[GetShape] Found shape in loaded stencils");
+                    return shape;
+                }
             }
+
+            // If not found, try to force-load the stencil
+            try
+            {
+                Debug.WriteLine($"[GetShape] Attempting to force-load stencil: {categoryName}");
+                var stencilDoc = visioApplication.Documents.OpenEx(categoryName, 
+                    (short)Microsoft.Office.Interop.Visio.VisOpenSaveArgs.visOpenDocked);
+                
+                if (stencilDoc != null)
+                {
+                    // Find the master by name
+                    foreach (Visio.Master master in stencilDoc.Masters)
+                    {
+                        if (master.Name == shapeName)
+                        {
+                            Debug.WriteLine($"[GetShape] Found shape in force-loaded stencil");
+                            return master;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GetShape] Error force-loading stencil: {ex.Message}");
+            }
+
+            Debug.WriteLine($"[GetShape] Shape not found");
             return null;
         }
 
@@ -156,8 +192,28 @@ namespace VisioPlugin
                 var master = GetShape(category, shapeName);
                 if (master == null)
                 {
-                    Debug.WriteLine($"[AddShapeToDocument] Master shape not found: {shapeName} in {category}");
-                    return null;
+                    // Try to find the shape in any loaded stencil
+                    foreach (Visio.Document doc in visioApplication.Documents)
+                    {
+                        if (doc.Type == Visio.VisDocumentTypes.visTypeStencil)
+                        {
+                            foreach (Visio.Master m in doc.Masters)
+                            {
+                                if (m.Name == shapeName)
+                                {
+                                    master = m;
+                                    break;
+                                }
+                            }
+                            if (master != null) break;
+                        }
+                    }
+
+                    if (master == null)
+                    {
+                        Debug.WriteLine($"[AddShapeToDocument] Master shape not found: {shapeName} in {category}");
+                        return null;
+                    }
                 }
 
                 // Drop the shape at the specified position
@@ -616,7 +672,9 @@ namespace VisioPlugin
                     Width = shape.CellsU["Width"].ResultIU,
                     Height = shape.CellsU["Height"].ResultIU,
                     Angle = shape.CellsU["Angle"].ResultIU,
-                    ZOrder = shape.Index
+                    ZOrder = shape.Index,
+                    // Get the original stencil name by checking the master's document
+                    Category = GetOriginalStencilName(shape)
                 };
 
                 // Check if it's a connector
@@ -761,6 +819,42 @@ namespace VisioPlugin
             }
 
             return shapes;
+        }
+
+        // Helper method to get the original stencil name
+        private string GetOriginalStencilName(Visio.Shape shape)
+        {
+            try
+            {
+                if (shape.Master == null) return "Dynamic";
+
+                // Try to get the original stencil name from the master's document
+                var masterDoc = shape.Master.Document;
+                
+                // Check if this is a document stencil or a regular stencil
+                if (masterDoc.Type == Visio.VisDocumentTypes.visTypeStencil)
+                {
+                    // Use the full document name including extension
+                    return masterDoc.Name;
+                }
+                else
+                {
+                    // For document stencils or other cases, try to find the original category
+                    foreach (var category in categories)
+                    {
+                        if (category.Value.GetShape(shape.Master.Name) != null)
+                        {
+                            return category.Key;
+                        }
+                    }
+                    return "Document Stencil";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting stencil name for shape: {ex.Message}");
+                return "Unknown";
+            }
         }
     }
 

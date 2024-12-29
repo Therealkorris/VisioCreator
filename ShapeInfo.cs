@@ -10,6 +10,7 @@ namespace VisioPlugin
         public string ShapeType { get; set; }
         public string ShapeColor { get; set; }
         public string Text { get; set; }
+        public string Category { get; set; }
         private double _posX;
         private double _posY;
         private double _width;
@@ -112,6 +113,7 @@ namespace VisioPlugin
             return new JObject
             {
                 ["shape_id"] = ShapeId,
+                ["category"] = Category,
                 ["shape_type"] = ShapeType,
                 ["pos_x"] = PosXPercent,
                 ["pos_y"] = PosYPercent,

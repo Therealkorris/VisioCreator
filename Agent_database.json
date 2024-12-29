@@ -1,0 +1,215 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -120,
+        160
+      ],
+      "id": "48f9cf16-f2c7-43cb-94a3-fe1d415a7f6b",
+      "name": "When chat message received",
+      "webhookId": "670e9b5a-99d5-4113-98d8-c7345b8978af"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -40
+      ],
+      "id": "0214707e-fff8-4e12-9bff-765f779ff088",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "http://localhost:5680/visio-command/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "e73ff897-9d2d-434d-9ee0-86448dec9291",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "### System:\nYou are an Action Agent responsible for transforming database records into a valid JSON command for Visio-like shape operations.\n\n### Task:\n1. Fetch shape records from the database using the `Supabase Tool`.\n2. Map each record to the JSON command format strictly adhering to the provided schema.\n3. Combine all shapes into a single JSON object that conforms to the schema.\n\n### Rules:\n- Output must be valid JSON, strictly adhering to the schema provided below.\n- No explanations, comments, or additional text.\n- Return only the JSON object.\n- Ensure there are no trailing commas, unescaped quotes, or structural issues in the output.\n\n### Example Input:\nEach shape record contains the following properties:\n{\n  \"shape_id\": \"string\",\n  \"shape_type\": \"string\",\n  \"shape_color\": \"string\",\n  \"pos_x\": \"number\",\n  \"pos_y\": \"number\",\n  \"width\": \"number\",\n  \"height\": \"number\",\n  \"z_order\": \"number\",\n  ...\n}\n\n### Schema:\n{\n  \"type\": \"object\",\n  \"properties\": {\n    \"command\": {\n      \"type\": \"string\",\n      \"enum\": [\"CreateShape\"]\n    },\n    \"parameters\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"shapes\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"shape_id\": { \"type\": \"string\" },\n              \"shape_type\": { \"type\": \"string\" },\n              \"shape_color\": { \"type\": \"string\" },\n              \"pos_x\": { \"type\": \"number\" },\n              \"pos_y\": { \"type\": \"number\" },\n              \"width\": { \"type\": \"number\" },\n              \"height\": { \"type\": \"number\" },\n              \"z_order\": { \"type\": \"number\" }\n            },\n            \"required\": [\"shape_id\", \"shape_type\", \"shape_color\", \"pos_x\", \"pos_y\", \"width\", \"height\", \"z_order\"]\n          }\n        }\n      }\n    }\n  },\n  \"required\": [\"command\", \"parameters\"]\n}\n\n### Output Format:\nReturn a JSON object adhering strictly to the schema:\n{\n  \"command\": \"CreateShape\",\n  \"parameters\": {\n    \"shapes\": [\n      {\n        \"shape_id\": \"string\",\n        \"shape_type\": \"string\",\n        \"shape_color\": \"string\",\n        \"pos_x\": number,\n        \"pos_y\": number,\n        \"width\": number,\n        \"height\": number,\n        \"z_order\": number\n      }\n    ]\n  }\n}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "name": "Agent to Process Shapes",
+      "position": [
+        400,
+        -40
+      ],
+      "id": "2c5d26d7-707d-40c3-b3bc-43eaf2e31b3c",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "shapes",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "name": "Supabase Tool",
+      "position": [
+        540,
+        260
+      ],
+      "id": "ec5131fb-315d-4d14-b5e0-c066929161b6",
+      "credentials": {
+        "supabaseApi": {
+          "id": "V9PVkZMtKdUuNtZX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        380,
+        260
+      ],
+      "id": "53590b4d-8785-4f79-94d8-0c9ce3ba9c94",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "ScoyOTvEmGxVsfpn",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const commandSchema = {\n  \"type\": \"object\",\n  \"properties\": {\n    \"command\": {\n      \"type\": \"string\",\n      \"enum\": [\"CreateShape\", \"CreateTextBox\"],\n      \"description\": \"The command type to execute.\"\n    },\n    \"parameters\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"shapes\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"shape_id\": {\n                \"type\": \"string\",\n                \"description\": \"Unique identifier for the shape.\"\n              },\n              \"shape_type\": {\n                \"type\": \"string\",\n                \"description\": \"Type of shape (e.g., 'Square', 'Circle', 'TextBox').\"\n              },\n              \"shape_color\": {\n                \"type\": \"string\",\n                \"description\": \"Color of the shape in hex format (e.g., '#FF0000').\"\n              },\n              \"text\": {\n                \"type\": \"string\",\n                \"description\": \"Text content of the shape.\"\n              },\n              \"pos_x\": {\n                \"type\": \"number\",\n                \"description\": \"X-coordinate position as percentage of page width.\"\n              },\n              \"pos_y\": {\n                \"type\": \"number\",\n                \"description\": \"Y-coordinate position as percentage of page height.\"\n              },\n              \"width\": {\n                \"type\": \"number\",\n                \"description\": \"Width as percentage of page width.\"\n              },\n              \"height\": {\n                \"type\": \"number\",\n                \"description\": \"Height as percentage of page height.\"\n              },\n              \"angle\": {\n                \"type\": \"number\",\n                \"description\": \"Rotation angle in degrees.\"\n              },\n              \"z_order\": {\n                \"type\": \"integer\",\n                \"description\": \"Z-index for shape layering.\"\n              },\n              \"custom_properties\": {\n                \"type\": \"object\",\n                \"description\": \"Custom key-value properties for the shape.\"\n              },\n              \"is_connector\": {\n                \"type\": \"boolean\",\n                \"description\": \"Whether the shape is a connector.\"\n              },\n              \"connector_type\": {\n                \"type\": \"string\",\n                \"description\": \"Type of connector if is_connector is true.\"\n              },\n              \"source_shape_id\": {\n                \"type\": \"string\",\n                \"description\": \"ID of shape where connector begins.\"\n              },\n              \"target_shape_id\": {\n                \"type\": \"string\",\n                \"description\": \"ID of shape where connector ends.\"\n              },\n              \"begin_x\": {\n                \"type\": \"number\",\n                \"description\": \"X-coordinate of connector start point.\"\n              },\n              \"begin_y\": {\n                \"type\": \"number\",\n                \"description\": \"Y-coordinate of connector start point.\"\n              },\n              \"end_x\": {\n                \"type\": \"number\",\n                \"description\": \"X-coordinate of connector end point.\"\n              },\n              \"end_y\": {\n                \"type\": \"number\",\n                \"description\": \"Y-coordinate of connector end point.\"\n              },\n              \"routing_points\": {\n                \"type\": \"array\",\n                \"items\": {\n                  \"type\": \"object\",\n                  \"properties\": {\n                    \"x\": {\n                      \"type\": \"number\"\n                    },\n                    \"y\": {\n                      \"type\": \"number\"\n                    }\n                  }\n                }\n              },\n              \"connector_pattern\": {\n                \"type\": \"string\",\n                \"description\": \"Pattern style for connector lines.\"\n              },\n              \"connector_weight\": {\n                \"type\": \"number\",\n                \"description\": \"Line weight/thickness for connectors.\"\n              },\n              \"connector_rounding\": {\n                \"type\": \"string\",\n                \"description\": \"Rounding style for connector corners.\"\n              }\n            }\n          }\n        }\n      }\n    }\n  },\n  \"required\": [\"command\", \"parameters\"]\n};\n\nreturn {\n  schema: JSON.stringify(commandSchema)\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Define Schema1",
+      "position": [
+        160,
+        -40
+      ],
+      "id": "25ee5c18-810d-4045-9551-b221049cb44e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the input object\nconst input = $input.first();\n\n// Parse the raw JSON string\nlet rawJson = input.json.output.trim();\n\n// Step 1: Remove unwanted characters and fix formatting\nrawJson = rawJson\n    .replace(/```[a-z]*\\n?/g, '') // Remove Markdown-like formatting (e.g., ```json)\n    .replace(/\\\\n/g, '') // Remove escaped newlines\n    .replace(/\\\\\"/g, '\"') // Fix escaped quotes\n    .replace(/,\\s*}/g, '}') // Remove trailing commas before closing braces\n    .replace(/,\\s*]/g, ']'); // Remove trailing commas before closing arrays\n\n// Step 2: Ensure the JSON starts and ends with proper braces\nif (!rawJson.startsWith('{')) {\n    rawJson = '{' + rawJson; // Add missing opening brace\n}\nif (!rawJson.endsWith('}')) {\n    rawJson = rawJson + '}'; // Add missing closing brace\n}\n\n// Step 3: Attempt to parse the cleaned JSON string\nlet parsedJson;\ntry {\n    parsedJson = JSON.parse(rawJson); // Parse the cleaned JSON\n} catch (error) {\n    throw new Error('Failed to parse JSON: ' + error.message + '\\nProblematic JSON:\\n' + rawJson);\n}\n\n// Return the cleaned JSON object\nreturn parsedJson;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        -40
+      ],
+      "id": "7500d574-cf8e-4867-a3c1-6af916374098",
+      "name": "Code1",
+      "alwaysOutputData": true,
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Define Schema1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Define Schema1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent to Process Shapes": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent to Process Shapes",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent to Process Shapes",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Schema1": {
+      "main": [
+        [
+          {
+            "node": "Agent to Process Shapes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}

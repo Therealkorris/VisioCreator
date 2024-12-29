@@ -497,11 +497,14 @@ namespace VisioPlugin
         {
             if (!string.IsNullOrEmpty(CurrentCategory))
             {
+                Debug.WriteLine($"[OnAddTestShapeClick] Using category: {CurrentCategory}");
                 var shapes = libraryManager.GetShapesInCategory(CurrentCategory).ToArray();
                 if (shapes.Any())
                 {
                     Random random = new Random();
                     string randomShape = shapes[random.Next(shapes.Length)];
+                    Debug.WriteLine($"[OnAddTestShapeClick] Selected random shape: {randomShape}");
+
                     var activePage = visioApplication.ActivePage;
                     double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
                     double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
@@ -522,10 +525,20 @@ namespace VisioPlugin
                     double widthPercent = (randomWidth / pageWidth) * 100;
                     double heightPercent = (randomHeight / pageHeight) * 100;
 
-                    libraryManager.AddShapeToDocument(CurrentCategory, randomShape, xPercent, yPercent, widthPercent, heightPercent);
+                    var shapeInfo = new ShapeInfo
+                    {
+                        ShapeType = randomShape,
+                        Category = CurrentCategory
+                    };
 
-                    Debug.WriteLine($"Added random shape: {randomShape} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
+                    libraryManager.AddShapeToDocument(CurrentCategory, randomShape, xPercent, yPercent, widthPercent, heightPercent, shapeInfo);
+
+                    Debug.WriteLine($"[OnAddTestShapeClick] Added random shape: {randomShape} at ({xPercent}%, {yPercent}%) with size ({widthPercent}%, {heightPercent}%)");
                 }
+            }
+            else
+            {
+                Debug.WriteLine("[OnAddTestShapeClick] No category selected");
             }
         }
 

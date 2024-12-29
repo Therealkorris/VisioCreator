@@ -183,9 +183,10 @@ namespace VisioPlugin
                 // Extract all possible shape properties
                 var shapeInfo = new ShapeInfo
                 {
-                    ShapeType = shapeObject["type"]?.ToString() ?? shapeObject["shapeType"]?.ToString(),
+                    ShapeType = shapeObject["shape_type"]?.ToString() ?? shapeObject["type"]?.ToString(),
+                    Category = shapeObject["category"]?.ToString(),
                     ShapeId = shapeObject["shape_id"]?.ToString(),
-                    ShapeColor = shapeObject["color"]?.ToString() ?? shapeObject["shape_color"]?.ToString(),
+                    ShapeColor = shapeObject["shape_color"]?.ToString() ?? shapeObject["color"]?.ToString(),
                     Text = shapeObject["text"]?.ToString(),
                     PosX = shapeObject["pos_x"]?.Value<double>() ?? shapeObject["position"]?["x"]?.Value<double>() ?? 0,
                     PosY = shapeObject["pos_y"]?.Value<double>() ?? shapeObject["position"]?["y"]?.Value<double>() ?? 0,
@@ -202,9 +203,31 @@ namespace VisioPlugin
                     EndX = shapeObject["end_x"]?.Value<double>() ?? 0,
                     EndY = shapeObject["end_y"]?.Value<double>() ?? 0,
                     ConnectorPattern = shapeObject["connector_pattern"]?.ToString(),
-                    ConnectorWeight = shapeObject["connector_weight"]?.Value<double>() ?? 1.0,
+                    ConnectorWeight = shapeObject["connector_weight"]?.Value<double>() ?? 0.01,
                     ConnectorRounding = shapeObject["connector_rounding"]?.ToString()
                 };
+
+                // Add validation for required properties
+                if (string.IsNullOrEmpty(shapeInfo.ShapeType))
+                {
+                    Debug.WriteLine("[CreateSingleShape] Error: shape_type is missing or empty");
+                    throw new ArgumentException("shape_type is required");
+                }
+
+                // If category is not provided, use the current category
+                if (string.IsNullOrEmpty(shapeInfo.Category))
+                {
+                    shapeInfo.Category = Globals.ThisAddIn.CurrentCategory;
+                    Debug.WriteLine($"[CreateSingleShape] Using current category: {shapeInfo.Category}");
+                }
+
+                // Debug: List available shapes in the category
+                //Debug.WriteLine($"[CreateSingleShape] Available shapes in category {shapeInfo.Category}:");
+                var availableShapes = libraryManager.GetShapesInCategory(shapeInfo.Category);
+                foreach (var shapeName in availableShapes)
+                {
+                    Debug.WriteLine($"  - {shapeName}");
+                }
 
                 // Parse routing points if they exist
                 if (shapeObject["routing_points"] is JArray routingPoints)
@@ -212,8 +235,8 @@ namespace VisioPlugin
                     foreach (JObject point in routingPoints)
                     {
                         shapeInfo.RoutingPoints.Add(new Point(
-                            point["x"]?.Value<double>() ?? 0,
-                            point["y"]?.Value<double>() ?? 0
+                            point["X"]?.Value<double>() ?? point["x"]?.Value<double>() ?? 0,
+                            point["Y"]?.Value<double>() ?? point["y"]?.Value<double>() ?? 0
                         ));
                     }
                 }
@@ -224,10 +247,10 @@ namespace VisioPlugin
                     foreach (JObject point in controlPoints)
                     {
                         shapeInfo.ControlPoints.Add(new ControlPoint(
-                            point["x"]?.Value<double>() ?? 0,
-                            point["y"]?.Value<double>() ?? 0,
-                            point["type"]?.ToString() ?? "Bezier",
-                            point["weight"]?.Value<double>()
+                            point["X"]?.Value<double>() ?? point["x"]?.Value<double>() ?? 0,
+                            point["Y"]?.Value<double>() ?? point["y"]?.Value<double>() ?? 0,
+                            point["Type"]?.ToString() ?? point["type"]?.ToString() ?? "Bezier",
+                            point["Weight"]?.Value<double>() ?? point["weight"]?.Value<double>()
                         ));
                     }
                 }
@@ -242,28 +265,91 @@ namespace VisioPlugin
                 }
 
                 Debug.WriteLine($"[CreateSingleShape] Creating shape with properties:");
+                Debug.WriteLine($"Category: {shapeInfo.Category}");
+                Debug.WriteLine($"Shape Type: {shapeInfo.ShapeType}");
                 Debug.WriteLine($"Position - X: {shapeInfo.PosX}%, Y: {shapeInfo.PosY}%");
                 Debug.WriteLine($"Size - Width: {shapeInfo.Width}%, Height: {shapeInfo.Height}%");
 
-                // Create the shape using the libraryManager
-                var shape = libraryManager.AddShapeToDocument(
-                    libraryManager.GetCategories().FirstOrDefault(),
-                    shapeInfo.ShapeType,
-                    shapeInfo.PosX,
-                    shapeInfo.PosY,
-                    shapeInfo.Width,
-                    shapeInfo.Height,
-                    shapeInfo
-                );
+                Visio.Shape shape;
 
-                if (shape != null)
+                if (shapeInfo.IsConnector)
                 {
-                    Debug.WriteLine($"[CreateSingleShape] Created shape of type {shapeInfo.ShapeType} with ID: {shape.ID16}");
-                    currentCommandShapes.Add(shapeInfo);
+                    // For connectors, use the built-in dynamic connector
+                    var connector = activePage.Application.ConnectorToolDataObject;
+                    
+                    // Scale the position to page coordinates
+                    double scaledX = (shapeInfo.PosX / 100.0) * pageWidth;
+                    double scaledY = (shapeInfo.PosY / 100.0) * pageHeight;
+                    shape = activePage.Drop(connector, scaledX, scaledY);
+
+                    if (shape != null)
+                    {
+                        // Set connector properties before connecting to ensure visibility
+                        shape.CellsU["LinePattern"].Formula = shapeInfo.ConnectorPattern ?? "1";  // Solid line
+                        shape.CellsU["LineWeight"].ResultIU = shapeInfo.ConnectorWeight;
+                        shape.CellsU["RouteStyle"].ResultIU = 3; // 3 = Right angle
+
+                        // Set color using the same method as other shapes
+                        if (!string.IsNullOrEmpty(shapeInfo.ShapeColor))
+                        {
+                            libraryManager.SetShapeColor(shape, shapeInfo.ShapeColor);
+                        }
+
+                        // Connect to source and target shapes if specified
+                        if (!string.IsNullOrEmpty(shapeInfo.SourceShapeId) && !string.IsNullOrEmpty(shapeInfo.TargetShapeId))
+                        {
+                            try
+                            {
+                                var sourceShape = activePage.Shapes.ItemFromID[int.Parse(shapeInfo.SourceShapeId)];
+                                var targetShape = activePage.Shapes.ItemFromID[int.Parse(shapeInfo.TargetShapeId)];
+
+                                if (sourceShape != null && targetShape != null)
+                                {
+                                    // Connect begin point to source shape
+                                    shape.CellsU["BeginX"].GlueTo(sourceShape.CellsU["PinX"]);
+                                    shape.CellsU["BeginY"].GlueTo(sourceShape.CellsU["PinY"]);
+
+                                    // Connect end point to target shape
+                                    shape.CellsU["EndX"].GlueTo(targetShape.CellsU["PinX"]);
+                                    shape.CellsU["EndY"].GlueTo(targetShape.CellsU["PinY"]);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[CreateSingleShape] Error connecting shapes: {ex.Message}");
+                            }
+                        }
+
+                        // Apply any additional connector properties
+                        if (!string.IsNullOrEmpty(shapeInfo.ConnectorRounding))
+                            shape.CellsU["Rounding"].Formula = shapeInfo.ConnectorRounding;
+
+                        currentCommandShapes.Add(shapeInfo);
+                        Debug.WriteLine($"[CreateSingleShape] Created connector with ID: {shape.ID16}");
+                    }
                 }
                 else
                 {
-                    Debug.WriteLine("[CreateSingleShape] Failed to create shape.");
+                    // Create regular shape using the libraryManager
+                    shape = libraryManager.AddShapeToDocument(
+                        shapeInfo.Category,
+                        shapeInfo.ShapeType,
+                        shapeInfo.PosX,
+                        shapeInfo.PosY,
+                        shapeInfo.Width,
+                        shapeInfo.Height,
+                        shapeInfo
+                    );
+
+                    if (shape != null)
+                    {
+                        Debug.WriteLine($"[CreateSingleShape] Created shape of type {shapeInfo.ShapeType} with ID: {shape.ID16}");
+                        currentCommandShapes.Add(shapeInfo);
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[CreateSingleShape] Failed to create shape. Category: {Globals.ThisAddIn.CurrentCategory}, Type: {shapeInfo.ShapeType}");
+                    }
                 }
             }
             catch (Exception ex)
