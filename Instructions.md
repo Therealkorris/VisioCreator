@@ -88,8 +88,8 @@ CREATE TABLE stencils (
 ```sql
 CREATE TABLE shapes (
     id SERIAL PRIMARY KEY,
-    shape_id VARCHAR NOT NULL,
     category VARCHAR NOT NULL,
+    shape_id VARCHAR NOT NULL,
     shape_type VARCHAR NOT NULL,
     shape_color VARCHAR,
     text TEXT,

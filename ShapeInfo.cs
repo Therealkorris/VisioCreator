@@ -112,8 +112,8 @@ namespace VisioPlugin
         {
             return new JObject
             {
-                ["shape_id"] = ShapeId,
                 ["category"] = Category,
+                ["shape_id"] = ShapeId,
                 ["shape_type"] = ShapeType,
                 ["pos_x"] = PosXPercent,
                 ["pos_y"] = PosYPercent,

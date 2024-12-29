@@ -90,7 +90,6 @@ namespace VisioPlugin
                     foreach (Visio.Master master in stencilDoc.Masters)
                     {
                         categories[category].AddShape(master.Name, master);
-                        Debug.WriteLine($"Added shape '{master.Name}' from stencil '{category}'");
                     }
                 }
             }
@@ -112,46 +111,52 @@ namespace VisioPlugin
 
         public Visio.Master GetShape(string categoryName, string shapeName)
         {
-            Debug.WriteLine($"[GetShape] Looking for shape '{shapeName}' in category '{categoryName}'");
-            
-            // First try to get from loaded stencils
-            if (categories.TryGetValue(categoryName, out ShapeCategory category))
-            {
-                var shape = category.GetShape(shapeName);
-                if (shape != null)
-                {
-                    Debug.WriteLine($"[GetShape] Found shape in loaded stencils");
-                    return shape;
-                }
-            }
-
-            // If not found, try to force-load the stencil
             try
             {
-                Debug.WriteLine($"[GetShape] Attempting to force-load stencil: {categoryName}");
+                // First check if we already have the shape in our cache
+                if (categories.TryGetValue(categoryName, out ShapeCategory category))
+                {
+                    var shape = category.GetShape(shapeName);
+                    if (shape != null)
+                    {
+                        return shape;
+                    }
+                }
+
+                // If not found in cache, try to load from stencil
                 var stencilDoc = visioApplication.Documents.OpenEx(categoryName, 
                     (short)Microsoft.Office.Interop.Visio.VisOpenSaveArgs.visOpenDocked);
                 
                 if (stencilDoc != null)
                 {
-                    // Find the master by name
+                    // Add category to cache if it doesn't exist
+                    if (!categories.ContainsKey(categoryName))
+                    {
+                        categories[categoryName] = new ShapeCategory(categoryName);
+                        foreach (Visio.Master master in stencilDoc.Masters)
+                        {
+                            categories[categoryName].AddShape(master.Name, master);
+                        }
+                    }
+
+                    // Try to get the shape from the stencil
                     foreach (Visio.Master master in stencilDoc.Masters)
                     {
                         if (master.Name == shapeName)
                         {
-                            Debug.WriteLine($"[GetShape] Found shape in force-loaded stencil");
                             return master;
                         }
                     }
                 }
+
+                Debug.WriteLine($"[GetShape] Shape {shapeName} not found in category {categoryName}");
+                return null;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[GetShape] Error force-loading stencil: {ex.Message}");
+                Debug.WriteLine($"[GetShape] Error: {ex.Message}");
+                return null;
             }
-
-            Debug.WriteLine($"[GetShape] Shape not found");
-            return null;
         }
 
         public Visio.Master GetShapeByName(string shapeName)
@@ -188,147 +193,78 @@ namespace VisioPlugin
                 double visioWidth = (widthPercent / 100.0) * pageWidth;
                 double visioHeight = (heightPercent / 100.0) * pageHeight;
 
-                // Get the master shape
+                // Get and drop regular shape
                 var master = GetShape(category, shapeName);
                 if (master == null)
                 {
-                    // Try to find the shape in any loaded stencil
-                    foreach (Visio.Document doc in visioApplication.Documents)
-                    {
-                        if (doc.Type == Visio.VisDocumentTypes.visTypeStencil)
-                        {
-                            foreach (Visio.Master m in doc.Masters)
-                            {
-                                if (m.Name == shapeName)
-                                {
-                                    master = m;
-                                    break;
-                                }
-                            }
-                            if (master != null) break;
-                        }
-                    }
-
-                    if (master == null)
-                    {
-                        Debug.WriteLine($"[AddShapeToDocument] Master shape not found: {shapeName} in {category}");
-                        return null;
-                    }
-                }
-
-                // Drop the shape at the specified position
-                var shape = activePage.Drop(master, visioX, visioY);
-                if (shape == null)
-                {
-                    Debug.WriteLine("[AddShapeToDocument] Failed to drop shape.");
+                    Debug.WriteLine($"[AddShapeToDocument] Master shape not found in {category}");
                     return null;
                 }
 
-                // Set basic properties
-                shape.CellsU["Width"].ResultIU = visioWidth;
-                shape.CellsU["Height"].ResultIU = visioHeight;
-                shape.CellsU["PinX"].ResultIU = visioX;
-                shape.CellsU["PinY"].ResultIU = visioY;
-
-                // Apply additional properties if ShapeInfo is provided
-                if (shapeInfo != null)
+                Visio.Shape shape = null;
+                try
                 {
-                    // Set color
-                    if (!string.IsNullOrEmpty(shapeInfo.ShapeColor))
+                    shape = activePage.Drop(master, visioX, visioY);
+                    if (shape == null)
                     {
-                        SetShapeColor(shape, shapeInfo.ShapeColor);
+                        Debug.WriteLine($"[AddShapeToDocument] Failed to drop shape {shapeName}");
+                        return null;
                     }
 
-                    // Set text
-                    if (!string.IsNullOrEmpty(shapeInfo.Text))
+                    try
                     {
-                        shape.Text = shapeInfo.Text;
-                    }
+                        Debug.WriteLine("[AddShapeToDocument] Setting Width");
+                        shape.CellsU["Width"].ResultIU = visioWidth;
+                        
+                        Debug.WriteLine("[AddShapeToDocument] Setting Height");
+                        shape.CellsU["Height"].ResultIU = visioHeight;
+                        
+                        Debug.WriteLine("[AddShapeToDocument] Setting PinX");
+                        shape.CellsU["PinX"].ResultIU = visioX;
+                        
+                        Debug.WriteLine("[AddShapeToDocument] Setting PinY");
+                        shape.CellsU["PinY"].ResultIU = visioY;
 
-                    // Set angle
-                    if (shapeInfo.Angle != 0)
-                    {
-                        shape.CellsU["Angle"].ResultIU = shapeInfo.Angle;
-                    }
-
-                    // Set z-order
-                    if (shapeInfo.ZOrder != 0)
-                    {
-                        shape.CellsU["ZOrderIndex"].Formula = shapeInfo.ZOrder.ToString();
-                    }
-
-                    // Handle connector properties if it's a connector
-                    if (shapeInfo.IsConnector)
-                    {
-                        // Set connector pattern
-                        if (!string.IsNullOrEmpty(shapeInfo.ConnectorPattern))
+                        // Apply additional properties if provided
+                        if (shapeInfo != null)
                         {
-                            shape.CellsU["LinePattern"].Formula = shapeInfo.ConnectorPattern;
-                        }
-
-                        // Set connector weight
-                        if (shapeInfo.ConnectorWeight > 0)
-                        {
-                            shape.CellsU["LineWeight"].ResultIU = shapeInfo.ConnectorWeight;
-                        }
-
-                        // Set connector rounding
-                        if (!string.IsNullOrEmpty(shapeInfo.ConnectorRounding))
-                        {
-                            shape.CellsU["Rounding"].Formula = shapeInfo.ConnectorRounding;
-                        }
-
-                        // Set begin and end points
-                        if (shapeInfo.BeginX != 0 || shapeInfo.BeginY != 0)
-                        {
-                            shape.CellsU["BeginX"].ResultIU = (shapeInfo.BeginX / 100.0) * pageWidth;
-                            shape.CellsU["BeginY"].ResultIU = (shapeInfo.BeginY / 100.0) * pageHeight;
-                        }
-                        if (shapeInfo.EndX != 0 || shapeInfo.EndY != 0)
-                        {
-                            shape.CellsU["EndX"].ResultIU = (shapeInfo.EndX / 100.0) * pageWidth;
-                            shape.CellsU["EndY"].ResultIU = (shapeInfo.EndY / 100.0) * pageHeight;
-                        }
-
-                        // Connect to source and target shapes if specified
-                        if (!string.IsNullOrEmpty(shapeInfo.SourceShapeId) && !string.IsNullOrEmpty(shapeInfo.TargetShapeId))
-                        {
-                            var sourceShape = activePage.Shapes.ItemFromID[int.Parse(shapeInfo.SourceShapeId)];
-                            var targetShape = activePage.Shapes.ItemFromID[int.Parse(shapeInfo.TargetShapeId)];
-                            if (sourceShape != null && targetShape != null)
+                            if (!string.IsNullOrEmpty(shapeInfo.ShapeColor))
                             {
-                                shape.CellsU["BeginX"].GlueTo(sourceShape.CellsU["PinX"]);
-                                shape.CellsU["BeginY"].GlueTo(sourceShape.CellsU["PinY"]);
-                                shape.CellsU["EndX"].GlueTo(targetShape.CellsU["PinX"]);
-                                shape.CellsU["EndY"].GlueTo(targetShape.CellsU["PinY"]);
+                                Debug.WriteLine("[AddShapeToDocument] Setting Color");
+                                SetShapeColor(shape, shapeInfo.ShapeColor);
+                            }
+                            if (!string.IsNullOrEmpty(shapeInfo.Text))
+                            {
+                                Debug.WriteLine("[AddShapeToDocument] Setting Text");
+                                shape.Text = shapeInfo.Text;
+                            }
+                            if (shapeInfo.Angle != 0)
+                            {
+                                Debug.WriteLine("[AddShapeToDocument] Setting Angle");
+                                shape.CellsU["Angle"].ResultIU = shapeInfo.Angle;
+                            }
+
+                            // Set a unique name for the shape based on shape_id if provided
+                            if (!string.IsNullOrEmpty(shapeInfo.ShapeId))
+                            {
+                                shape.NameU = $"{shapeName}_{shapeInfo.ShapeId}";
                             }
                         }
-                    }
 
-                    // Set custom properties
-                    foreach (var prop in shapeInfo.CustomProperties)
+                        Debug.WriteLine($"[AddShapeToDocument] Successfully created shape {shapeName} from {category}");
+                        return shape;
+                    }
+                    catch (Exception ex)
                     {
-                        try
-                        {
-                            shape.AddNamedRow(
-                                (short)Visio.VisSectionIndices.visSectionProp, 
-                                prop.Key, 
-                                (short)Visio.VisRowTags.visTagDefault
-                            );
-                            shape.CellsSRC[
-                                (short)Visio.VisSectionIndices.visSectionProp, 
-                                (short)(shape.RowCount[(short)Visio.VisSectionIndices.visSectionProp] - 1), 
-                                (short)Visio.VisCellIndices.visCustPropsValue
-                            ].FormulaU = $"\"{prop.Value}\"";
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[AddShapeToDocument] Error setting custom property {prop.Key}: {ex.Message}");
-                        }
+                        Debug.WriteLine($"[AddShapeToDocument] Error setting properties: {ex.Message}");
+                        return shape; // Return the shape anyway since it was created
                     }
                 }
-
-                return shape;
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[AddShapeToDocument] Error dropping shape: {ex.Message}");
+                    return null;
+                }
             }
             catch (Exception ex)
             {
@@ -339,44 +275,77 @@ namespace VisioPlugin
 
         // New and enhanced functions for greater Visio control:
 
-        public Visio.Shape ConnectShapes(string shape1Name, string shape2Name, string connectorType)
+        public Visio.Shape ConnectShapes(string sourceShapeId, string targetShapeId, string connectorType)
         {
             try
             {
-                var activePage = visioApplication.ActivePage;
-                var shape1 = activePage.Shapes.ItemU[shape1Name];
-                var shape2 = activePage.Shapes.ItemU[shape2Name];
+                var activePage = visioApplication?.ActivePage;
+                if (activePage == null)
+                {
+                    Debug.WriteLine("[ConnectShapes] No active page found.");
+                    return null;
+                }
+
+                // Find shapes by their IDs
+                Visio.Shape sourceShape = null;
+                Visio.Shape targetShape = null;
+
+                foreach (Visio.Shape shape in activePage.Shapes)
+                {
+                    if (shape.NameU.EndsWith($"_{sourceShapeId}"))
+                    {
+                        sourceShape = shape;
+                    }
+                    else if (shape.NameU.EndsWith($"_{targetShapeId}"))
+                    {
+                        targetShape = shape;
+                    }
+
+                    if (sourceShape != null && targetShape != null)
+                    {
+                        break;
+                    }
+                }
+
+                if (sourceShape == null || targetShape == null)
+                {
+                    Debug.WriteLine($"[ConnectShapes] Could not find shapes with IDs {sourceShapeId} and {targetShapeId}");
+                    return null;
+                }
 
                 // Add a dynamic connector
                 var connector = activePage.Application.ConnectorToolDataObject;
                 var connectorShape = activePage.Drop(connector, 0, 0);
 
                 // Glue the connector's begin point to the first shape
-                connectorShape.CellsU["BeginX"].GlueTo(shape1.CellsU["PinX"]);
+                connectorShape.CellsU["BeginX"].GlueTo(sourceShape.CellsU["PinX"]);
 
                 // Glue the connector's end point to the second shape
-                connectorShape.CellsU["EndX"].GlueTo(shape2.CellsU["PinX"]);
+                connectorShape.CellsU["EndX"].GlueTo(targetShape.CellsU["PinX"]);
 
                 // Set the connector type if needed (e.g., straight, curved)
                 if (!string.IsNullOrEmpty(connectorType))
                 {
-                    // You might need to adjust this based on how connector types are represented in Visio
-                    if (connectorType.Equals("curved", StringComparison.OrdinalIgnoreCase))
+                    switch (connectorType.ToLower())
                     {
-                        connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "2"; // Example value for curved connectors
-                    }
-                    else
-                    {
-                        connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1"; // Example value for straight connectors
+                        case "curved":
+                            connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "2";
+                            break;
+                        case "straight":
+                            connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1";
+                            break;
+                        default:
+                            connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1"; // Default to straight
+                            break;
                     }
                 }
 
-                Debug.WriteLine($"Connected shapes: {shape1Name} and {shape2Name} with connector type: {connectorType}");
+                Debug.WriteLine($"[ConnectShapes] Successfully connected shapes with IDs {sourceShapeId} and {targetShapeId}");
                 return connectorShape;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error connecting shapes: {ex.Message}");
+                Debug.WriteLine($"[ConnectShapes] Error connecting shapes: {ex.Message}");
                 return null;
             }
         }
