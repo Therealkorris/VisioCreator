@@ -180,13 +180,6 @@ namespace VisioPlugin
         {
             try
             {
-                // Skip if it's a connector
-                if (shapeObject["is_connector"]?.Value<bool>() == true)
-                {
-                    Debug.WriteLine("[CreateSingleShape] Skipping connector shape temporarily");
-                    return;
-                }
-
                 // Extract all possible shape properties
                 var shapeInfo = new ShapeInfo
                 {
@@ -200,10 +193,111 @@ namespace VisioPlugin
                     Width = shapeObject["width"]?.Value<double>() ?? shapeObject["size"]?["width"]?.Value<double>() ?? 10,
                     Height = shapeObject["height"]?.Value<double>() ?? shapeObject["size"]?["height"]?.Value<double>() ?? 10,
                     Angle = shapeObject["angle"]?.Value<double>() ?? 0,
-                    ZOrder = shapeObject["z_order"]?.Value<int>() ?? 0
+                    ZOrder = shapeObject["z_order"]?.Value<int>() ?? 0,
+                    IsConnector = shapeObject["is_connector"]?.Value<bool>() ?? false,
+                    ConnectorType = shapeObject["connector_type"]?.ToString(),
+                    SourceShapeId = shapeObject["source_shape_id"]?.ToString(),
+                    TargetShapeId = shapeObject["target_shape_id"]?.ToString(),
+                    ConnectorPattern = shapeObject["connector_pattern"]?.ToString(),
+                    ConnectorWeight = shapeObject["connector_weight"]?.Value<double>() ?? 0
                 };
 
-                // Add validation for required properties
+                Debug.WriteLine($"[CreateSingleShape] Processing shape:");
+                Debug.WriteLine($"  Type: {shapeInfo.ShapeType}");
+                Debug.WriteLine($"  ID: {shapeInfo.ShapeId}");
+                Debug.WriteLine($"  Is Connector: {shapeInfo.IsConnector}");
+                
+                if (shapeInfo.IsConnector)
+                {
+                    // Ensure we have both source and target IDs for the connector
+                    if (string.IsNullOrEmpty(shapeInfo.SourceShapeId) || string.IsNullOrEmpty(shapeInfo.TargetShapeId))
+                    {
+                        Debug.WriteLine("[CreateSingleShape] Error: Connector missing source_shape_id or target_shape_id");
+                        return;
+                    }
+
+                    Debug.WriteLine($"  Source Shape ID: {shapeInfo.SourceShapeId}");
+                    Debug.WriteLine($"  Target Shape ID: {shapeInfo.TargetShapeId}");
+                    Debug.WriteLine($"  Connector Type: {shapeInfo.ConnectorType}");
+                    
+                    var connectorShape = libraryManager.ConnectShapes(
+                        shapeInfo.SourceShapeId,
+                        shapeInfo.TargetShapeId,
+                        shapeInfo.ConnectorType ?? "Default"
+                    );
+
+                    if (connectorShape != null)
+                    {
+                        try
+                        {
+                            // Set connector properties only if they have valid values
+                            try
+                            {
+                                Debug.WriteLine("[Connector] Setting properties:");
+                                if (!string.IsNullOrEmpty(shapeInfo.ConnectorPattern))
+                                {
+                                    Debug.WriteLine($"[Connector] Setting line pattern to: {shapeInfo.ConnectorPattern}");
+                                    try
+                                    {
+                                        connectorShape.get_CellsSRC((short)Visio.VisSectionIndices.visSectionObject,
+                                            (short)Visio.VisRowIndices.visRowLine,
+                                            (short)Visio.VisCellIndices.visLinePattern).FormulaU = shapeInfo.ConnectorPattern;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[Connector] Failed to set line pattern: {ex.Message}");
+                                    }
+                                }
+                                if (shapeInfo.ConnectorWeight > 0)
+                                {
+                                    Debug.WriteLine($"[Connector] Setting line weight to: {shapeInfo.ConnectorWeight}");
+                                    try
+                                    {
+                                        connectorShape.get_CellsSRC((short)Visio.VisSectionIndices.visSectionObject,
+                                            (short)Visio.VisRowIndices.visRowLine,
+                                            (short)Visio.VisCellIndices.visLineWeight).FormulaU = shapeInfo.ConnectorWeight.ToString("0.####");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[Connector] Failed to set line weight: {ex.Message}");
+                                    }
+                                }
+                                if (!string.IsNullOrEmpty(shapeInfo.ShapeColor))
+                                {
+                                    Debug.WriteLine($"[Connector] Setting color to: {shapeInfo.ShapeColor}");
+                                    libraryManager.SetShapeColor(connectorShape, shapeInfo.ShapeColor);
+                                }
+                                if (!string.IsNullOrEmpty(shapeInfo.ShapeId))
+                                {
+                                    Debug.WriteLine($"[Connector] Setting name to: {shapeInfo.ShapeId}");
+                                    connectorShape.NameU = shapeInfo.ShapeId;
+                                }
+                                Debug.WriteLine("[Connector] All properties set successfully");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Connector] Error setting properties: {ex.Message}");
+                                Debug.WriteLine($"[Connector] Stack trace: {ex.StackTrace}");
+                                // Continue anyway since the connector is created and connected
+                            }
+
+                            currentCommandShapes.Add(shapeInfo);
+                            Debug.WriteLine($"[CreateSingleShape] Successfully created connector between shapes {shapeInfo.SourceShapeId} and {shapeInfo.TargetShapeId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[CreateSingleShape] Warning: Some connector properties could not be set: {ex.Message}");
+                            // Continue anyway since the connector is created and connected
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[CreateSingleShape] Failed to create connector between shapes {shapeInfo.SourceShapeId} and {shapeInfo.TargetShapeId}");
+                    }
+                    return;
+                }
+
+                // Add validation for required properties for non-connector shapes
                 if (string.IsNullOrEmpty(shapeInfo.ShapeType))
                 {
                     Debug.WriteLine("[CreateSingleShape] Error: shape_type is missing or empty");
@@ -241,6 +335,7 @@ namespace VisioPlugin
             catch (Exception ex)
             {
                 Debug.WriteLine($"[CreateSingleShape] Error: {ex.Message}");
+                Debug.WriteLine($"[CreateSingleShape] Stack trace: {ex.StackTrace}");
             }
         }
 

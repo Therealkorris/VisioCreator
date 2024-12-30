@@ -139,7 +139,7 @@ namespace VisioPlugin
                         }
                     }
 
-                    // Try to get the shape from the stencil
+                    // Try exact match
                     foreach (Visio.Master master in stencilDoc.Masters)
                     {
                         if (master.Name == shapeName)
@@ -149,7 +149,6 @@ namespace VisioPlugin
                     }
                 }
 
-                Debug.WriteLine($"[GetShape] Shape {shapeName} not found in category {categoryName}");
                 return null;
             }
             catch (Exception ex)
@@ -247,7 +246,8 @@ namespace VisioPlugin
                             // Set a unique name for the shape based on shape_id if provided
                             if (!string.IsNullOrEmpty(shapeInfo.ShapeId))
                             {
-                                shape.NameU = $"{shapeName}_{shapeInfo.ShapeId}";
+                                shape.NameU = shapeInfo.ShapeId;
+                                Debug.WriteLine($"[AddShapeToDocument] Set shape name to: {shape.NameU}");
                             }
                         }
 
@@ -282,9 +282,12 @@ namespace VisioPlugin
                 var activePage = visioApplication?.ActivePage;
                 if (activePage == null)
                 {
-                    Debug.WriteLine("[ConnectShapes] No active page found.");
+                    Debug.WriteLine("[Connector] No active page found.");
                     return null;
                 }
+
+                Debug.WriteLine($"[Connector] Looking for shapes with IDs {sourceShapeId} and {targetShapeId}");
+                Debug.WriteLine($"[Connector] Total shapes on page: {activePage.Shapes.Count}");
 
                 // Find shapes by their IDs
                 Visio.Shape sourceShape = null;
@@ -292,13 +295,18 @@ namespace VisioPlugin
 
                 foreach (Visio.Shape shape in activePage.Shapes)
                 {
-                    if (shape.NameU.EndsWith($"_{sourceShapeId}"))
+                    Debug.WriteLine($"[Connector] Checking shape: {shape.NameU} (ID: {shape.ID16})");
+                    
+                    // Match by exact shape_id
+                    if (shape.NameU == sourceShapeId)
                     {
                         sourceShape = shape;
+                        Debug.WriteLine($"[Connector] Found source shape: {shape.NameU}");
                     }
-                    else if (shape.NameU.EndsWith($"_{targetShapeId}"))
+                    else if (shape.NameU == targetShapeId)
                     {
                         targetShape = shape;
+                        Debug.WriteLine($"[Connector] Found target shape: {shape.NameU}");
                     }
 
                     if (sourceShape != null && targetShape != null)
@@ -309,43 +317,87 @@ namespace VisioPlugin
 
                 if (sourceShape == null || targetShape == null)
                 {
-                    Debug.WriteLine($"[ConnectShapes] Could not find shapes with IDs {sourceShapeId} and {targetShapeId}");
+                    Debug.WriteLine($"[Connector] Could not find shapes with IDs {sourceShapeId} and {targetShapeId}");
+                    Debug.WriteLine($"[Connector] Source shape found: {sourceShape != null}");
+                    Debug.WriteLine($"[Connector] Target shape found: {targetShape != null}");
                     return null;
                 }
 
+                Debug.WriteLine($"[Connector] Creating connector between {sourceShape.NameU} and {targetShape.NameU}");
+
                 // Add a dynamic connector
+                Debug.WriteLine("[Connector] Getting connector tool data");
                 var connector = activePage.Application.ConnectorToolDataObject;
+                Debug.WriteLine("[Connector] Dropping connector on page");
                 var connectorShape = activePage.Drop(connector, 0, 0);
 
-                // Glue the connector's begin point to the first shape
-                connectorShape.CellsU["BeginX"].GlueTo(sourceShape.CellsU["PinX"]);
-
-                // Glue the connector's end point to the second shape
-                connectorShape.CellsU["EndX"].GlueTo(targetShape.CellsU["PinX"]);
-
-                // Set the connector type if needed (e.g., straight, curved)
-                if (!string.IsNullOrEmpty(connectorType))
+                if (connectorShape == null)
                 {
-                    switch (connectorType.ToLower())
-                    {
-                        case "curved":
-                            connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "2";
-                            break;
-                        case "straight":
-                            connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1";
-                            break;
-                        default:
-                            connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1"; // Default to straight
-                            break;
-                    }
+                    Debug.WriteLine("[Connector] Failed to create connector shape");
+                    return null;
                 }
 
-                Debug.WriteLine($"[ConnectShapes] Successfully connected shapes with IDs {sourceShapeId} and {targetShapeId}");
-                return connectorShape;
+                Debug.WriteLine("[Connector] Gluing connector endpoints");
+
+                try
+                {
+                    // Glue the connector's begin point to the first shape
+                    Debug.WriteLine("[Connector] Gluing begin point");
+                    connectorShape.CellsU["BeginX"].GlueTo(sourceShape.CellsU["PinX"]);
+                    connectorShape.CellsU["BeginY"].GlueTo(sourceShape.CellsU["PinY"]);
+
+                    // Glue the connector's end point to the second shape
+                    Debug.WriteLine("[Connector] Gluing end point");
+                    connectorShape.CellsU["EndX"].GlueTo(targetShape.CellsU["PinX"]);
+                    connectorShape.CellsU["EndY"].GlueTo(targetShape.CellsU["PinY"]);
+
+                    // Set the connector type if needed (e.g., straight, curved)
+                    if (!string.IsNullOrEmpty(connectorType))
+                    {
+                        Debug.WriteLine($"[Connector] Setting connector type to: {connectorType}");
+                        switch (connectorType.ToLower())
+                        {
+                            case "curved":
+                                connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "2";
+                                break;
+                            case "straight":
+                                connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1";
+                                break;
+                            case "dynamic":
+                                connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "16";
+                                break;
+                            default:
+                                connectorShape.CellsU["ShapeRouteStyle"].FormulaU = "1"; // Default to straight
+                                break;
+                        }
+                    }
+
+                    Debug.WriteLine($"[Connector] Successfully connected shapes with IDs {sourceShapeId} and {targetShapeId}");
+                    return connectorShape;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Connector] Error gluing connector: {ex.Message}");
+                    Debug.WriteLine($"[Connector] Stack trace: {ex.StackTrace}");
+                    
+                    // Try to clean up the failed connector
+                    try
+                    {
+                        if (connectorShape != null)
+                        {
+                            connectorShape.Delete();
+                            Debug.WriteLine("[Connector] Cleaned up failed connector");
+                        }
+                    }
+                    catch { }
+                    
+                    return null;
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ConnectShapes] Error connecting shapes: {ex.Message}");
+                Debug.WriteLine($"[Connector] Error connecting shapes: {ex.Message}");
+                Debug.WriteLine($"[Connector] Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
