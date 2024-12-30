@@ -95,9 +95,22 @@ namespace VisioPlugin
                     Debug.WriteLine($"[ProcessSingleCommand] Processing CreateShape command");
                     if (commandObject["parameters"]?["shapes"] is JArray shapesArray)
                     {
+                        // Reorder shapes - non-connectors first, connectors last
+                        var orderedShapes = shapesArray
+                            .Select(s => s as JObject)
+                            .Where(s => s != null)
+                            .OrderBy(s => s["shape_type"]?.ToString()?.ToLower()?.Contains("connector") ?? false)
+                            .ToList();
+
+                        Debug.WriteLine($"[ProcessSingleCommand] Processing {orderedShapes.Count} shapes in order:");
+                        foreach (var shape in orderedShapes)
+                        {
+                            Debug.WriteLine($"  - {shape["shape_type"]?.ToString() ?? "unknown"} (ID: {shape["shape_id"]?.ToString() ?? "unknown"})");
+                        }
+
                         // Track created shape IDs to prevent duplicates
                         var createdShapeIds = new HashSet<string>();
-                        foreach (JObject shapeObject in shapesArray)
+                        foreach (JObject shapeObject in orderedShapes)
                         {
                             string shapeId = shapeObject["shape_id"]?.ToString();
                             if (!string.IsNullOrEmpty(shapeId) && !createdShapeIds.Contains(shapeId))

@@ -17,12 +17,51 @@ namespace VisioPlugin
     {
         private readonly Visio.Application visioApplication;
         private readonly Dictionary<string, ShapeCategory> categories;
+        private HashSet<string> usedShapeIds = new HashSet<string>();  // Track used shape IDs
 
         public LibraryManager(Visio.Application visioApp)
         {
             visioApplication = visioApp ?? throw new ArgumentNullException(nameof(visioApp));
             categories = new Dictionary<string, ShapeCategory>();
+            usedShapeIds = new HashSet<string>();
             LoadLibraries();
+        }
+
+        // Method to ensure unique shape IDs
+        private string EnsureUniqueShapeId(string requestedId)
+        {
+            // If a specific ID is requested, always use it
+            if (!string.IsNullOrEmpty(requestedId))
+            {
+                usedShapeIds.Add(requestedId);
+                return requestedId;
+            }
+
+            // Only generate a new ID if none was provided
+            int counter = 1;
+            string newId = counter.ToString();
+            while (usedShapeIds.Contains(newId))
+            {
+                counter++;
+                newId = counter.ToString();
+            }
+            usedShapeIds.Add(newId);
+            return newId;
+        }
+
+        // Method to register existing shape IDs (used when loading a document)
+        private void RegisterExistingShapeId(string shapeId)
+        {
+            if (!string.IsNullOrEmpty(shapeId))
+            {
+                usedShapeIds.Add(shapeId);
+            }
+        }
+
+        // Method to clear shape ID registry (used when closing/creating new documents)
+        public void ClearShapeIdRegistry()
+        {
+            usedShapeIds.Clear();
         }
 
         public void LoadLibraries()
@@ -113,10 +152,14 @@ namespace VisioPlugin
         {
             try
             {
+                // Clean up the shape name by removing any trailing ".number"
+                string cleanShapeName = System.Text.RegularExpressions.Regex.Replace(shapeName, @"\.\d+$", "");
+                Debug.WriteLine($"[GetShape] Looking for shape: {cleanShapeName} (original: {shapeName})");
+
                 // First check if we already have the shape in our cache
                 if (categories.TryGetValue(categoryName, out ShapeCategory category))
                 {
-                    var shape = category.GetShape(shapeName);
+                    var shape = category.GetShape(cleanShapeName);
                     if (shape != null)
                     {
                         return shape;
@@ -139,16 +182,17 @@ namespace VisioPlugin
                         }
                     }
 
-                    // Try exact match
+                    // Try exact match with cleaned name
                     foreach (Visio.Master master in stencilDoc.Masters)
                     {
-                        if (master.Name == shapeName)
+                        if (master.Name == cleanShapeName)
                         {
                             return master;
                         }
                     }
                 }
 
+                Debug.WriteLine($"[GetShape] Shape not found: {cleanShapeName}");
                 return null;
             }
             catch (Exception ex)
@@ -193,7 +237,7 @@ namespace VisioPlugin
                 double visioHeight = (heightPercent / 100.0) * pageHeight;
 
                 // Get and drop regular shape
-                var master = GetShape(category, shapeName);
+                var master = GetShape(category, shapeInfo?.ShapeType ?? shapeName);
                 if (master == null)
                 {
                     Debug.WriteLine($"[AddShapeToDocument] Master shape not found in {category}");
@@ -243,11 +287,70 @@ namespace VisioPlugin
                                 shape.CellsU["Angle"].ResultIU = shapeInfo.Angle;
                             }
 
-                            // Set a unique name for the shape based on shape_id if provided
-                            if (!string.IsNullOrEmpty(shapeInfo.ShapeId))
+                            // Ensure unique shape ID and set it
+                            try
                             {
-                                shape.NameU = shapeInfo.ShapeId;
-                                Debug.WriteLine($"[AddShapeToDocument] Set shape name to: {shape.NameU}");
+                                // Use the original shape ID from the request
+                                string shapeId = shapeInfo?.ShapeId;
+                                if (string.IsNullOrEmpty(shapeId))
+                                {
+                                    // Only generate a new ID if none was provided
+                                    shapeId = EnsureUniqueShapeId(null);
+                                }
+
+                                // First, set the shape's name
+                                shape.Name = shapeId;
+                                Debug.WriteLine($"[AddShapeToDocument] Set shape name to: {shapeId}");
+
+                                // Add custom property section if it doesn't exist
+                                if (shape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] == 0)
+                                {
+                                    shape.AddSection((short)Visio.VisSectionIndices.visSectionProp);
+                                }
+
+                                // Find if ShapeId property already exists
+                                short existingRow = -1;
+                                var propSection = shape.Section[(short)Visio.VisSectionIndices.visSectionProp];
+                                for (short propRow = 0; propRow < propSection.Count; propRow++)
+                                {
+                                    if (shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, propRow, (short)Visio.VisCellIndices.visCustPropsLabel].ResultStr[""] == "ShapeId")
+                                    {
+                                        existingRow = propRow;
+                                        break;
+                                    }
+                                }
+
+                                // Delete existing row if found
+                                if (existingRow != -1)
+                                {
+                                    shape.DeleteRow((short)Visio.VisSectionIndices.visSectionProp, existingRow);
+                                }
+
+                                // Add new row for ShapeId
+                                short newPropRow = shape.AddRow(
+                                    (short)Visio.VisSectionIndices.visSectionProp,
+                                    (short)Visio.VisRowIndices.visRowProp,
+                                    (short)Visio.VisRowTags.visTagDefault
+                                );
+
+                                // Set the property name (label)
+                                shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsLabel].FormulaForceU = "\"ShapeId\"";
+
+                                // Set the property value to the original ID
+                                shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsValue].FormulaForceU = $"\"{shapeId}\"";
+
+                                // Set property type to 0 (string)
+                                shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsType].FormulaForceU = "0";
+
+                                Debug.WriteLine($"[AddShapeToDocument] Successfully set shape ID property to: {shapeId}");
+
+                                // Verify the property was set
+                                string verifyValue = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsValue].ResultStr[""];
+                                Debug.WriteLine($"[AddShapeToDocument] Verified shape ID property value: {verifyValue}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[AddShapeToDocument] Error setting shape ID property: {ex.Message}");
                             }
                         }
 
@@ -275,7 +378,7 @@ namespace VisioPlugin
 
         // New and enhanced functions for greater Visio control:
 
-        public Visio.Shape ConnectShapes(string sourceShapeId, string targetShapeId, string connectorType)
+        public Visio.Shape ConnectShapes(string sourceShapeId, string targetShapeId, string connectorType, string connectorShapeId = null)
         {
             try
             {
@@ -295,18 +398,38 @@ namespace VisioPlugin
 
                 foreach (Visio.Shape shape in activePage.Shapes)
                 {
-                    Debug.WriteLine($"[Connector] Checking shape: {shape.NameU} (ID: {shape.ID16})");
-                    
-                    // Match by exact shape_id
-                    if (shape.NameU == sourceShapeId)
+                    try
                     {
-                        sourceShape = shape;
-                        Debug.WriteLine($"[Connector] Found source shape: {shape.NameU}");
+                        // Get the ShapeId property if it exists
+                        if (shape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] != 0)
+                        {
+                            var propSection = shape.Section[(short)Visio.VisSectionIndices.visSectionProp];
+                            for (short row = 0; row < propSection.Count; row++)
+                            {
+                                string propName = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, row, (short)Visio.VisCellIndices.visCustPropsLabel].ResultStr[""];
+                                if (propName == "ShapeId")
+                                {
+                                    string propValue = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, row, (short)Visio.VisCellIndices.visCustPropsValue].ResultStr[""];
+                                    Debug.WriteLine($"[Connector] Found shape with ShapeId property: {propValue}");
+                                    
+                                    if (propValue == sourceShapeId)
+                                    {
+                                        sourceShape = shape;
+                                        Debug.WriteLine($"[Connector] Found source shape with ID {sourceShapeId}");
+                                    }
+                                    else if (propValue == targetShapeId)
+                                    {
+                                        targetShape = shape;
+                                        Debug.WriteLine($"[Connector] Found target shape with ID {targetShapeId}");
+                                    }
+                                    break;
+                                }
+                            }
+                        }
                     }
-                    else if (shape.NameU == targetShapeId)
+                    catch (Exception ex)
                     {
-                        targetShape = shape;
-                        Debug.WriteLine($"[Connector] Found target shape: {shape.NameU}");
+                        Debug.WriteLine($"[Connector] Error checking shape properties: {ex.Message}");
                     }
 
                     if (sourceShape != null && targetShape != null)
@@ -323,7 +446,7 @@ namespace VisioPlugin
                     return null;
                 }
 
-                Debug.WriteLine($"[Connector] Creating connector between {sourceShape.NameU} and {targetShape.NameU}");
+                Debug.WriteLine($"[Connector] Creating connector between {sourceShape.Name} and {targetShape.Name}");
 
                 // Add a dynamic connector
                 Debug.WriteLine("[Connector] Getting connector tool data");
@@ -372,7 +495,50 @@ namespace VisioPlugin
                         }
                     }
 
+                    // Add custom property section if it doesn't exist
+                    if (connectorShape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] == 0)
+                    {
+                        connectorShape.AddSection((short)Visio.VisSectionIndices.visSectionProp);
+                    }
+
+                    // Add ShapeId property to the connector
+                    short newPropRow = connectorShape.AddRow(
+                        (short)Visio.VisSectionIndices.visSectionProp,
+                        (short)Visio.VisRowIndices.visRowProp,
+                        (short)Visio.VisRowTags.visTagDefault
+                    );
+
+                    // Set the property name (label)
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsLabel].FormulaForceU = "\"ShapeId\"";
+
+                    // Set the property value to the provided connector shape ID
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsValue].FormulaForceU = $"\"{connectorShapeId}\"";
+                    connectorShape.Name = connectorShapeId; // Also set the shape's name to match
+
+                    // Set property type to 0 (string)
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, newPropRow, (short)Visio.VisCellIndices.visCustPropsType].FormulaForceU = "0";
+
+                    // Add source and target shape IDs as custom properties
+                    short sourceRow = connectorShape.AddRow(
+                        (short)Visio.VisSectionIndices.visSectionProp,
+                        (short)Visio.VisRowIndices.visRowProp,
+                        (short)Visio.VisRowTags.visTagDefault
+                    );
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, sourceRow, (short)Visio.VisCellIndices.visCustPropsLabel].FormulaForceU = "\"SourceShapeId\"";
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, sourceRow, (short)Visio.VisCellIndices.visCustPropsValue].FormulaForceU = $"\"{sourceShapeId}\"";
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, sourceRow, (short)Visio.VisCellIndices.visCustPropsType].FormulaForceU = "0";
+
+                    short targetRow = connectorShape.AddRow(
+                        (short)Visio.VisSectionIndices.visSectionProp,
+                        (short)Visio.VisRowIndices.visRowProp,
+                        (short)Visio.VisRowTags.visTagDefault
+                    );
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, targetRow, (short)Visio.VisCellIndices.visCustPropsLabel].FormulaForceU = "\"TargetShapeId\"";
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, targetRow, (short)Visio.VisCellIndices.visCustPropsValue].FormulaForceU = $"\"{targetShapeId}\"";
+                    connectorShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, targetRow, (short)Visio.VisCellIndices.visCustPropsType].FormulaForceU = "0";
+
                     Debug.WriteLine($"[Connector] Successfully connected shapes with IDs {sourceShapeId} and {targetShapeId}");
+                    Debug.WriteLine($"[Connector] Set connector ShapeId to: {connectorShapeId}");
                     return connectorShape;
                 }
                 catch (Exception ex)
@@ -674,6 +840,9 @@ namespace VisioPlugin
             var activePage = visioApplication?.ActivePage;
             if (activePage == null) return shapes;
 
+            // Clear existing shape ID registry before reading shapes
+            ClearShapeIdRegistry();
+
             // Set page dimensions for percentage calculations
             double pageWidth = activePage.PageSheet.CellsU["PageWidth"].ResultIU;
             double pageHeight = activePage.PageSheet.CellsU["PageHeight"].ResultIU;
@@ -682,10 +851,65 @@ namespace VisioPlugin
             // First pass: Collect all shapes and their basic information
             foreach (Visio.Shape shape in activePage.Shapes)
             {
+                string shapeId = null;
+                string shapeType = null;
+                string sourceShapeId = null;
+                string targetShapeId = null;
+
+                // Get the custom ShapeId property and original shape type
+                if (shape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] != 0)
+                {
+                    var propSection = shape.Section[(short)Visio.VisSectionIndices.visSectionProp];
+                    for (short row = 0; row < propSection.Count; row++)
+                    {
+                        string propName = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, row, (short)Visio.VisCellIndices.visCustPropsLabel].ResultStr[""];
+                        string propValue = shape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, row, (short)Visio.VisCellIndices.visCustPropsValue].ResultStr[""];
+                        
+                        switch (propName)
+                        {
+                            case "ShapeId":
+                                shapeId = propValue;
+                                RegisterExistingShapeId(shapeId); // Register the shape ID
+                                break;
+                            case "SourceShapeId":
+                                sourceShapeId = propValue;
+                                break;
+                            case "TargetShapeId":
+                                targetShapeId = propValue;
+                                break;
+                        }
+                    }
+                }
+
+                // If no custom ShapeId found, generate a new unique one
+                if (string.IsNullOrEmpty(shapeId))
+                {
+                    shapeId = EnsureUniqueShapeId(null);
+                    Debug.WriteLine($"[ListAllShapes] Generated new shape ID for shape without one: {shapeId}");
+                }
+
+                // Get the original shape type from the master
+                if (shape.Master != null)
+                {
+                    // Get the original master name without any Visio-added numbers
+                    shapeType = System.Text.RegularExpressions.Regex.Replace(shape.Master.Name, @"\.\d+$", "");
+                }
+                else
+                {
+                    // For connectors or other special shapes
+                    shapeType = shape.Name;
+                    if (shape.CellExists["BeginX", 0] != 0 && shape.CellExists["EndX", 0] != 0)
+                    {
+                        shapeType = "Dynamic connector";
+                    }
+                }
+
+                Debug.WriteLine($"[ListAllShapes] Processing shape: ID={shapeId}, Type={shapeType}, Master={(shape.Master != null ? shape.Master.Name : "null")}");
+
                 var shapeInfo = new VisioPlugin.ShapeInfo
                 {
-                    ShapeId = shape.ID16.ToString(),
-                    ShapeType = shape.Name,
+                    ShapeId = shapeId,
+                    ShapeType = shapeType,
                     ShapeColor = GetShapeColor(shape),
                     Text = shape.Text,
                     PosX = shape.CellsU["PinX"].ResultIU,
@@ -694,7 +918,6 @@ namespace VisioPlugin
                     Height = shape.CellsU["Height"].ResultIU,
                     Angle = shape.CellsU["Angle"].ResultIU,
                     ZOrder = shape.Index,
-                    // Get the original stencil name by checking the master's document
                     Category = GetOriginalStencilName(shape)
                 };
 
@@ -708,6 +931,59 @@ namespace VisioPlugin
                     shapeInfo.BeginY = shape.CellsU["BeginY"].ResultIU;
                     shapeInfo.EndX = shape.CellsU["EndX"].ResultIU;
                     shapeInfo.EndY = shape.CellsU["EndY"].ResultIU;
+                    
+                    // First try to get source and target IDs from custom properties
+                    if (!string.IsNullOrEmpty(sourceShapeId) && !string.IsNullOrEmpty(targetShapeId))
+                    {
+                        shapeInfo.SourceShapeId = sourceShapeId;
+                        shapeInfo.TargetShapeId = targetShapeId;
+                        Debug.WriteLine($"Found source/target IDs from properties - Source: {sourceShapeId}, Target: {targetShapeId}");
+                    }
+                    // If not found in properties, try to get them from connections
+                    else
+                    {
+                        try
+                        {
+                            foreach (Visio.Connect connect in shape.Connects)
+                            {
+                                string cellName = connect.FromCell.Name.ToLower();
+                                Visio.Shape connectedShape = connect.ToSheet;
+
+                                // Get the ShapeId property of the connected shape
+                                string connectedShapeId = null;
+                                if (connectedShape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] != 0)
+                                {
+                                    var propSection = connectedShape.Section[(short)Visio.VisSectionIndices.visSectionProp];
+                                    for (short row = 0; row < propSection.Count; row++)
+                                    {
+                                        if (connectedShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, row, (short)Visio.VisCellIndices.visCustPropsLabel].ResultStr[""] == "ShapeId")
+                                        {
+                                            connectedShapeId = connectedShape.CellsSRC[(short)Visio.VisSectionIndices.visSectionProp, row, (short)Visio.VisCellIndices.visCustPropsValue].ResultStr[""];
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!string.IsNullOrEmpty(connectedShapeId))
+                                {
+                                    if (cellName.Contains("beginx") || cellName.Contains("beginy"))
+                                    {
+                                        shapeInfo.SourceShapeId = connectedShapeId;
+                                        Debug.WriteLine($"Found source shape from connection: {connectedShapeId}");
+                                    }
+                                    else if (cellName.Contains("endx") || cellName.Contains("endy"))
+                                    {
+                                        shapeInfo.TargetShapeId = connectedShapeId;
+                                        Debug.WriteLine($"Found target shape from connection: {connectedShapeId}");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Error getting connector endpoints: {ex.Message}");
+                        }
+                    }
                     
                     // Get connector type and styling
                     try
@@ -768,40 +1044,9 @@ namespace VisioPlugin
                         Debug.WriteLine($"Error getting connector styling: {ex.Message}");
                         shapeInfo.ConnectorType = "Default";
                     }
-
-                    // Get connected shapes
-                    try
-                    {
-                        // Examine each connection to determine source and target
-                        foreach (Visio.Connect connect in shape.Connects)
-                        {
-                            // The FromCell will tell us if this is a begin or end point
-                            string cellName = connect.FromCell.Name.ToLower();
-                            
-                            // The ToSheet is the shape we're connected to
-                            Visio.Shape connectedShape = connect.ToSheet;
-                            
-                            if (cellName.Contains("beginx") || cellName.Contains("beginy"))
-                            {
-                                shapeInfo.SourceShapeId = connectedShape.ID16.ToString();
-                                Debug.WriteLine($"Found source shape: {shapeInfo.SourceShapeId} via {cellName}");
-                            }
-                            else if (cellName.Contains("endx") || cellName.Contains("endy"))
-                            {
-                                shapeInfo.TargetShapeId = connectedShape.ID16.ToString();
-                                Debug.WriteLine($"Found target shape: {shapeInfo.TargetShapeId} via {cellName}");
-                            }
-                        }
-
-                        Debug.WriteLine($"Connector {shape.ID16} - Source: {shapeInfo.SourceShapeId}, Target: {shapeInfo.TargetShapeId}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Error getting connector endpoints: {ex.Message}");
-                    }
                 }
 
-                // Get custom properties only if the shape has a properties section
+                // Get custom properties
                 try
                 {
                     if (shape.SectionExists[(short)Visio.VisSectionIndices.visSectionProp, 0] != 0)
@@ -875,6 +1120,102 @@ namespace VisioPlugin
             {
                 Debug.WriteLine($"Error getting stencil name for shape: {ex.Message}");
                 return "Unknown";
+            }
+        }
+
+        public void ProcessSingleCommand(Dictionary<string, object> command)
+        {
+            try
+            {
+                string commandType = command["CommandType"] as string;
+                if (commandType == "CreateShape")
+                {
+                    var shapes = command["Parameters"] as Dictionary<string, object>;
+                    var shapesList = shapes?["shapes"] as List<VisioPlugin.ShapeInfo>;
+                    if (shapesList != null)
+                    {
+                        // Split shapes into non-connectors and connectors
+                        var nonConnectors = new List<VisioPlugin.ShapeInfo>();
+                        var connectors = new List<VisioPlugin.ShapeInfo>();
+
+                        foreach (var shape in shapesList)
+                        {
+                            if (shape.ShapeType.ToLower().Contains("connector"))
+                            {
+                                connectors.Add(shape);
+                            }
+                            else
+                            {
+                                nonConnectors.Add(shape);
+                            }
+                        }
+
+                        // Process non-connectors first
+                        foreach (var shape in nonConnectors)
+                        {
+                            Debug.WriteLine($"[CreateSingleShape] Processing regular shape:\n  Type: {shape.ShapeType}\n  ID: {shape.ShapeId}");
+                            CreateSingleShape(shape);
+                        }
+
+                        // Then process connectors
+                        foreach (var shape in connectors)
+                        {
+                            Debug.WriteLine($"[CreateSingleShape] Processing connector:\n  Type: {shape.ShapeType}\n  ID: {shape.ShapeId}\n  Source: {shape.SourceShapeId}\n  Target: {shape.TargetShapeId}");
+                            CreateSingleShape(shape);
+                        }
+                    }
+                }
+                // ... rest of the existing code ...
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ProcessSingleCommand] Error: {ex.Message}");
+            }
+        }
+
+        private Visio.Shape CreateSingleShape(VisioPlugin.ShapeInfo shapeInfo)
+        {
+            try
+            {
+                if (shapeInfo.IsConnector)
+                {
+                    Debug.WriteLine($"[CreateSingleShape] Creating connector with ID {shapeInfo.ShapeId} between shapes {shapeInfo.SourceShapeId} and {shapeInfo.TargetShapeId}");
+                    var connector = ConnectShapes(shapeInfo.SourceShapeId, shapeInfo.TargetShapeId, shapeInfo.ConnectorType, shapeInfo.ShapeId);
+                    if (connector != null)
+                    {
+                        // Apply connector properties
+                        if (!string.IsNullOrEmpty(shapeInfo.ShapeColor))
+                        {
+                            SetShapeColor(connector, shapeInfo.ShapeColor);
+                        }
+                        if (!string.IsNullOrEmpty(shapeInfo.ConnectorPattern))
+                        {
+                            connector.CellsU["LinePattern"].Formula = shapeInfo.ConnectorPattern;
+                        }
+                        if (shapeInfo.ConnectorWeight > 0)
+                        {
+                            connector.CellsU["LineWeight"].ResultIU = shapeInfo.ConnectorWeight;
+                        }
+                        
+                        Debug.WriteLine($"[CreateSingleShape] Successfully created connector");
+                        return connector;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[CreateSingleShape] Failed to create connector between shapes {shapeInfo.SourceShapeId} and {shapeInfo.TargetShapeId}");
+                        return null;
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine($"[CreateSingleShape] Creating shape with properties:\nCategory: {shapeInfo.Category}\nShape Type: {shapeInfo.ShapeType}\nPosition - X: {shapeInfo.PosX}%, Y: {shapeInfo.PosY}%\nSize - Width: {shapeInfo.Width}%, Height: {shapeInfo.Height}%");
+                    return AddShapeToDocument(shapeInfo.Category, shapeInfo.ShapeType, shapeInfo.PosX, shapeInfo.PosY, shapeInfo.Width, shapeInfo.Height, shapeInfo);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CreateSingleShape] Error: {ex.Message}");
+                return null;
             }
         }
     }
