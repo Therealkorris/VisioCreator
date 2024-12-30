@@ -255,7 +255,8 @@ namespace VisioPlugin
                                     {
                                         connectorShape.get_CellsSRC((short)Visio.VisSectionIndices.visSectionObject,
                                             (short)Visio.VisRowIndices.visRowLine,
-                                            (short)Visio.VisCellIndices.visLineWeight).FormulaU = shapeInfo.ConnectorWeight.ToString("0.####");
+                                            (short)Visio.VisCellIndices.visLineWeight).FormulaU = 
+                                            shapeInfo.ConnectorWeight.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + " pt";
                                     }
                                     catch (Exception ex)
                                     {
